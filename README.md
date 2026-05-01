@@ -173,8 +173,6 @@ RoverDevKit is developed by the Space Systems Autonomy Lab at Duke University.
 The project focuses on open, reproducible design-space exploration for lunar
 micro-rovers in the pre-Phase A / conceptual-design regime.
 
-For research motivation and model assumptions, see [`project_brief.md`](project_brief.md).
-
 ## Citation
 
 A paper is in preparation. Citation information will be added on submission.

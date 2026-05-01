@@ -1,5 +1,0 @@
-target,median_test_r2,step3_tuned_test_r2_path,step3_tuned_test_r2,delta_r2
-range_km,0.99824487946748,reports/week8_tuned_v4/tuned_summary.csv,0.999274520211706,-0.001029640744226068
-energy_margin_raw_pct,0.9911501143557333,reports/week8_tuned_v4/tuned_summary.csv,0.9960805518939384,-0.004930437538205101
-slope_capability_deg,0.9928668208475541,reports/week8_tuned_v4/tuned_summary.csv,0.9944531203014172,-0.001586299453863127
-total_mass_kg,0.9995841455753303,reports/week8_tuned_v4/tuned_summary.csv,0.9997874668871152,-0.00020332131178490975

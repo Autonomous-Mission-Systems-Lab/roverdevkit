@@ -3,10 +3,6 @@
 Single-wheel testbed data digitized from published papers. Used **only** to
 validate the evaluator; never used for training the surrogate.
 
-Populate this directory in Week 13 (Phase 4) as the Wong-textbook
-worked-example is digitised for the single-wheel BW Layer-3 validation
-(project_plan.md §6 Phase 4).
-
 ## Target sources
 
 - Ding et al. 2011 — Lunar rover single-wheel slip/sinkage experiments.

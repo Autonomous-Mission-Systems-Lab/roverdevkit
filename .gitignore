@@ -71,9 +71,19 @@ data/scm/*
 data/validation/raw/*
 !data/validation/raw/.gitkeep
 
+# Generated reports / model artifacts
+reports/
+*.joblib
+*.parquet
+
 # Pretrained models — ship only the canonical one once trained.
 pretrained/*.pkl
 pretrained/checkpoints/
+
+# Internal planning notes
+project_plan.md
+project_log.md
+project_brief.md
 
 # Logs
 logs/

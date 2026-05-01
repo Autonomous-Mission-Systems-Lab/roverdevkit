@@ -1,6 +1,0 @@
-target,thresholds,r2_observed,r2_threshold,passes,auc_observed,auc_threshold
-range_km,"{""r2"": 0.95}",0.999274520211706,0.95,True,,
-energy_margin_raw_pct,"{""r2"": 0.95}",0.9960805518939385,0.95,True,,
-slope_capability_deg,"{""r2"": 0.85}",0.9944531203014172,0.85,True,,
-total_mass_kg,"{""r2"": 0.85}",0.9997874668871151,0.85,True,,
-motor_torque_ok,"{""auc"": 0.9}",,,True,0.9876401954967935,0.9
