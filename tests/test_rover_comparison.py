@@ -142,9 +142,9 @@ def test_motor_and_traversal_not_stalled(
     """Motor torque within envelope and rover didn't stall on scenario slope."""
     result = rover_compare_results[rover_name]
     assert result.motor_and_traversal_ok, (
-        f"{rover_name}: motor_torque_ok is False or rover stalled on the "
+        f"{rover_name}: rover stalled on the "
         f"scenario's {registry_by_name(rover_name).scenario.max_slope_deg:.0f} "
-        f"deg typical-ops slope."
+        f"deg typical-ops slope (schema v6 stall gate)."
     )
 
 

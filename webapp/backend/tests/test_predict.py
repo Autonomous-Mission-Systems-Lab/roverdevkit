@@ -19,9 +19,14 @@ PRIMARY_TARGETS = {
 
 
 @pytest.fixture(autouse=True)
-def _skip_if_no_artifact(artifacts_present: bool) -> None:
-    if not artifacts_present:
-        pytest.skip("quantile_bundles.joblib not on disk; skipping predict tests")
+def _skip_if_no_v7_1_artifact(surrogate_v7_1_compatible: bool) -> None:
+    if not surrogate_v7_1_compatible:
+        pytest.skip(
+            "schema-v7_1 quantile_bundles.joblib not on disk; skipping "
+            "predict tests (pre-v7_1 bundles lack "
+            "scenario_operational_duty_cycle and KeyError on the v7_1 "
+            "feature row produced by build_feature_row)."
+        )
 
 
 def test_predict_returns_monotone_quantiles(
@@ -51,8 +56,11 @@ def test_predict_feature_row_includes_categoricals(
     assert response.status_code == 200
     body = response.json()
     cols = body["feature_row"]["columns"]
-    # 25 columns: 12 design + 9 scenario numerics + 4 scenario categoricals.
+    # 25 columns: 11 design (v7 dropped designed_duty_cycle) + 10 scenario
+    # numerics (v7_1 added scenario_operational_duty_cycle) + 4 scenario
+    # categoricals.
     assert len(cols) == 25
+    assert "scenario_operational_duty_cycle" in cols
     # Family is forwarded from the scenario name on the canonical four.
     fam_idx = cols.index("scenario_family")
     assert body["feature_row"]["values"][fam_idx] == "polar_prospecting"

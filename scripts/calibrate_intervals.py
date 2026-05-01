@@ -111,7 +111,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def _split_xy(df: pd.DataFrame, target: str) -> tuple[pd.DataFrame, np.ndarray, pd.Series]:
     """Build feasible-only (X, y, scenario_family) for one regression target."""
     df_clean = valid_rows(df)
-    mask = df_clean[FEASIBILITY_COLUMN].astype(bool).to_numpy()
+    # Schema v6 (W12 step B): ``FEASIBILITY_COLUMN`` is now ``stalled``
+    # with positive class = infeasible, so we negate before masking to
+    # keep only the feasible (non-stalled) rows the regression heads
+    # were trained on.
+    mask = (~df_clean[FEASIBILITY_COLUMN].astype(bool)).to_numpy()
     df_clean = df_clean.loc[mask]
     X = build_feature_matrix(df_clean)
     y = df_clean[target].to_numpy()

@@ -29,17 +29,17 @@ results speak.
 
 Feasibility classifier
 ----------------------
-A single-target binary classifier on ``motor_torque_ok`` (the v2
-schema's only feasibility flag — see ``data/analytical/SCHEMA.md``).
-Trained on **all** rows (both feasible and infeasible) because that is
-the population the deployed surrogate sees at NSGA-II constraint
-evaluation time. Reported as AUC and F1 (both overall and per
-scenario family).
+A single-target binary classifier on ``stalled`` (schema v6 —
+see ``data/analytical/SCHEMA.md``). Positive class = stalled =
+infeasible. Trained on **all** rows (both feasible and infeasible)
+because that is the population the deployed surrogate sees at
+NSGA-II constraint evaluation time. Reported as AUC and F1 (both
+overall and per scenario family).
 
 Two-stage convention
 --------------------
 At evaluation time, the regressors are trained on the **feasible**
-subset (``motor_torque_ok == True``) so they don't waste capacity
+subset (``stalled == False``) so they don't waste capacity
 modelling the ``range_km ~ 0`` failure mode; the feasibility
 classifier is trained on **all** rows so the deployed surrogate can
 gate predictions before the regressor ever runs.
@@ -103,7 +103,7 @@ unambiguous."""
 LAYER1_PRIMARY_TARGETS: tuple[str, ...] = (
     "total_mass_kg",
     "slope_capability_deg",
-    "motor_torque_ok",
+    "stalled",
 )
 """Primary acceptance set for the registry-rover Layer-1 sanity check
 (``predict_for_registry_rovers``). These three metrics depend on the
@@ -150,8 +150,7 @@ _NUMERIC_FOR_PREPROC: list[str] = [
     "design_solar_area_m2",
     "design_battery_capacity_wh",
     "design_avionics_power_w",
-    "design_nominal_speed_mps",
-    "design_drive_duty_cycle",
+    "design_peak_wheel_torque_nm",
     *SCENARIO_NUMERIC_COLUMNS,
 ]
 
@@ -374,7 +373,7 @@ def fit_baselines(
         :data:`FEASIBILITY_COLUMN`. Rows with ``status != 'ok'`` are
         dropped via :func:`valid_rows`. The feasibility classifier
         sees both feasible and infeasible (post-``status``) rows; the
-        regressors only see ``motor_torque_ok == True``.
+        regressors only see ``stalled == False`` (i.e. feasible) rows.
     targets
         Regression targets to fit. Defaults to the four Week-6
         primary targets.
@@ -391,17 +390,19 @@ def fit_baselines(
     import time
 
     df_clean = valid_rows(df_train)
+    # Schema v6: feasibility is "not stalled" (positive class flipped).
+    feas_series = ~df_clean[FEASIBILITY_COLUMN].astype(bool)
     if verbose:
         print(
             f"[fit_baselines] training rows: {len(df_clean)} "
             f"(after status='ok' filter); feasible rows: "
-            f"{int(df_clean[FEASIBILITY_COLUMN].sum())}",
+            f"{int(feas_series.sum())}",
             flush=True,
         )
     X_all = build_feature_matrix(df_clean)
 
-    # Regressors: train on the feasible subset
-    feas_mask = df_clean[FEASIBILITY_COLUMN].astype(bool).to_numpy()
+    # Regressors: train on the feasible (non-stalled) subset
+    feas_mask = feas_series.to_numpy()
     X_feas = X_all.loc[feas_mask].copy()
 
     regressors: dict[tuple[str, str], Any] = {}
@@ -525,7 +526,8 @@ def evaluate_baselines(
     rows: list[dict[str, Any]] = []
 
     # --- Regression: per-target estimators -------------------------------
-    feas_mask_full = df_clean[FEASIBILITY_COLUMN].astype(bool)
+    # Schema v6: feasibility is "not stalled" (positive class flipped).
+    feas_mask_full = ~df_clean[FEASIBILITY_COLUMN].astype(bool)
     df_feas = df_clean.loc[feas_mask_full].copy()
     # Guard: empty regression slices (everything in the input split was
     # infeasible after status filtering) skip the regressor block
@@ -716,11 +718,11 @@ def _row_for_registry_rover(
         "design_solar_area_m2": design.solar_area_m2,
         "design_battery_capacity_wh": design.battery_capacity_wh,
         "design_avionics_power_w": design.avionics_power_w,
-        "design_nominal_speed_mps": design.nominal_speed_mps,
-        "design_drive_duty_cycle": design.drive_duty_cycle,
+        "design_peak_wheel_torque_nm": design.peak_wheel_torque_nm,
         "scenario_latitude_deg": scenario.latitude_deg,
         "scenario_mission_duration_earth_days": scenario.mission_duration_earth_days,
         "scenario_max_slope_deg": scenario.max_slope_deg,
+        "scenario_operational_duty_cycle": scenario.operational_duty_cycle,
         "scenario_soil_n": float("nan"),  # filled below
         "scenario_soil_k_c": float("nan"),
         "scenario_soil_k_phi": float("nan"),
@@ -779,7 +781,7 @@ def _row_for_registry_rover(
         "energy_margin_raw_pct": metrics.energy_margin_raw_pct,
         "slope_capability_deg": metrics.slope_capability_deg,
         "total_mass_kg": metrics.total_mass_kg,
-        "motor_torque_ok": bool(metrics.motor_torque_ok),
+        "stalled": bool(metrics.stalled),
     }
     return X_row, evaluator_metrics
 
@@ -802,7 +804,7 @@ def predict_for_registry_rovers(
     into two groups (``project_log.md`` 2026-04-25 LHS v3 entry):
 
     - ``is_primary=True`` — :data:`LAYER1_PRIMARY_TARGETS`
-      (``total_mass_kg``, ``slope_capability_deg``, ``motor_torque_ok``).
+      (``total_mass_kg``, ``slope_capability_deg``, ``stalled``).
       Design-axis metrics where the v3 widened LHS bounds put the
       registry inside training support; treated as the real Layer-1
       acceptance set.
@@ -820,8 +822,8 @@ def predict_for_registry_rovers(
       breakdown so downstream readers can use one mental model.
     - ``is_primary`` — see "Layer-1 framing" above.
 
-    The classifier reports its predicted feasibility probability
-    against the evaluator's binary ``motor_torque_ok``.
+    The classifier reports its predicted stall probability
+    against the evaluator's binary ``stalled``.
     """
     primary_targets = set(LAYER1_PRIMARY_TARGETS)
     rows: list[dict[str, Any]] = []

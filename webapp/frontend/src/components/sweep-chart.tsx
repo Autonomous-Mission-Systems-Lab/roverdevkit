@@ -80,7 +80,15 @@ export function SweepChart({ data, overlayRovers }: SweepChartProps) {
       showlegend: overlayRovers.length > 0,
       legend: { orientation: "h", y: -0.2 },
     };
-    return <Plot data={traces} layout={layout} useResizeHandler style={{ width: "100%" }} config={{ displaylogo: false }} />;
+    return (
+      <Plot
+        data={traces}
+        layout={layout}
+        useResizeHandler
+        style={{ width: "100%" }}
+        config={{ displaylogo: false }}
+      />
+    );
   }
 
   // 2-D heatmap
@@ -153,13 +161,21 @@ export function SweepChart({ data, overlayRovers }: SweepChartProps) {
     yaxis: { title: { text: yLabel ?? "" } },
     showlegend: false,
   };
-  return <Plot data={traces} layout={layout} useResizeHandler style={{ width: "100%" }} config={{ displaylogo: false }} />;
+  return (
+    <Plot
+      data={traces}
+      layout={layout}
+      useResizeHandler
+      style={{ width: "100%" }}
+      config={{ displaylogo: false }}
+    />
+  );
 }
 
 function formatAxisLabel(variable: string): string {
-  const meta = (DESIGN_BOUNDS as Record<string, { label: string; unit: string }>)[
-    variable
-  ];
+  const meta = (
+    DESIGN_BOUNDS as Record<string, { label: string; unit: string }>
+  )[variable];
   if (!meta) return variable;
   return meta.unit ? `${meta.label} (${meta.unit})` : meta.label;
 }

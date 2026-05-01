@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type AppView = "design" | "sweep";
+export type AppView = "design" | "sweep" | "pareto" | "shap";
 
 interface ViewState {
   view: AppView;

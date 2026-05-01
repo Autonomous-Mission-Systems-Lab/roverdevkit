@@ -37,6 +37,7 @@ export function ParametricSweep() {
   const baseDesign = useDesignStore((s) => s.design);
   const overlayRovers = useDesignStore((s) => s.overlayRovers);
   const scenarioName = useDesignStore((s) => s.scenarioName);
+  const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
 
   const target = useSweepStore((s) => s.target);
   const xAxis = useSweepStore((s) => s.xAxis);
@@ -54,6 +55,12 @@ export function ParametricSweep() {
   );
 
   const handleRun = () => {
+    // SCHEMA_VERSION v7_1: δ_ops is a true LHS-sampled surrogate
+    // input, so the override flows through to both sweep backends
+    // (surrogate batch predict + per-cell deterministic evaluator)
+    // exactly the same way it does on the Single design tab. The
+    // grid is still one-shot — only the constant-across-grid δ_ops
+    // changes.
     sweep.mutate({
       target,
       x_axis: xAxis,
@@ -61,6 +68,7 @@ export function ParametricSweep() {
       base_design: baseDesign,
       scenario_name: scenarioName,
       backend,
+      operational_duty_cycle: opsDutyOverride ?? null,
     });
   };
 
@@ -73,8 +81,8 @@ export function ParametricSweep() {
         <CardHeader>
           <CardTitle>Sweep configuration</CardTitle>
           <CardDescription>
-            Vary one or two design dimensions on a grid; the rest of the
-            design is taken from the Single design tab.
+            Vary one or two design dimensions on a grid; the rest of the design
+            is taken from the Single design tab.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

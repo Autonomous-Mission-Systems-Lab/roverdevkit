@@ -3,7 +3,8 @@
 Scope (project_plan.md §6.2 / Week-8 step-3)
 --------------------------------------------
 Tunes only **XGBoost** — for both the per-target regressors and the
-``motor_torque_ok`` feasibility classifier. The Week-8 step-2 baselines
+``stalled`` feasibility classifier (schema v6 flipped polarity from
+``motor_torque_ok``). The Week-8 step-2 baselines
 report (`reports/week8_baselines_v4/SUMMARY.md`) shows XGBoost is within
 0.005 R² of the joint MLP on every primary target while being ~7×
 faster to fit, which makes it the production candidate for the
@@ -105,7 +106,7 @@ class TuningResult:
     Attributes
     ----------
     target
-        Target column name (regressor) or ``motor_torque_ok``
+        Target column name (regressor) or ``stalled``
         (classifier). Used for downstream artifact naming.
     best_params
         Hyperparameter dict applied to the final refit. The
@@ -230,7 +231,7 @@ def tune_xgboost_classifier(
     X_val: pd.DataFrame,
     y_val: np.ndarray,
     *,
-    target: str = "motor_torque_ok",
+    target: str = "stalled",
     n_trials: int = 50,
     timeout_seconds: float | None = None,
     random_state: int = 42,

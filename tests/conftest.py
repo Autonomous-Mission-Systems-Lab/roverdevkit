@@ -45,8 +45,7 @@ def rashid_like_design() -> DesignVector:
         solar_area_m2=0.4,
         battery_capacity_wh=100.0,
         avionics_power_w=15.0,
-        nominal_speed_mps=0.03,
-        drive_duty_cycle=0.3,
+        peak_wheel_torque_nm=1.5,
     )
 
 
@@ -61,6 +60,7 @@ def equatorial_scenario() -> MissionScenario:
         mission_duration_earth_days=14.0,
         max_slope_deg=15.0,
         sun_geometry="diurnal",
+        operational_duty_cycle=0.30,
     )
 
 

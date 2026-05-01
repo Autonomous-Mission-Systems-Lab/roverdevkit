@@ -1,10 +1,6 @@
 import { AlertCircle, Info } from "lucide-react";
 
-import {
-  DESIGN_BOUNDS,
-  TARGET_META,
-  type SweepResponse,
-} from "@/types/api";
+import { DESIGN_BOUNDS, TARGET_META, type SweepResponse } from "@/types/api";
 
 interface SweepSensitivityHintProps {
   data: SweepResponse;
@@ -40,12 +36,11 @@ export function SweepSensitivityHint({ data }: SweepSensitivityHintProps) {
     const pct = (sensitivity.relative_spread * 100).toFixed(2);
     return (
       <Hint variant="warning" icon={<AlertCircle className="h-4 w-4" />}>
-        <strong>Metric is saturated on this grid.</strong>{" "}
-        {targetMeta.label} varies by only{" "}
-        {sensitivity.total_spread.toExponential(2)} {targetMeta.unit} ({pct} %
-        of its absolute value) across all cells, so the chart looks uniform.
-        Try widening the swept range, switching to a more sensitive metric,
-        or using a different scenario.
+        <strong>Metric is saturated on this grid.</strong> {targetMeta.label}{" "}
+        varies by only {sensitivity.total_spread.toExponential(2)}{" "}
+        {targetMeta.unit} ({pct} % of its absolute value) across all cells, so
+        the chart looks uniform. Try widening the swept range, switching to a
+        more sensitive metric, or using a different scenario.
       </Hint>
     );
   }
@@ -67,10 +62,10 @@ export function SweepSensitivityHint({ data }: SweepSensitivityHintProps) {
           <Hint variant="info" icon={<Info className="h-4 w-4" />}>
             <strong>{dominantLabel} dominates this surface.</strong> Median
             spread along {dominantLabel} is {ratio.toFixed(1)}× larger than
-            along {minorLabel}, so {minorLabel}'s effect is real but is
-            visually masked by the shared color scale. To see it, run a 1-D
-            sweep over {minorLabel} alone, or freeze {dominantLabel} at the
-            value you care about.
+            along {minorLabel}, so {minorLabel}'s effect is real but is visually
+            masked by the shared color scale. To see it, run a 1-D sweep over{" "}
+            {minorLabel} alone, or freeze {dominantLabel} at the value you care
+            about.
           </Hint>
         );
       }

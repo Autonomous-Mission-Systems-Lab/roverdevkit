@@ -44,6 +44,13 @@ def build_feature_row(
 ) -> pd.DataFrame:
     """Build the 25-column input frame the surrogate expects.
 
+    SCHEMA_VERSION v7_1: ``scenario_operational_duty_cycle`` is now a
+    surrogate input column (it became a per-row LHS feature in v7_1).
+    The caller must therefore pass the *effective* δ_ops -- usually
+    ``scenario.operational_duty_cycle`` after applying any per-call
+    override -- on the scenario object so the surrogate sees the
+    same δ_ops the deterministic evaluator would use.
+
     Parameters
     ----------
     design
@@ -67,7 +74,7 @@ def build_feature_row(
     """
     family = scenario_family if scenario_family is not None else scenario.name
     row: dict[str, Any] = {
-        # Design (12)
+        # Design (11) — schema v7 dropped designed_duty_cycle
         "design_wheel_radius_m": design.wheel_radius_m,
         "design_wheel_width_m": design.wheel_width_m,
         "design_grouser_height_m": design.grouser_height_m,
@@ -78,12 +85,13 @@ def build_feature_row(
         "design_solar_area_m2": design.solar_area_m2,
         "design_battery_capacity_wh": design.battery_capacity_wh,
         "design_avionics_power_w": design.avionics_power_w,
-        "design_nominal_speed_mps": design.nominal_speed_mps,
-        "design_drive_duty_cycle": design.drive_duty_cycle,
-        # Scenario numerics (9)
+        "design_peak_wheel_torque_nm": design.peak_wheel_torque_nm,
+        # Scenario numerics (10) — v7_1 promoted operational_duty_cycle
+        # to a true surrogate input feature.
         "scenario_latitude_deg": scenario.latitude_deg,
         "scenario_mission_duration_earth_days": scenario.mission_duration_earth_days,
         "scenario_max_slope_deg": scenario.max_slope_deg,
+        "scenario_operational_duty_cycle": scenario.operational_duty_cycle,
         "scenario_soil_n": soil.n,
         "scenario_soil_k_c": soil.k_c,
         "scenario_soil_k_phi": soil.k_phi,

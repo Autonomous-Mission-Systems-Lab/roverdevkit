@@ -24,10 +24,18 @@ Two orthogonal stratifications are applied:
    both strata equally represented without doubling the sample count.
 
 Continuous design variables (10) and scenario-level perturbation
-variables (3 mission + 6 soil = 9) are stacked into a single
-(10 + 9)-D LHS across each stratum, then unscaled to their physical
-ranges. ``grouser_count`` is drawn from a continuous LHS column and
-rounded to an integer in ``[0, 24]``.
+variables (3 mission + 1 ops duty + 6 soil = 10) are stacked into a
+single (10 + 10)-D LHS across each stratum, then unscaled to their
+physical ranges. ``grouser_count`` is drawn from a continuous LHS
+column and rounded to an integer in ``[0, 24]``.
+
+Schema-version note (v7_1, W12 step B follow-on): the
+``operational_duty_cycle`` column is now drawn from the LHS over
+[0, 0.6] independently of the scenario family, instead of being
+pinned to the family default. The per-family default is retained on
+:class:`ScenarioFamily` for canonical YAML / UI initial slider use
+but the *training distribution* is family-agnostic so the calibrated
+quantile heads are valid across the full frontend slider range.
 
 Split assignment
 ----------------
@@ -53,6 +61,7 @@ from typing import Literal
 import numpy as np
 from scipy.stats import qmc
 
+from roverdevkit.drivetrain.motor import sizing_peak_torque_anchor_nm
 from roverdevkit.schema import DesignVector, MissionScenario, TerrainClass
 from roverdevkit.terramechanics.bekker_wong import SoilParameters
 
@@ -72,6 +81,26 @@ SplitName = Literal["train", "val", "test"]
 # of the cube. See project_log.md for the rationale and the registry
 # entries (Yutu-2 mass ~35 kg ex-payload, Rashid-1 grouser 15 mm,
 # Lunokhod-class wheel widths 20 cm) that motivated the widening.
+# SCHEMA_VERSION v6 (2026-04-28, W12 step B): ``nominal_speed_mps`` is
+# no longer a free design variable (cruise speed is now derived inside
+# the evaluator from drivetrain torque + slip-balance + energy
+# balance + kinematic envelope) and ``drive_duty_cycle`` is renamed
+# ``designed_duty_cycle`` (the "sizing" half of the duty semantics;
+# see ``MissionScenario.operational_duty_cycle`` for the ground-ops
+# half). ``peak_wheel_torque_nm`` enters as a true drivetrain
+# capability input. The LHS column ``peak_wheel_torque_nm`` is
+# sampled in *log-space* (anchored at the v5-implicit hub torque,
+# log-uniform [0.5, 3.0]; clipped to schema bounds) by
+# :func:`_build_design_from_lhs_row`, not via this uniform-bound
+# entry — the schema bounds here are the floor / ceiling clips, not
+# the prior shape.
+#
+# SCHEMA_VERSION v7 (2026-04-28, W12 step B follow-up): drops
+# ``designed_duty_cycle`` from the LHS bounds tuple after that field
+# turned out to do no engineering work in the v6 mass model. The
+# only role of δ_des in v6 was to upper-bound δ_eff = min(δ_des,
+# δ_ops); a user can equivalently express that by lowering δ_ops.
+# Drive duty cycle now lives entirely on the scenario.
 _CONTINUOUS_DESIGN_BOUNDS: tuple[tuple[str, float, float], ...] = (
     ("wheel_radius_m", 0.05, 0.20),
     ("wheel_width_m", 0.03, 0.20),
@@ -81,18 +110,31 @@ _CONTINUOUS_DESIGN_BOUNDS: tuple[tuple[str, float, float], ...] = (
     ("solar_area_m2", 0.1, 1.5),
     ("battery_capacity_wh", 20.0, 500.0),
     ("avionics_power_w", 5.0, 40.0),
-    ("nominal_speed_mps", 0.01, 0.10),
-    ("drive_duty_cycle", 0.02, 0.6),
+    ("peak_wheel_torque_nm", 0.3, 20.0),
 )
 
 # grouser_count is an integer LHS column
 _GROUSER_COUNT_BOUNDS: tuple[int, int] = (0, 24)
 
 # Scenario-level perturbation columns (per-family base values live in FAMILIES).
+#
+# SCHEMA_VERSION v7_1 (W12 step B follow-on, 2026-04-28): added
+# ``operational_duty_cycle`` so the surrogate sees δ_ops as a true LHS
+# feature instead of a per-family constant. The pre-v7_1 dataset
+# pinned δ_ops to the family's published default (mare 0.30, polar
+# 0.05, highland 0.15, crater 0.20), which made the
+# ``operational_duty_cycle`` slider in the webapp fall through to
+# evaluator-only mode for off-default values (no PIs). Sampling δ_ops
+# uniformly over its schema bounds [0, 0.6] *independently of family*
+# closes that gap: the user can pick any δ_ops on any scenario and
+# the calibrated quantile heads still apply. The per-family default
+# is retained on :class:`ScenarioFamily` because the canonical
+# scenario YAMLs / UI initial slider position still reference it.
 _SCENARIO_PERTURB_COLS: tuple[str, ...] = (
     "latitude_deg",
     "mission_duration_earth_days",
     "max_slope_deg",
+    "operational_duty_cycle",
     "soil_n",
     "soil_k_c",
     "soil_k_phi",
@@ -100,6 +142,11 @@ _SCENARIO_PERTURB_COLS: tuple[str, ...] = (
     "soil_friction_angle_deg",
     "soil_shear_modulus_k_m",
 )
+
+# Per-row δ_ops bounds for the LHS draw. Matches
+# :attr:`MissionScenario.operational_duty_cycle` schema bounds; chosen
+# so the entire frontend slider range is in-distribution.
+_OPERATIONAL_DUTY_CYCLE_BOUNDS: tuple[float, float] = (0.0, 0.6)
 
 # Unified soil parameter bounds, covering the envelope of the seven
 # simulants in data/soil_simulants.csv. The LHS draws jittered Bekker
@@ -140,6 +187,12 @@ class ScenarioFamily:
     latitude_range_deg: tuple[float, float]
     mission_duration_range_days: tuple[float, float]
     max_slope_range_deg: tuple[float, float]
+    operational_duty_cycle: float
+    """Per-family default ground-ops duty cycle. Schema v6 (W12 step B):
+    each generated :class:`MissionScenario` carries the calibrated δ_ops
+    for its family so the LHS dataset sees the same operational anchor
+    the canonical YAMLs expose at runtime (mare 0.30, polar 0.05,
+    highland 0.15, crater 0.20)."""
 
 
 FAMILIES: dict[str, ScenarioFamily] = {
@@ -152,6 +205,7 @@ FAMILIES: dict[str, ScenarioFamily] = {
         latitude_range_deg=(10.0, 25.0),
         mission_duration_range_days=(10.0, 18.0),
         max_slope_range_deg=(3.0, 18.0),
+        operational_duty_cycle=0.30,
     ),
     "polar_prospecting": ScenarioFamily(
         name="polar_prospecting",
@@ -162,6 +216,7 @@ FAMILIES: dict[str, ScenarioFamily] = {
         latitude_range_deg=(-88.0, -80.0),
         mission_duration_range_days=(25.0, 35.0),
         max_slope_range_deg=(10.0, 28.0),
+        operational_duty_cycle=0.05,
     ),
     "highland_slope_capability": ScenarioFamily(
         name="highland_slope_capability",
@@ -172,6 +227,7 @@ FAMILIES: dict[str, ScenarioFamily] = {
         latitude_range_deg=(5.0, 20.0),
         mission_duration_range_days=(5.0, 10.0),
         max_slope_range_deg=(18.0, 30.0),
+        operational_duty_cycle=0.15,
     ),
     "crater_rim_survey": ScenarioFamily(
         name="crater_rim_survey",
@@ -182,6 +238,7 @@ FAMILIES: dict[str, ScenarioFamily] = {
         latitude_range_deg=(-15.0, 15.0),
         mission_duration_range_days=(3.0, 7.0),
         max_slope_range_deg=(10.0, 25.0),
+        operational_duty_cycle=0.20,
     ),
 }
 
@@ -244,20 +301,83 @@ def _assign_splits(n: int, seed: int, val_frac: float, test_frac: float) -> np.n
     )
 
 
+# Schema bounds for ``peak_wheel_torque_nm``; the LHS column is mapped
+# log-uniform around a per-row anchor (see ``_build_design_from_lhs_row``)
+# rather than uniform on these bounds, so we keep them as a separate
+# clip rather than driving the unscale.
+_PEAK_TORQUE_NM_FLOOR: float = 0.3
+_PEAK_TORQUE_NM_CEILING: float = 20.0
+# Log-uniform range applied to the v5-implicit anchor (decision.md
+# §"LHS prior on peak_wheel_torque_nm"): a row's anchor is multiplied
+# by a draw from LogUniform(0.5, 3.0) before clipping.
+_PEAK_TORQUE_LOGU_LO: float = 0.5
+_PEAK_TORQUE_LOGU_HI: float = 3.0
+
+
+def _peak_wheel_torque_anchor_for_row(
+    chassis_mass_kg: float,
+    wheel_radius_m: float,
+    n_wheels: int,
+) -> float:
+    """Coarse v5-implicit per-wheel torque anchor for the LHS prior.
+
+    Uses the same expression the v5 mass model used (safety factor ×
+    friction × per-wheel weight × radius), but with a coarse total-mass
+    estimate (``2.5 × chassis_mass``) since motor mass is not yet
+    sized. This is a *prior anchor only* — it is multiplied by a
+    LogUniform(0.5, 3.0) factor and clipped to schema bounds before
+    being written to the design vector. Designed so most LHS rows land
+    near a physically realisable torque sizing for the rest of their
+    design vector, avoiding an LHS that spends most of its samples in
+    grossly under- or over-sized motor regimes.
+    """
+    coarse_total_mass = 2.5 * chassis_mass_kg
+    return sizing_peak_torque_anchor_nm(
+        total_mass_kg=coarse_total_mass,
+        wheel_radius_m=wheel_radius_m,
+        n_wheels=n_wheels,
+    )
+
+
 def _build_design_from_lhs_row(
     u_continuous: np.ndarray,
     u_grouser: float,
     n_wheels: int,
 ) -> DesignVector:
-    """Convert one unit-cube LHS row to a validated :class:`DesignVector`."""
+    """Convert one unit-cube LHS row to a validated :class:`DesignVector`.
+
+    SCHEMA_VERSION v6: ``peak_wheel_torque_nm`` is sampled
+    log-uniform around the per-row v5-implicit hub torque anchor (see
+    :func:`_peak_wheel_torque_anchor_for_row`) rather than uniform on
+    its schema bounds. All other continuous design variables are
+    uniform-LHS as before.
+    """
     kwargs: dict[str, float | int] = {}
+    peak_torque_u: float | None = None
     for (name, lo, hi), u in zip(_CONTINUOUS_DESIGN_BOUNDS, u_continuous, strict=True):
+        if name == "peak_wheel_torque_nm":
+            peak_torque_u = float(u)
+            continue
         kwargs[name] = float(_unscale(np.array([u]), lo, hi)[0])
-    # Integer grouser_count via round; guarantees uniform coverage of
-    # the [0, 24] integer lattice under LHS.
     g_lo, g_hi = _GROUSER_COUNT_BOUNDS
     kwargs["grouser_count"] = int(round(g_lo + u_grouser * (g_hi - g_lo)))
     kwargs["n_wheels"] = n_wheels
+
+    assert peak_torque_u is not None, (
+        "peak_wheel_torque_nm must be present in _CONTINUOUS_DESIGN_BOUNDS; "
+        "see SCHEMA_VERSION v6 in the bounds tuple comment."
+    )
+    anchor_nm = _peak_wheel_torque_anchor_for_row(
+        chassis_mass_kg=float(kwargs["chassis_mass_kg"]),
+        wheel_radius_m=float(kwargs["wheel_radius_m"]),
+        n_wheels=n_wheels,
+    )
+    log_factor = _PEAK_TORQUE_LOGU_LO * (
+        _PEAK_TORQUE_LOGU_HI / _PEAK_TORQUE_LOGU_LO
+    ) ** peak_torque_u
+    kwargs["peak_wheel_torque_nm"] = float(
+        np.clip(anchor_nm * log_factor, _PEAK_TORQUE_NM_FLOOR, _PEAK_TORQUE_NM_CEILING)
+    )
     return DesignVector(**kwargs)  # type: ignore[arg-type]
 
 
@@ -265,13 +385,22 @@ def _build_scenario_and_soil_from_lhs_row(
     family: ScenarioFamily,
     u_scenario: np.ndarray,
 ) -> tuple[MissionScenario, SoilParameters]:
-    """Convert one scenario-perturbation LHS row to (scenario, soil)."""
+    """Convert one scenario-perturbation LHS row to (scenario, soil).
+
+    SCHEMA_VERSION v7_1: ``operational_duty_cycle`` is now drawn from
+    the LHS uniformly over :data:`_OPERATIONAL_DUTY_CYCLE_BOUNDS`
+    instead of being pinned to ``family.operational_duty_cycle``. The
+    family-level default is still kept on :class:`ScenarioFamily` for
+    canonical YAML / UI initial slider use.
+    """
     lat_lo, lat_hi = family.latitude_range_deg
     dur_lo, dur_hi = family.mission_duration_range_days
     slope_lo, slope_hi = family.max_slope_range_deg
+    duty_lo, duty_hi = _OPERATIONAL_DUTY_CYCLE_BOUNDS
     latitude = float(_unscale(u_scenario[0:1], lat_lo, lat_hi)[0])
     duration = float(_unscale(u_scenario[1:2], dur_lo, dur_hi)[0])
     max_slope = float(_unscale(u_scenario[2:3], slope_lo, slope_hi)[0])
+    ops_duty = float(_unscale(u_scenario[3:4], duty_lo, duty_hi)[0])
 
     soil_values: dict[str, float] = {}
     for i, col in enumerate(
@@ -283,7 +412,7 @@ def _build_scenario_and_soil_from_lhs_row(
             "soil_friction_angle_deg",
             "soil_shear_modulus_k_m",
         ],
-        start=3,
+        start=4,
     ):
         lo, hi = _SOIL_BOUNDS[col]
         soil_values[col] = float(_unscale(u_scenario[i : i + 1], lo, hi)[0])
@@ -297,6 +426,7 @@ def _build_scenario_and_soil_from_lhs_row(
         mission_duration_earth_days=duration,
         max_slope_deg=max_slope,
         sun_geometry=family.sun_geometry,
+        operational_duty_cycle=ops_duty,
     )
     soil = SoilParameters(
         n=soil_values["soil_n"],

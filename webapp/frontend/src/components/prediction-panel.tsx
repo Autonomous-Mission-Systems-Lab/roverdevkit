@@ -2,6 +2,7 @@ import { Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ConstraintDetailsButton } from "@/components/constraint-details-dialog";
+import { OutputDetailsButton } from "@/components/output-details-dialog";
 import {
   PredictionChart,
   type OverlayPrediction,
@@ -14,8 +15,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type {
-  MotorTorqueDiagnostic,
   PredictionRow,
+  StallDiagnostic,
   ThermalDiagnostic,
 } from "@/types/api";
 import { TARGET_META } from "@/types/api";
@@ -29,9 +30,17 @@ export interface PredictionPanelMeta {
    * Structured constraint diagnostics from the deterministic evaluator.
    * Used by the footer chips to show pass/fail and to back the
    * click-for-details dialog explaining *why* a flag fired.
+   *
+   * Schema v6 (W12 step B): the v5 ``motor_torque`` field was renamed
+   * to ``stall`` and now exposes the explicit per-wheel torque
+   * demand-vs-capacity comparison from the run-traverse stall gate.
    */
   thermal: ThermalDiagnostic;
-  motor_torque: MotorTorqueDiagnostic;
+  stall: StallDiagnostic;
+  /** δ_eff = δ_ops (clamped to [0, 1]) the evaluator actually drove at. */
+  effective_duty_cycle: number;
+  /** Derived rover cruise speed (m/s) the time loop drove at. */
+  cruise_speed_mps: number;
 }
 
 interface PredictionPanelProps {
@@ -70,14 +79,14 @@ export function PredictionPanel({
       <CardHeader>
         <CardTitle>Predicted performance</CardTitle>
         <CardDescription>
-          Median (♦) is the physics evaluator&rsquo;s deterministic output;
-          the blue bar shows the surrogate&rsquo;s calibrated 90% prediction
+          Median (♦) is the physics evaluator&rsquo;s deterministic output; the
+          blue bar shows the surrogate&rsquo;s calibrated 90% prediction
           interval around it.
           {overlays.length > 0 ? (
             <>
               {" "}
-              Coloured circles show the same evaluator output for selected
-              real rovers run on this scenario, for comparison.
+              Coloured circles show the same evaluator output for selected real
+              rovers run on this scenario, for comparison.
             </>
           ) : null}
         </CardDescription>
@@ -127,7 +136,10 @@ export function PredictionPanel({
                     return (
                       <tr key={row.target} className="border-t">
                         <td className="px-3 py-2">
-                          <div className="font-medium">{m.label}</div>
+                          <div className="flex items-center gap-1.5 font-medium">
+                            {m.label}
+                            <OutputDetailsButton target={row.target} />
+                          </div>
                           <div className="text-xs text-[var(--color-muted-foreground)]">
                             {m.description}
                           </div>
@@ -162,13 +174,18 @@ export function PredictionPanel({
 
 function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
   const thermalOk = meta.thermal.survives;
-  const motorOk = meta.motor_torque.survives;
-  const allOk = thermalOk && motorOk;
+  // Schema v6: ``stalled`` is the *infeasibility* flag (positive = bad);
+  // negate to get the OK polarity the chip expects.
+  const driveOk = !meta.stall.stalled;
+  const allOk = thermalOk && driveOk;
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--color-muted-foreground)]">
       <span>
         Evaluator: {meta.evaluator_ms.toFixed(0)} ms
         {meta.used_scm_correction ? " · SCM-corrected" : " · Bekker–Wong only"}
+        {" · "}v<sub>cruise</sub> {fmtCruiseSpeed(meta.cruise_speed_mps)}
+        {" · δ_eff "}
+        {meta.effective_duty_cycle.toFixed(2)}
       </span>
       {allOk ? (
         <span className="flex flex-wrap items-center gap-2">
@@ -179,19 +196,19 @@ function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
               <ConstraintDetailsButton
                 variant="thermal"
                 thermal={meta.thermal}
-                motorTorque={meta.motor_torque}
+                stall={meta.stall}
                 failed={false}
               />
             }
           />
           <ConstraintChip
-            label="motor torque ok"
+            label="rover does not stall"
             ok
             details={
               <ConstraintDetailsButton
-                variant="motor_torque"
+                variant="stall"
                 thermal={meta.thermal}
-                motorTorque={meta.motor_torque}
+                stall={meta.stall}
                 failed={false}
               />
             }
@@ -207,21 +224,21 @@ function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
                 <ConstraintDetailsButton
                   variant="thermal"
                   thermal={meta.thermal}
-                  motorTorque={meta.motor_torque}
+                  stall={meta.stall}
                   failed
                 />
               }
             />
           ) : null}
-          {!motorOk ? (
+          {!driveOk ? (
             <ConstraintChip
-              label="motor torque exceeded"
+              label="rover stalls"
               ok={false}
               details={
                 <ConstraintDetailsButton
-                  variant="motor_torque"
+                  variant="stall"
                   thermal={meta.thermal}
-                  motorTorque={meta.motor_torque}
+                  stall={meta.stall}
                   failed
                 />
               }
@@ -231,6 +248,13 @@ function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
       )}
     </div>
   );
+}
+
+function fmtCruiseSpeed(v: number): string {
+  if (!Number.isFinite(v) || v <= 0) return "0 m/s";
+  if (v < 0.01) return `${(v * 1000).toFixed(0)} mm/s`;
+  if (v < 0.1) return `${(v * 100).toFixed(1)} cm/s`;
+  return `${v.toFixed(2)} m/s`;
 }
 
 function ConstraintChip({

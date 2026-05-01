@@ -37,6 +37,9 @@ export default defineConfig({
       "/predict": "http://localhost:8000",
       "/evaluate": "http://localhost:8000",
       "/sweep": "http://localhost:8000",
+      "/optimize": "http://localhost:8000",
+      "/pareto": "http://localhost:8000",
+      "/shap": "http://localhost:8000",
     },
   },
 });

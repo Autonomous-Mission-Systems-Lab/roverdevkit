@@ -48,7 +48,11 @@ def small_df() -> pd.DataFrame:
 
 def _split_xy(df: pd.DataFrame, target: str) -> tuple[pd.DataFrame, np.ndarray]:
     df_clean = valid_rows(df)
-    mask = df_clean[FEASIBILITY_COLUMN].astype(bool).to_numpy()
+    # Schema v6 (W12 step B): ``FEASIBILITY_COLUMN`` is now ``stalled``
+    # with positive class = infeasible (the failure mode), so we negate
+    # before masking to keep only the *feasible* (non-stalled) rows the
+    # quantile heads need.
+    mask = (~df_clean[FEASIBILITY_COLUMN].astype(bool)).to_numpy()
     df_clean = df_clean.loc[mask]
     X = build_feature_matrix(df_clean).reset_index(drop=True)
     y = df_clean[target].to_numpy()
@@ -212,7 +216,8 @@ def test_coverage_table_schema(small_df: pd.DataFrame) -> None:
         )
 
     df_clean = valid_rows(small_df)
-    df_clean = df_clean.loc[df_clean[FEASIBILITY_COLUMN].astype(bool)]
+    # Schema v6: keep only the feasible (non-``stalled``) rows.
+    df_clean = df_clean.loc[~df_clean[FEASIBILITY_COLUMN].astype(bool)]
     fam = df_clean["scenario_family"].astype(str).reset_index(drop=True)
     cov = coverage_table(bundle, X, y, scenario_family=fam, repair_crossings=False)
     expected_cols = {

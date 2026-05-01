@@ -44,7 +44,7 @@ Target accuracy (project_plan.md §7 Layer 1, surrogate vs corrected
 evaluator):
     R² > 0.95 for range_km and energy_margin_raw_pct; R² > 0.85 for
     slope_capability_deg and total_mass_kg; AUC > 0.90 for
-    motor_torque_ok feasibility.
+    stalled feasibility.
 """
 
 from roverdevkit.surrogate.baselines import (

@@ -284,7 +284,7 @@ def test_predict_for_registry_rovers_schema(fitted: FittedBaselines) -> None:
     assert primary_targets == {
         "total_mass_kg",
         "slope_capability_deg",
-        "motor_torque_ok",
+        "stalled",
     }
     assert diagnostic_targets == {"range_km", "energy_margin_raw_pct"}
 

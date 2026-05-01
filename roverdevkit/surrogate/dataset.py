@@ -66,7 +66,7 @@ from roverdevkit.surrogate.sampling import LHSSample
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = "v5"
+SCHEMA_VERSION = "v7_1"
 """Bump when the column schema or training distribution changes so
 downstream code can detect stale Parquet files. Written into Parquet
 file-level metadata.
@@ -105,7 +105,68 @@ History
   (~+2.6 deg), peak_motor_torque_nm ~+14 %, energy_margin_raw_pct
   ~-15 % (more torque demand at the same forward force). Triggered
   by the Week-11 sweep-tool finding that grouser_height_m and
-  grouser_count had no effect on slope capability."""
+  grouser_count had no effect on slope capability.
+- v5_1 (Week 12 step A, 2026-04-27): rebuild after the traverse simulator
+  gained an energy-feasibility throttle that drops effective duty when
+  the battery hits its DoD floor (see ``run_traverse`` in
+  ``roverdevkit/mission/traverse_sim.py`` and
+  ``reports/week12_design/decision.md``). Column schema is byte-
+  identical to v5; the bump signals the achievable-range semantics —
+  a v5-trained range_km head is a capability-envelope predictor and
+  is no longer aligned with the v5_1 evaluator's range labels (range
+  drops most on polar / highland scenarios where the battery used to
+  drive past floor unphysically). Other label columns (energy_margin,
+  slope_capability, mass) shift only slightly because the throttle
+  reduces consumption when it engages, leaving the steady-state
+  behavior unchanged everywhere else. Step B (W12 main) will rebuild
+  again as v6 with the drivetrain-aware design vector.
+- v6 (Week 12 step B, 2026-04-28): drivetrain-aware design vector. Drops
+  ``design_nominal_speed_mps`` (cruise speed is now derived inside the
+  evaluator from per-wheel torque demand + slip-balance + energy
+  balance + a kinematic envelope cap; see
+  ``roverdevkit/drivetrain/motor.py``); replaces it with
+  ``design_peak_wheel_torque_nm`` (a true drivetrain-capability input);
+  renames ``design_drive_duty_cycle`` -> ``design_designed_duty_cycle``
+  (the *sizing* duty); flips the feasibility target from
+  ``motor_torque_ok`` to ``stalled`` (1 = stalled, the failure mode
+  inverted from v5's OK convention) since the explicit torque-ceiling
+  stall gate makes the prior flag redundant. Scenario YAMLs gain
+  ``operational_duty_cycle``; labels are computed at
+  ``δ_eff = min(δ_des, scenario.δ_ops)``. Median shifts on the LHS
+  marginal: range_km down on average (-40 % to +5 %, mostly down where
+  v5 assumed an unsustainable speed); slope_capability_deg essentially
+  unchanged; energy_margin_raw_pct can shift up or down depending on
+  whether δ_des or δ_ops is binding; total_mass_kg ±1 kg drift from
+  the mass-model touch-up (motor mass now keyed off
+  ``design_peak_wheel_torque_nm`` directly, removing the v5 fixed-point
+  iteration). See ``reports/week12_design/decision.md`` for full
+  rationale and validation gates.
+- v7 (Week 12 step B follow-up, 2026-04-28): drops
+  ``design_designed_duty_cycle`` from the feature schema after that
+  field turned out to do no engineering work in the v6 mass model
+  (no mass term scales with δ_des; the only role of δ_des in v6 was
+  to upper-bound δ_eff = min(δ_des, δ_ops), which a user can
+  equivalently express by lowering δ_ops). Drive duty cycle is now
+  a single per-scenario ``operational_duty_cycle`` parameter
+  (already present in v6 schema, with optional per-call override at
+  inference time). Net effect on labels is ≈zero; the bump is to
+  reflect the changed feature-vector dimensionality (11 design dims
+  instead of 12) and to invalidate v6 surrogate artifacts that
+  expect the dropped column. See
+  ``reports/week12_design/decision.md`` for full rationale.
+- v7_1 (Week 12 step B follow-on, 2026-04-28): rebuild after
+  ``operational_duty_cycle`` was promoted from a per-family constant
+  (mare 0.30, polar 0.05, highland 0.15, crater 0.20) to a per-row
+  LHS feature drawn uniformly over [0.0, 0.6] independently of the
+  scenario family (see ``_SCENARIO_PERTURB_COLS`` /
+  ``_OPERATIONAL_DUTY_CYCLE_BOUNDS`` in
+  ``roverdevkit/surrogate/sampling.py``). Column schema is byte-
+  identical to v7; the bump signals the changed input distribution
+  so the calibrated quantile heads are valid for the entire
+  frontend δ_ops slider range. Pre-v7_1 surrogates are still
+  feasible to use deterministically but their PIs are only
+  calibrated at the four per-family δ_ops anchors and break the
+  webapp's δ_ops override path."""
 
 DEFAULT_FIDELITY = "analytical"
 
@@ -156,8 +217,7 @@ def _flatten_design(design: DesignVector) -> dict[str, Any]:
         "design_solar_area_m2": design.solar_area_m2,
         "design_battery_capacity_wh": design.battery_capacity_wh,
         "design_avionics_power_w": design.avionics_power_w,
-        "design_nominal_speed_mps": design.nominal_speed_mps,
-        "design_drive_duty_cycle": design.drive_duty_cycle,
+        "design_peak_wheel_torque_nm": design.peak_wheel_torque_nm,
     }
 
 
@@ -175,6 +235,7 @@ def _flatten_scenario(scenario: MissionScenario, sample: LHSSample) -> dict[str,
         "scenario_mission_duration_earth_days": scenario.mission_duration_earth_days,
         "scenario_max_slope_deg": scenario.max_slope_deg,
         "scenario_sun_geometry": scenario.sun_geometry,
+        "scenario_operational_duty_cycle": scenario.operational_duty_cycle,
         "scenario_soil_n": sample.soil.n,
         "scenario_soil_k_c": sample.soil.k_c,
         "scenario_soil_k_phi": sample.soil.k_phi,
@@ -195,7 +256,7 @@ def _flatten_metrics(metrics: MissionMetrics) -> dict[str, Any]:
         "total_mass_kg": metrics.total_mass_kg,
         "peak_motor_torque_nm": metrics.peak_motor_torque_nm,
         "sinkage_max_m": metrics.sinkage_max_m,
-        "motor_torque_ok": bool(metrics.motor_torque_ok),
+        "stalled": bool(metrics.stalled),
     }
 
 
@@ -260,7 +321,7 @@ _NUMERIC_METRIC_COLS: tuple[str, ...] = (
     "sinkage_max_m",
 )
 
-_BOOL_METRIC_COLS: tuple[str, ...] = ("motor_torque_ok",)
+_BOOL_METRIC_COLS: tuple[str, ...] = ("stalled",)
 
 _STAT_NUMERIC_COLS: tuple[str, ...] = (
     "stat_power_in_mean_w",
@@ -293,11 +354,18 @@ _STAT_BOOL_COLS: tuple[str, ...] = (
 
 
 def _nan_outputs() -> dict[str, Any]:
-    """Build the output columns dict for a failed evaluation."""
+    """Build the output columns dict for a failed evaluation.
+
+    SCHEMA_VERSION v6: ``stalled`` defaults to ``True`` on failure
+    (the safe-conservative side; the row is also flagged as
+    ``status != 'ok'`` so trainers drop it via :func:`valid_rows`).
+    Pre-v6 ``motor_torque_ok`` defaulted to ``False`` for the same
+    reason, with the polarity flipped.
+    """
     out: dict[str, Any] = {col: float("nan") for col in _NUMERIC_METRIC_COLS}
-    out.update({col: False for col in _BOOL_METRIC_COLS})
-    out.update({col: float("nan") for col in _STAT_NUMERIC_COLS})
+    out.update({col: True for col in _BOOL_METRIC_COLS})
     out.update({col: False for col in _STAT_BOOL_COLS})
+    out.update({col: float("nan") for col in _STAT_NUMERIC_COLS})
     out["stat_terminated_reason"] = "evaluator_error"
     return out
 

@@ -25,7 +25,7 @@ from webapp.backend.schemas import (
     EvaluateMetric,
     EvaluateRequest,
     EvaluateResponse,
-    MotorTorqueDiagnosticOut,
+    StallDiagnosticOut,
     ThermalDiagnosticOut,
 )
 from webapp.backend.services.evaluate import (
@@ -52,8 +52,10 @@ def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
        ``used_scm_correction=False`` in the response so the frontend
        can flag the degraded mode.
     4. Project ``MissionMetrics`` onto the four primary targets and
-       attach structured ``thermal`` / ``motor_torque`` diagnostics so
-       the panel chip can explain *why* a survival flag fired.
+       attach structured ``thermal`` / ``stall`` diagnostics (schema
+       v6) plus the runtime-resolved ``effective_duty_cycle`` and
+       ``cruise_speed_mps`` so the panel chip can explain *why* a
+       survival flag fired.
     """
     scenarios = get_canonical_scenarios()
     if req.scenario_name not in scenarios:
@@ -67,7 +69,12 @@ def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
     scenario = scenarios[req.scenario_name]
     correction = get_correction()
 
-    output = evaluate_design(req.design, scenario, correction=correction)
+    output = evaluate_design(
+        req.design,
+        scenario,
+        correction=correction,
+        operational_duty_cycle=req.operational_duty_cycle,
+    )
     primary = metrics_as_primary_dict(output.metrics)
 
     metrics = [
@@ -96,20 +103,20 @@ def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
         cold_case_ok=arch.lunar_night_temp_c >= -30.0,
     )
 
-    mt = output.motor_torque
-    motor_torque_out = MotorTorqueDiagnosticOut(
-        survives=bool(mt.survives),
-        peak_torque_nm=float(mt.peak_torque_nm),
-        ceiling_nm=float(mt.ceiling_nm),
-        rover_stalled=bool(mt.rover_stalled),
-        torque_ok=bool(mt.torque_ok),
+    st = output.stall
+    stall_out = StallDiagnosticOut(
+        stalled=bool(st.stalled),
+        peak_torque_demand_nm=float(st.peak_torque_demand_nm),
+        peak_torque_capacity_nm=float(st.peak_torque_capacity_nm),
     )
 
     return EvaluateResponse(
         scenario_name=req.scenario_name,
         metrics=metrics,
         thermal=thermal_out,
-        motor_torque=motor_torque_out,
+        stall=stall_out,
+        effective_duty_cycle=float(output.effective_duty_cycle),
+        cruise_speed_mps=float(output.cruise_speed_mps),
         used_scm_correction=output.used_scm_correction,
         elapsed_ms=output.elapsed_ms,
     )

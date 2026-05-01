@@ -33,7 +33,18 @@ __all__ = [
     "FeatureRow",
     "HealthResponse",
     "MissionScenario",
-    "MotorTorqueDiagnosticOut",
+    "OptimizeCancelResponse",
+    "OptimizeCheckpointOut",
+    "OptimizeConstraintIn",
+    "OptimizeJobResponse",
+    "OptimizeObjectiveIn",
+    "OptimizeParetoPoint",
+    "OptimizeRequest",
+    "OptimizeResultResponse",
+    "ParetoFrontListResponse",
+    "ParetoFrontResponse",
+    "ParetoFrontSummary",
+    "PredictMode",
     "PredictRequest",
     "PredictResponse",
     "PredictTarget",
@@ -41,7 +52,13 @@ __all__ = [
     "RegistryListResponse",
     "ScenarioListResponse",
     "ScenarioWithSoil",
+    "ShapExplainRequest",
+    "ShapFeatureScore",
+    "ShapGlobalResponse",
+    "ShapLocalResponse",
+    "ShapTargetImportance",
     "SoilParametersOut",
+    "StallDiagnosticOut",
     "SweepAxisIn",
     "SweepRequest",
     "SweepResponse",
@@ -203,6 +220,20 @@ class PredictRequest(BaseModel):
     scenario_name: str = Field(
         description="Canonical scenario key (one of the four returned by /scenarios)."
     )
+    operational_duty_cycle: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=0.6,
+        description=(
+            "Optional per-query override for "
+            "``MissionScenario.operational_duty_cycle``. SCHEMA_VERSION "
+            "v7_1 (W12 step B follow-on): δ_ops is now a per-row LHS "
+            "feature uniform on [0, 0.6], so any in-bounds override "
+            "stays on the surrogate path with calibrated PIs. The "
+            "pre-v7_1 evaluator-only fallback for off-default values "
+            "has been removed."
+        ),
+    )
     repair_crossings: bool = Field(
         default=True,
         description=(
@@ -225,11 +256,25 @@ class PredictTarget(BaseModel):
     q95: float
 
 
+PredictMode = Literal["surrogate", "evaluator_only"]
+"""Kept as a literal for response-schema stability across the v6 ->
+v7_1 transition. Live ``/predict`` always returns ``"surrogate"``
+since v7_1; the ``"evaluator_only"`` slot is retained for forwards-
+compat with future evaluator-fallback paths (e.g. out-of-bounds
+inputs the surrogate refuses to predict on)."""
+
+
 class PredictResponse(BaseModel):
     """Median + 90 % PI for each primary regression target.
 
     See ``reports/week8_intervals_v4/SUMMARY.md`` for empirical coverage
     on the test split (target ≈ 90 %, achieved 86–92 % per scenario).
+
+    SCHEMA_VERSION v7_1 (W12 step B follow-on): ``operational_duty_cycle``
+    is a true surrogate input feature, so any in-bounds δ_ops stays on
+    the surrogate path. ``mode`` is therefore always ``"surrogate"`` in
+    v7_1; the literal still admits ``"evaluator_only"`` for forwards-
+    compat with future fallback paths.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -238,6 +283,10 @@ class PredictResponse(BaseModel):
     quantiles: tuple[float, float, float] = (0.05, 0.50, 0.95)
     predictions: list[PredictTarget]
     feature_row: FeatureRow
+    mode: PredictMode = "surrogate"
+    """Always ``"surrogate"`` in v7_1; reserved literal slot for future
+    evaluator fallbacks. See :class:`PredictRequest` for the override
+    semantics."""
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +310,17 @@ class EvaluateRequest(BaseModel):
     design: DesignVector
     scenario_name: str = Field(
         description="Canonical scenario key (one of the four returned by /scenarios)."
+    )
+    operational_duty_cycle: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=0.6,
+        description=(
+            "Optional per-query override for "
+            "``MissionScenario.operational_duty_cycle``. Schema v7: the "
+            "evaluator uses this value directly as δ_eff (clamped to "
+            "[0, 1]). ``None`` uses the scenario's calibrated default."
+        ),
     )
 
 
@@ -301,22 +361,32 @@ class ThermalDiagnosticOut(BaseModel):
     cold_case_ok: bool
 
 
-class MotorTorqueDiagnosticOut(BaseModel):
-    """Peak motor torque vs the sizing-time per-wheel ceiling.
+class StallDiagnosticOut(BaseModel):
+    """Drivetrain stall status and the torque numbers that drove it.
 
-    See :class:`webapp.backend.services.evaluate.MotorTorqueDiagnostic`
-    for the closed form.
+    SCHEMA_VERSION v6 (W12 step B): replaces ``MotorTorqueDiagnosticOut``.
+    The pre-v6 diagnostic flagged ``motor_torque_ok`` whenever the
+    per-step peak torque stayed below an implicit, mass-derived ceiling
+    inside the mass model. v6 makes the ceiling explicit
+    (``DesignVector.peak_wheel_torque_nm``) and surfaces the stall gate
+    directly. ``stalled = True`` means the slip-balance torque demand
+    exceeded the design's drivetrain capacity *or* the slip solver
+    couldn't develop the required drawbar pull, equivalent to
+    ``MissionMetrics.stalled`` and the underlying
+    ``run_traverse(...).rover_stalled`` flag.
     """
 
     model_config = ConfigDict(frozen=True)
 
-    survives: bool
-    """End-to-end pass / fail (matches ``MissionMetrics.motor_torque_ok``)."""
+    stalled: bool
+    """``True`` iff the rover's drivetrain stalled on the scenario's
+    worst-case slope. Replaces the v5 ``survives`` field."""
 
-    peak_torque_nm: float
-    ceiling_nm: float
-    rover_stalled: bool
-    torque_ok: bool
+    peak_torque_demand_nm: float
+    """Per-wheel hub torque the slip-balance solve demanded."""
+
+    peak_torque_capacity_nm: float
+    """``DesignVector.peak_wheel_torque_nm`` echoed back for context."""
 
 
 class EvaluateResponse(BaseModel):
@@ -324,8 +394,8 @@ class EvaluateResponse(BaseModel):
 
     Values match :class:`roverdevkit.schema.MissionMetrics` 1:1 for the
     primary subset; the response also surfaces structured constraint
-    diagnostics (``thermal``, ``motor_torque``) so the frontend can
-    explain *why* a flag fired without a second round-trip.
+    diagnostics (``thermal``, ``stall``) so the frontend can explain *why*
+    a flag fired without a second round-trip.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -333,7 +403,18 @@ class EvaluateResponse(BaseModel):
     scenario_name: str
     metrics: list[EvaluateMetric]
     thermal: ThermalDiagnosticOut
-    motor_torque: MotorTorqueDiagnosticOut
+    stall: StallDiagnosticOut
+    """Schema v6: replaces the v5 ``motor_torque`` field."""
+    effective_duty_cycle: float
+    """Schema v7: ``operational_duty_cycle`` (per-scenario default or
+    per-call override) clamped to ``[0, 1]``. The v6 ``min(δ_des,
+    δ_ops)`` semantics collapsed when ``designed_duty_cycle`` was
+    removed from the design vector. Surfaced so the single-design
+    panel can echo the duty the evaluator actually drove the rover at."""
+    cruise_speed_mps: float
+    """Derived rover cruise speed used by the time loop. Replaces the
+    v5 ``DesignVector.nominal_speed_mps`` design input. See
+    :func:`roverdevkit.drivetrain.motor.cruise_speed`."""
     used_scm_correction: bool
     elapsed_ms: float
 
@@ -375,6 +456,20 @@ class SweepRequest(BaseModel):
 
     scenario_name: str
     backend: Literal["auto", "evaluator", "surrogate"] = "auto"
+    operational_duty_cycle: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=0.6,
+        description=(
+            "Optional per-query override for "
+            "``MissionScenario.operational_duty_cycle``. SCHEMA_VERSION "
+            "v7_1: δ_ops is a true LHS-sampled surrogate input, so any "
+            "in-bounds override stays on the surrogate sweep path with "
+            "calibrated quantiles; the deterministic-evaluator sweep "
+            "path also honours it (one δ_ops per grid, the grid still "
+            "runs one-shot)."
+        ),
+    )
 
 
 class SweepSensitivityOut(BaseModel):
@@ -427,3 +522,196 @@ class SweepResponse(BaseModel):
     """Per-axis spread of the swept metric. Drives the inline sensitivity
     hint under the chart so users can tell at a glance when a metric is
     saturated on the chosen grid or when one axis dominates the other."""
+
+
+# ---------------------------------------------------------------------------
+# Optimize (NSGA-II job orchestration)
+# ---------------------------------------------------------------------------
+
+
+class OptimizeObjectiveIn(BaseModel):
+    """One Pareto objective requested by the UI."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    target: PrimaryTarget
+    direction: Literal["min", "max"]
+
+
+class OptimizeConstraintIn(BaseModel):
+    """Threshold constraint over a primary target."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    target: PrimaryTarget
+    sense: Literal["min", "max"]
+    value: float
+
+
+class OptimizeRequest(BaseModel):
+    """``POST /optimize`` body."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    scenario_name: str = Field(
+        description="Canonical scenario key (one of the four returned by /scenarios)."
+    )
+    backend: Literal["surrogate", "evaluator"] = Field(
+        default="surrogate",
+        description=(
+            "Surrogate fitness by default. Evaluator fitness is accepted for "
+            "small power-user runs and capped server-side at 1000 evaluations."
+        ),
+    )
+    objectives: list[OptimizeObjectiveIn] = Field(
+        default_factory=lambda: [
+            OptimizeObjectiveIn(target="range_km", direction="max"),
+            OptimizeObjectiveIn(target="total_mass_kg", direction="min"),
+            OptimizeObjectiveIn(target="slope_capability_deg", direction="max"),
+        ],
+        min_length=1,
+        max_length=4,
+    )
+    constraints: list[OptimizeConstraintIn] = Field(default_factory=list, max_length=8)
+    population_size: int = Field(default=64, ge=4, le=300)
+    n_generations: int = Field(default=100, ge=1, le=500)
+    seed: int = Field(default=0, ge=0)
+    operational_duty_cycle: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=0.6,
+        description="Optional per-job override for MissionScenario.operational_duty_cycle.",
+    )
+
+
+class OptimizeJobResponse(BaseModel):
+    """Immediate response after queueing an optimization job."""
+
+    model_config = ConfigDict(frozen=True)
+
+    job_id: str
+    status: Literal["queued", "running", "completed", "cancelled", "failed"]
+    stream_url: str
+    result_url: str
+    cancel_url: str
+
+
+class OptimizeCheckpointOut(BaseModel):
+    """Per-generation SSE payload."""
+
+    model_config = ConfigDict(frozen=True)
+
+    gen: int
+    hypervolume: float
+    pareto_size: int
+    best_per_objective: dict[str, float]
+
+
+class OptimizeParetoPoint(BaseModel):
+    """One final Pareto-front point."""
+
+    model_config = ConfigDict(frozen=True)
+
+    design: DesignVector
+    metrics: dict[str, float]
+
+
+class OptimizeResultResponse(BaseModel):
+    """Final job state and Pareto front."""
+
+    model_config = ConfigDict(frozen=True)
+
+    job_id: str
+    status: Literal["queued", "running", "completed", "cancelled", "failed"]
+    backend_used: Literal["surrogate", "evaluator"] | None = None
+    checkpoints: list[OptimizeCheckpointOut] = Field(default_factory=list)
+    pareto_front: list[OptimizeParetoPoint] = Field(default_factory=list)
+    error: str | None = None
+
+
+class OptimizeCancelResponse(BaseModel):
+    """Response from ``POST /optimize/{id}/cancel``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    job_id: str
+    status: Literal["queued", "running", "completed", "cancelled", "failed"]
+
+
+class ParetoFrontSummary(BaseModel):
+    """One persisted canonical Pareto front available to the explorer."""
+
+    model_config = ConfigDict(frozen=True)
+
+    scenario_name: str
+    pareto_size: int
+    backend: str
+    dataset_version: str | None = None
+    front_url: str
+
+
+class ParetoFrontListResponse(BaseModel):
+    """List of persisted canonical Pareto fronts."""
+
+    model_config = ConfigDict(frozen=True)
+
+    fronts: list[ParetoFrontSummary]
+
+
+class ParetoFrontResponse(BaseModel):
+    """Persisted canonical Pareto front loaded from ``reports/phase3_pareto``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    scenario_name: str
+    source: Literal["canonical"] = "canonical"
+    metadata: dict[str, Any]
+    pareto_front: list[OptimizeParetoPoint]
+
+
+class ShapFeatureScore(BaseModel):
+    """Feature attribution or importance score."""
+
+    model_config = ConfigDict(frozen=True)
+
+    feature: str
+    value: float
+
+
+class ShapTargetImportance(BaseModel):
+    """Global importance scores for one target."""
+
+    model_config = ConfigDict(frozen=True)
+
+    target: PrimaryTarget
+    features: list[ShapFeatureScore]
+
+
+class ShapGlobalResponse(BaseModel):
+    """Global feature importance for all primary targets."""
+
+    model_config = ConfigDict(frozen=True)
+
+    targets: list[ShapTargetImportance]
+
+
+class ShapExplainRequest(BaseModel):
+    """Explain the current design for one target."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    design: DesignVector
+    scenario_name: str
+    target: PrimaryTarget
+    operational_duty_cycle: float | None = Field(default=None, ge=0.0, le=0.6)
+
+
+class ShapLocalResponse(BaseModel):
+    """Per-design feature contributions for one target prediction."""
+
+    model_config = ConfigDict(frozen=True)
+
+    target: PrimaryTarget
+    prediction: float
+    base_value: float
+    contributions: list[ShapFeatureScore]

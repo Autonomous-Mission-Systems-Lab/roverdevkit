@@ -6,8 +6,64 @@ Each row is **one** `(design, scenario, soil)` triple evaluated by
 `roverdevkit.mission.evaluator.evaluate_verbose`, flattened into a
 single Parquet row.
 
-- **Schema version:** `v5` (see `dataset.SCHEMA_VERSION`).
-  - **v5 (current, 2026-04-27):** the Bekker-Wong kernel
+- **Schema version:** `v7_1` (see `dataset.SCHEMA_VERSION`).
+  - **v7_1 (current, 2026-04-28):** `scenario_operational_duty_cycle`
+    promoted from a per-family constant (mare 0.30, polar 0.05,
+    highland 0.15, crater 0.20) to a per-row LHS feature uniform on
+    `[0, 0.6]` *independently of family*, and added to
+    `SCENARIO_NUMERIC_COLUMNS` as a true surrogate input. Surrogate
+    input columns 24 → 25 (column-additive). Motivation: the v7
+    deployment forced the live `/predict` route into evaluator-only
+    mode whenever the user moved the frontend δ_ops slider away from
+    its scenario default, because the surrogate had no training
+    support there. Sampling δ_ops over the full UI range puts the
+    entire slider in-distribution. Median R² drops 0.01–0.04 vs v7
+    (one extra continuous input to fit) but 90 % coverage on the
+    feasible test set is on-target across all four primary targets;
+    see `reports/week12_intervals_v7_1/`. Optuna re-tune was
+    *skipped* because the column schema is byte-identical to v7 and
+    re-running the search converges back to the same parameters. See
+    `project_log.md` 2026-04-28 (W12 step B) for the full v6 → v7
+    → v7_1 evolution.
+  - **v7 (retired, 2026-04-28):** dropped `design_designed_duty_cycle`
+    from the design-side schema after the v6 review surfaced that
+    the field did no engineering work in the mass model — its only
+    role was to upper-bound `δ_eff = min(δ_des, δ_ops)`, which a
+    user can equivalently express by lowering δ_ops. Drive duty
+    cycle becomes a single per-scenario `operational_duty_cycle`
+    parameter with optional per-call override. Design dimensionality
+    12 → 11; surrogate input columns 25 → 24.
+  - **v6 (retired, 2026-04-28):** drivetrain-aware design vector.
+    Dropped `design_nominal_speed_mps` (cruise speed is now derived
+    inside the evaluator from a torque-balance + slip-balance +
+    power-budget + ω_hub × R cap, see
+    `roverdevkit/drivetrain/motor.py::cruise_speed`); replaced it
+    with `design_peak_wheel_torque_nm` (a true drivetrain-capability
+    input); renamed `design_drive_duty_cycle → design_designed_duty_cycle`
+    on the design side and added `operational_duty_cycle` to
+    `MissionScenario`; flipped the feasibility classifier from
+    `motor_torque_ok` (1 = OK) to `stalled` (1 = infeasible) since
+    the explicit per-wheel torque-vs-capacity stall gate makes the
+    prior flag redundant. Median shifts on the LHS marginal:
+    `range_km` down on average (the v5 surface assumed an
+    unsustainable cruise speed where torque was binding);
+    `slope_capability_deg` essentially unchanged;
+    `energy_margin_raw_pct` ±, depending on whether δ_des or δ_ops
+    is binding; `total_mass_kg` ±1 kg drift from the mass-model
+    touch-up. See `reports/week12_design/decision.md` Step B for
+    full rationale.
+  - **v5_1 (retired, 2026-04-27):** `range_km` becomes
+    *energy-feasible* — `run_traverse` gained a per-step throttle
+    that drops effective duty when the battery hits its DoD floor
+    and the unthrottled load exceeds solar (W12 step A). Column
+    schema byte-identical to v5; the bump signals achievable-range
+    semantics. Range drops most on polar / highland scenarios
+    (median polar `range_km` 30.0 km → 2.67 km on the LHS marginal)
+    where the battery used to drive past floor unphysically. Other
+    label columns shift only slightly because the throttle reduces
+    consumption when it engages, leaving steady state unchanged.
+    See `project_log.md` 2026-04-27 W12 step A.
+  - **v5 (retired, 2026-04-27):** the Bekker-Wong kernel
     (`roverdevkit/terramechanics/bekker_wong.py`) gained an
     Iizuka & Kubota 2011 engaged-grouser shear-thrust term so
     `slope_capability_deg` and the traverse-derived metrics (range,
@@ -31,15 +87,17 @@ single Parquet row.
   to the BW solve at every wheel-force step within `brentq`. The
   `use_scm_correction` flag in the Parquet footer records whether this
   composition was active at build time (always `True` for v5).
-- **Canonical filename:** `lhs_v5.parquet` — current main training set,
-  40k rows at 10k × 4 scenario families on the v3 widened bounds with
-  v4 SCM correction and the v5 grouser-aware BW kernel. Pilot
-  (`lhs_pilot.parquet`) and challenge (`challenge_v1.parquet`) files
-  are generated on demand from `scripts/build_dataset.py`; only the
-  canonical training set is treated as a tracked artifact. Earlier
-  versions (`lhs_v1`, `lhs_v2`, `lhs_v3`, `lhs_v4`) are retired;
-  their build context lives in `project_log.md` for historical
-  reproducibility.
+- **Canonical filename:** `lhs_v7_1.parquet` — current main training
+  set, 40k rows at 10k × 4 scenario families on the v3 widened
+  bounds with v4 SCM correction, the v5 grouser-aware BW kernel,
+  the v5_1 energy-feasible-range throttle, the v6 drivetrain-aware
+  design vector, the v7 single-duty-knob simplification, and the
+  v7_1 LHS-sampled δ_ops. Pilot (`lhs_pilot.parquet`) and challenge
+  (`challenge_v1.parquet`) files are generated on demand from
+  `scripts/build_dataset.py`; only the canonical training set is
+  treated as a tracked artifact. Earlier versions (`lhs_v1` through
+  `lhs_v7`) are retired; their build context lives in
+  `project_log.md` for historical reproducibility.
 
 Dataset-level metadata is written to the Parquet file's schema footer;
 use `read_parquet_metadata(path)` to recover it (seed, sampler version,
@@ -50,7 +108,9 @@ version, free-form notes).
 
 Prefix conventions:
 
-- `design_*` — inputs from the 12-D `DesignVector`.
+- `design_*` — inputs from the 11-D `DesignVector` (v7 dropped
+  `design_designed_duty_cycle`; v6 dropped `design_nominal_speed_mps`
+  and added `design_peak_wheel_torque_nm`).
 - `scenario_*` — inputs from the `MissionScenario`, plus the sampler's
   jittered Bekker soil parameters (`scenario_soil_*`).
 - `stat_*` — aggregate statistics (mean / p95 / max / final) reduced
@@ -69,7 +129,7 @@ Prefix conventions:
 | `fidelity` | category | `analytical` for this file. The `use_scm_correction=True` Parquet-footer flag records that the wheel-level correction was composed in row-wise; no separate `scm_corrected` fidelity tier is shipped. |
 | `status` | category | `ok` if evaluator succeeded, else the exception class name (e.g. `ValueError`). Numeric target columns are NaN on non-`ok` rows; boolean targets are `False`. |
 
-### Design vector (12 columns)
+### Design vector (11 columns)
 
 All `design_*` columns mirror the `DesignVector` pydantic schema.
 
@@ -85,10 +145,14 @@ All `design_*` columns mirror the `DesignVector` pydantic schema.
 | `design_solar_area_m2` | float64 | [0.1, 1.5] | Solar array area |
 | `design_battery_capacity_wh` | float64 | [20.0, 500.0] | Usable battery energy |
 | `design_avionics_power_w` | float64 | [5.0, 40.0] | Continuous avionics draw |
-| `design_nominal_speed_mps` | float64 | [0.01, 0.10] | Nominal drive speed |
-| `design_drive_duty_cycle` | float64 | [0.02, 0.6] | Designed drive duty cycle δ (capability envelope anchor — see `schema.MissionMetrics` docstring). |
+| `design_peak_wheel_torque_nm` | float64 | [0.3, 20.0] | Per-wheel hub torque capacity. v6 added this in place of `design_nominal_speed_mps`; cruise speed is now derived inside the evaluator from torque + slip + power balance (see `roverdevkit/drivetrain/motor.py::cruise_speed`). LHS is log-uniform around a per-row v5-implicit anchor rather than uniform on these bounds — see `roverdevkit/surrogate/sampling.py::_peak_wheel_torque_anchor_for_row`. |
 
-### Scenario inputs (15 columns)
+Retired v5 columns: `design_nominal_speed_mps` (v6 dropped — cruise
+speed is derived) and `design_drive_duty_cycle` (v6 renamed to
+`design_designed_duty_cycle`, v7 dropped entirely — drive duty cycle
+lives on the scenario as `scenario_operational_duty_cycle`).
+
+### Scenario inputs (16 columns)
 
 Family-fixed columns (`scenario_family`, `scenario_terrain_class`,
 `scenario_soil_simulant`, `scenario_sun_geometry`,
@@ -105,6 +169,7 @@ family. The remaining columns are jittered per sample.
 | `scenario_soil_simulant` | category | Family nominal; the *actual* Bekker numbers used by the evaluator are the `scenario_soil_*` columns below. |
 | `scenario_mission_duration_earth_days` | float64 | Family-specific range. |
 | `scenario_max_slope_deg` | float64 | Family-specific range. |
+| `scenario_operational_duty_cycle` | float64 | Drive duty cycle the rover would actually run on the ground — sets `δ_eff = clamp(δ_ops, 0, 0.6)` in the traverse loop. v6 added this on the scenario side; v7_1 promoted it from a per-family constant (mare 0.30, polar 0.05, highland 0.15, crater 0.20) to a per-row LHS feature uniform on `[0, 0.6]` *independently of family*, so the surrogate keys off it as a true continuous input. The per-family default is still kept on `ScenarioFamily` for canonical YAML / UI initial slider position. |
 | `scenario_sun_geometry` | category | `continuous` / `diurnal` / `polar_intermittent`. |
 | `scenario_soil_n` | float64 | Bekker sinkage exponent, jitter bounds [0.8, 1.2]. |
 | `scenario_soil_k_c` | float64 | Cohesive modulus, [0.5, 2.0] kN/m^(n+1). |
@@ -123,14 +188,14 @@ above).
 
 | Column | dtype | Notes |
 | --- | --- | --- |
-| `range_km` | float64 | Capability-envelope range at designed duty. |
+| `range_km` | float64 | Energy-feasible mission range (v5_1 added an in-traverse throttle that drops effective duty when the battery floors and load exceeds solar; pre-v5_1 this was a kinematic capability envelope that ignored the energy budget). |
 | `energy_margin_pct` | float64 | Clipped 0-100, SOC-based reporting metric. |
 | `energy_margin_raw_pct` | float64 | Unclipped mission-integrated `(E_in - E_out)/E_out × 100`; primary surrogate target. |
 | `slope_capability_deg` | float64 | Max climbable slope on this soil. |
 | `total_mass_kg` | float64 | Mass-model output. |
 | `peak_motor_torque_nm` | float64 | Observed peak wheel torque during traverse. |
 | `sinkage_max_m` | float64 | Observed peak sinkage during traverse. |
-| `motor_torque_ok` | bool | Peak torque ≤ motor sizing ceiling *and* rover did not stall. Single feasibility classifier target. |
+| `stalled` | bool | Single feasibility classifier target. v6 flipped polarity from `motor_torque_ok` (1 = OK) to `stalled` (1 = infeasible) — the failure mode is now front-and-center because v6's explicit per-wheel torque-vs-`design_peak_wheel_torque_nm` stall gate makes the prior "OK" flag redundant. Captures whether the rover failed the slip-balance solve at any traverse step (Brent solver could not find a slip that satisfied force balance under the available drawbar pull and torque envelope). Baseline / classifier training scripts re-bind class-weight semantics accordingly. |
 
 ### Traverse-log aggregate statistics (≥24 columns)
 
@@ -172,10 +237,12 @@ by the `LAYER1_PRIMARY_TARGETS` / `LAYER1_DIAGNOSTIC_TARGETS`
 constants in `roverdevkit/surrogate/baselines.py`:
 
 - **Primary (is_primary=True):** `total_mass_kg`,
-  `slope_capability_deg`, `motor_torque_ok`. Design-axis metrics
-  where the v3 widened bounds put every flown / design-target rover
-  inside the surrogate's training support. Treated as the real
-  Layer-1 acceptance set in `project_plan.md` §6 W6 evaluation.
+  `slope_capability_deg`, `stalled` (renamed in v6 from
+  `motor_torque_ok` with polarity flipped — see metric-targets
+  section). Design-axis metrics where the v3 widened bounds put
+  every flown / design-target rover inside the surrogate's training
+  support. Treated as the real Layer-1 acceptance set in
+  `project_plan.md` §6 W6 evaluation.
 - **Diagnostic (is_primary=False):** `range_km`,
   `energy_margin_raw_pct`. Both are scenario-OOD for the registry:
   Pragyan ≈ 100 m, Yutu-2 ≈ 25 m / lunar day, MoonRanger and
@@ -186,9 +253,13 @@ constants in `roverdevkit/surrogate/baselines.py`:
   scenario-OOD rather than a surrogate-calibration failure. Reported
   for transparency only.
 
-A v4 example (median MAPE across algorithms, `reports/week8_baselines_v4/registry_sanity.csv`):
+A v4 example (median MAPE across algorithms,
+`reports/week8_baselines_v4/registry_sanity.csv`); the v6 polarity
+flip from `motor_torque_ok` to `stalled` does not change accuracy
+(both columns are derived from the same Bekker-Wong slip-balance
+outcome) but it does flip the column's name in any v6+ rerun:
 
-| rover | `total_mass_kg` | `slope_capability_deg` | `motor_torque_ok` accuracy |
+| rover | `total_mass_kg` | `slope_capability_deg` | feasibility flag accuracy |
 | --- | ---: | ---: | ---: |
 | Yutu-2 | 0.9 % | 2.1 % | 1.0 |
 | Pragyan | 2.7 % | 60.6 % | 1.0 |
@@ -199,11 +270,15 @@ Slope MAPE on Pragyan and MoonRanger remains elevated relative to mass; v4 close
 
 ## Column count sanity
 
-Metadata (5) + design (12) + scenario (15) + metrics (8) + stats (≥24)
-= ≥64 columns at `SCHEMA_VERSION = v4` (byte-identical to v3 / v2; the
-v4 bump records that wheel-level SCM correction is composed in row-wise
-at build time, not a column change). v1 had 65 (one more, the removed
-`thermal_survival`). Future versions appending,
-removing, or re-binding columns — *or* changing the LHS support so a
-v_n-trained surrogate would be OOD on the v_(n+1) dataset — *must*
-bump `SCHEMA_VERSION` so downstream code can detect a mismatch.
+Metadata (5) + design (11) + scenario (16) + metrics (8) + stats (≥24)
+= ≥64 columns at `SCHEMA_VERSION = v7_1`. The v6 → v7 → v7_1 net
+swap on the design / scenario side is design 12 → 11
+(`design_nominal_speed_mps` → `design_peak_wheel_torque_nm` in v6;
+`design_designed_duty_cycle` dropped in v7) and scenario 15 → 16
+(`scenario_operational_duty_cycle` added in v6 and promoted to a
+true LHS feature in v7_1). The metrics column `motor_torque_ok` was
+renamed to `stalled` (polarity flipped) in v6 — same column count.
+Future versions appending, removing, or re-binding columns — *or*
+changing the LHS support so a v_n-trained surrogate would be OOD on
+the v_(n+1) dataset — *must* bump `SCHEMA_VERSION` so downstream code
+can detect a mismatch.

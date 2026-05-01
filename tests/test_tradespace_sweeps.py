@@ -36,8 +36,7 @@ def _base_design() -> DesignVector:
         solar_area_m2=0.5,
         battery_capacity_wh=100.0,
         avionics_power_w=15.0,
-        nominal_speed_mps=0.04,
-        drive_duty_cycle=0.15,
+        peak_wheel_torque_nm=1.5,
     )
 
 

@@ -224,9 +224,13 @@ def main(argv: list[str] | None = None) -> int:
             n_failed,
             ", ".join(f"{k}={v}" for k, v in top_reasons.items()),
         )
-    if "motor_torque_ok" in df.columns:
-        feas_rate = float(df["motor_torque_ok"].astype(bool).mean())
-        log.info("feasibility positive rate (motor_torque_ok): %.2f%%", 100 * feas_rate)
+    if "stalled" in df.columns:
+        # Schema v6 (W12 step B): infeasibility flag flipped from
+        # ``motor_torque_ok`` to ``stalled`` (positive class = bad).
+        # Report the *non-stalled* rate so the headline number stays
+        # comparable to pre-v6 datasets ("higher is better").
+        feas_rate = 1.0 - float(df["stalled"].astype(bool).mean())
+        log.info("feasibility (non-stalled) rate: %.2f%%", 100 * feas_rate)
 
     # Non-zero exit only on catastrophic build failure (no rows written).
     # Per-sample graceful failures are by design and must not masquerade

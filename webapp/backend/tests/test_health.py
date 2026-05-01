@@ -35,4 +35,9 @@ def test_version_returns_metadata(client: TestClient) -> None:
         "quantile_bundles_path",
     }
     assert body["api_version"] == "0.1.0"
-    assert body["dataset_version"] == "v5"
+    # Schema v7_1 (W12 step B follow-on): dataset_version bumped to
+    # "v7_1" when ``operational_duty_cycle`` was promoted from a per-
+    # family constant to a per-row LHS feature uniform on [0, 0.6].
+    # See ``data/analytical/SCHEMA.md`` and
+    # ``webapp/backend/config.py::get_settings``.
+    assert body["dataset_version"] == "v7_1"

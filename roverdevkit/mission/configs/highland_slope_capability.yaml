@@ -14,3 +14,8 @@ soil_simulant: Apollo_regolith_loose    # worst-case soil for slope climbing
 mission_duration_earth_days: 7.0
 max_slope_deg: 25.0
 sun_geometry: diurnal
+# Schema v6 (W12 step B): per-scenario default ops duty cycle.
+# Slope-focused missions are systematically slower than nominal
+# terrain missions (more careful traverse planning). See
+# reports/week12_design/decision.md "Per-scenario calibration".
+operational_duty_cycle: 0.15

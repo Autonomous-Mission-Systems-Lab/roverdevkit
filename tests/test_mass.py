@@ -31,6 +31,9 @@ from roverdevkit.schema import DesignVector
 
 def _rashid_like_kwargs(**overrides: Any) -> dict[str, Any]:
     """Reasonable Rashid-class design vector for tests."""
+    # Schema v6 (W12 step B): ``peak_wheel_torque_nm`` is a true design
+    # input that sizes motor mass directly. 1.0 Nm is in the middle of
+    # the Rashid / Pragyan-class hub-torque band.
     base: dict[str, Any] = dict(
         wheel_radius_m=0.10,
         wheel_width_m=0.05,
@@ -39,6 +42,7 @@ def _rashid_like_kwargs(**overrides: Any) -> dict[str, Any]:
         solar_area_m2=0.4,
         battery_capacity_wh=50.0,
         avionics_power_w=10.0,
+        peak_wheel_torque_nm=1.0,
         grouser_height_m=0.005,
         grouser_count=12,
     )
@@ -215,23 +219,28 @@ class TestEstimateMass:
             assert getattr(b, attr) > 0, attr
         assert b.total_kg > b.chassis_kg
 
-    def test_iteration_converges_quickly(self) -> None:
+    def test_iteration_converges_in_a_single_pass(self) -> None:
+        # Schema v6 (W12 step B): peak_wheel_torque_nm is a direct design
+        # input, so the pre-v6 fixed-point iteration on motor mass vs.
+        # total mass is gone and ``n_iterations`` is pinned to 1.
         b = estimate_mass(**_rashid_like_kwargs())
-        assert b.n_iterations < 10
-
-    def test_result_independent_of_initial_guess(self) -> None:
-        # The fixed-point iteration has only one stable fixed point within
-        # the physical range; tightening rel_tol should not change the
-        # converged value by more than the requested tolerance.
-        loose = estimate_mass(**_rashid_like_kwargs(), rel_tol=1e-2)
-        tight = estimate_mass(**_rashid_like_kwargs(), rel_tol=1e-9)
-        assert tight.total_kg == pytest.approx(loose.total_kg, rel=1e-2)
+        assert b.n_iterations == 1
 
     def test_monotonic_in_chassis_mass(self) -> None:
+        # Schema v6: motor mass is sized by ``peak_wheel_torque_nm``, not
+        # by total vehicle mass, so chassis no longer pulls motor mass
+        # along with it. We only assert the direct-additive effect on
+        # ``total_kg`` here; motor monotonicity is checked separately.
         b1 = estimate_mass(**_rashid_like_kwargs(chassis_mass_kg=3.0))
         b2 = estimate_mass(**_rashid_like_kwargs(chassis_mass_kg=6.0))
         assert b2.total_kg > b1.total_kg
-        assert b2.motors_and_drives_kg > b1.motors_and_drives_kg  # motor sized to bigger rover
+
+    def test_motor_mass_monotonic_in_peak_wheel_torque(self) -> None:
+        # Schema v6: ``_motors_mass`` is m_0 + k_tau * tau_peak, so
+        # bumping the design's peak hub torque must increase motor mass.
+        b1 = estimate_mass(**_rashid_like_kwargs(peak_wheel_torque_nm=1.0))
+        b2 = estimate_mass(**_rashid_like_kwargs(peak_wheel_torque_nm=4.0))
+        assert b2.motors_and_drives_kg > b1.motors_and_drives_kg
 
     def test_monotonic_in_wheel_size(self) -> None:
         b_small = estimate_mass(**_rashid_like_kwargs(wheel_radius_m=0.08, wheel_width_m=0.04))
@@ -258,6 +267,7 @@ class TestEstimateMassFromDesign:
             solar_area_m2=rashid_like_design.solar_area_m2,
             battery_capacity_wh=rashid_like_design.battery_capacity_wh,
             avionics_power_w=rashid_like_design.avionics_power_w,
+            peak_wheel_torque_nm=rashid_like_design.peak_wheel_torque_nm,
             grouser_height_m=rashid_like_design.grouser_height_m,
             grouser_count=rashid_like_design.grouser_count,
         )

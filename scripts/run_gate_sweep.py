@@ -18,7 +18,7 @@ discrepancy clears one of two thresholds:
   good enough at the mission level and SCM is reported as a §9 bounded
   sensitivity instead.
 - **Sign bias:** > 5 % of paired runs disagree on the binary feasibility
-  flag (``motor_torque_ok``) or on the sign of ``energy_margin_raw_pct``.
+  flag (``stalled``) or on the sign of ``energy_margin_raw_pct``.
   Sign flips mean the BW surrogate would mislabel the feasibility frontier
   even on rank-only criteria.
 
@@ -91,7 +91,7 @@ _HEADLINE_FIELDS: tuple[str, ...] = (
     "peak_motor_torque_nm",
     "sinkage_max_m",
     "thermal_survival",
-    "motor_torque_ok",
+    "stalled",
 )
 
 
@@ -157,7 +157,7 @@ def gate_summary(df: pd.DataFrame) -> pd.DataFrame:
       (range > 100 m under both evaluators), what is the median /
       p90 relative range delta? > 10 % median ⇒ ``range_gate=True``.
     - **Qualitative (feasibility):** how often do BW and SCM disagree
-      on whether a design is feasible at all (``motor_torque_ok`` AND
+      on whether a design is feasible at all (``stalled == False`` AND
       ``range > 100 m``), and how often do they flip the sign of the
       mission energy balance? Either > 5 % ⇒ ``sign_gate=True``.
 
@@ -180,8 +180,11 @@ def gate_summary(df: pd.DataFrame) -> pd.DataFrame:
             med = float("nan")
             p90 = float("nan")
 
-        bw_feas = sub["bw_motor_torque_ok"] & (sub["bw_range_km"] > _MOBILE_RANGE_KM_FLOOR)
-        scm_feas = sub["scm_motor_torque_ok"] & (sub["scm_range_km"] > _MOBILE_RANGE_KM_FLOOR)
+        # Schema v6: ``stalled`` is the *infeasibility* flag (positive = bad);
+        # negate to get the v5 ``motor_torque_ok`` semantics this gate
+        # condition was originally written against.
+        bw_feas = (~sub["bw_stalled"]) & (sub["bw_range_km"] > _MOBILE_RANGE_KM_FLOOR)
+        scm_feas = (~sub["scm_stalled"]) & (sub["scm_range_km"] > _MOBILE_RANGE_KM_FLOOR)
         feas_flip = float((bw_feas != scm_feas).mean())
 
         em_sign_flip = float(

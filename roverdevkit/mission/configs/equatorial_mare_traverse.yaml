@@ -15,3 +15,8 @@ soil_simulant: Apollo_regolith_nominal
 mission_duration_earth_days: 14.0
 max_slope_deg: 15.0
 sun_geometry: diurnal
+# Schema v6 (W12 step B): per-scenario default ops duty cycle.
+# Calibrated against Apollo-17 LRV (~0.5 manned EVA duty) and
+# unmanned long-traverse references (~0.30). See
+# reports/week12_design/decision.md "Per-scenario calibration".
+operational_duty_cycle: 0.30

@@ -159,11 +159,17 @@ def _pragyan_entry() -> RoverRegistryEntry:
     # - wheel_width_m = 0.07 (scaled from n_wheels geometry);
     # - chassis_mass_kg = 10 (~38 % of total per class ROT);
     # - wheelbase_m = 0.5 (from published images);
-    # - nominal_speed_mps = 0.01 (10 mm/s, published ops limit);
-    # - drive_duty_cycle = 0.15 (~1.5 h drive per 10 h active window,
-    #   consistent with ~100 m over 10 Earth days);
+    # - peak_wheel_torque_nm = 0.85 (v5-implicit anchor at 26 kg / 6 / R=0.085;
+    #   matches the order of magnitude of Pragyan's actual hub torque
+    #   given its slow-traverse / low-slope design point);
     # - grouser_height_m, grouser_count from class heritage (Rashid/
     #   Yutu-style 8 mm x 12 grousers).
+    # Schema v6 (W12 step B): nominal_speed_mps no longer a design
+    # input (cruise speed is derived); drive_duty_cycle renamed to
+    # designed_duty_cycle. Schema v7 (W12 step B follow-up):
+    # designed_duty_cycle dropped from the design vector — drive
+    # duty cycle now lives only on the per-scenario YAML (Pragyan
+    # ~0.008, see chandrayaan3_pragyan.yaml).
     design = DesignVector(
         wheel_radius_m=0.085,
         wheel_width_m=0.07,
@@ -175,8 +181,7 @@ def _pragyan_entry() -> RoverRegistryEntry:
         solar_area_m2=0.5,
         battery_capacity_wh=60.0,
         avionics_power_w=20.0,
-        nominal_speed_mps=0.01,
-        drive_duty_cycle=0.15,
+        peak_wheel_torque_nm=0.85,
     )
     # Thermal: Pragyan did NOT carry RHUs and died in lunar night.
     # Default architecture (rhu_power_w=0) correctly predicts failure.
@@ -196,9 +201,12 @@ def _pragyan_entry() -> RoverRegistryEntry:
         is_flown=True,
         imputation_notes=(
             "wheel_width, wheelbase, grouser_height/count, chassis_mass, "
-            "nominal_speed_mps, drive_duty_cycle imputed from class "
-            "heritage and published ops. avionics_power set to 20 W "
-            "(design-space floor for a 26 kg rover)."
+            "peak_wheel_torque_nm imputed from class heritage and "
+            "published ops. avionics_power set to 20 W (design-space "
+            "floor for a 26 kg rover). v6: torque anchor 0.85 Nm from "
+            "sizing_peak_torque_anchor at the published 26 kg total. "
+            "v7: drive duty cycle now lives on the scenario only "
+            "(designed_duty_cycle removed from the design vector)."
         ),
     )
 
@@ -217,8 +225,9 @@ def _yutu2_entry() -> RoverRegistryEntry:
     # - grouser specs: h=0.012 m x 18 (Yutu-class wheels are grousered);
     # - avionics_power_w = 20 (steady-state CPU+comms+sensors; 40 W only
     #   during peak drive+heater operation, which is a different case);
-    # - drive_duty_cycle = 0.15 (~7 h drive per day during a 5-day active
-    #   window; matches per-lunar-day ~25 m drive distance).
+    # - peak_wheel_torque_nm = 5.0 (Yutu-class 6-wheel mobility motors
+    #   are sized for ~5 Nm per hub; consistent with the v5-implicit
+    #   anchor at the published all-up 135 kg total mass and R=0.15).
     # Note: Yutu-2 has a published all-up flight mass of ~135 kg; the
     # registry holds chassis_mass at 35 kg because that is the published
     # chassis ex-payload value (the analytical mass-up model adds payload
@@ -237,8 +246,7 @@ def _yutu2_entry() -> RoverRegistryEntry:
         solar_area_m2=1.3,
         battery_capacity_wh=130.0,
         avionics_power_w=20.0,
-        nominal_speed_mps=0.04,
-        drive_duty_cycle=0.15,
+        peak_wheel_torque_nm=5.0,
     )
     # Thermal: Yutu-class carries Pu-238 RHUs on a thermally-controlled
     # avionics box wrapped in MLI with low-alpha/high-eps surface
@@ -270,8 +278,12 @@ def _yutu2_entry() -> RoverRegistryEntry:
             "Yutu-2's all-up flight mass is ~135 kg including payload, "
             "structure, and power system margins which the analytical "
             "mass-up model adds on top of chassis_mass. wheelbase, "
-            "grouser specs, drive_duty_cycle imputed from published "
-            "images and the per-lunar-day ~25 m drive distance target."
+            "grouser specs imputed from published images and the "
+            "per-lunar-day ~25 m drive distance target. v6: "
+            "peak_wheel_torque_nm=5.0 from class-typical Yutu-2 hub "
+            "motor sizing (~5 Nm per drive). v7: drive duty cycle "
+            "now lives on the scenario only (designed_duty_cycle "
+            "removed from the design vector)."
         ),
     )
 
@@ -309,9 +321,9 @@ def _moonranger_entry() -> RoverRegistryEntry:
     #   cold-start; class-typical for 13 kg polar rover.
     # - avionics_power_w = 25: NVIDIA TX2i (~10 W) + space-hardened RTOS
     #   MCU (~3 W) + cameras + IMU + sun sensor + comms ~ 25 W active.
-    # - nominal_speed_mps = 0.05: 70 % of max mech, planning headroom.
-    # - drive_duty_cycle = 0.20: 1 km/day target / 0.05 m/s ~ 5.5 h
-    #   drive per 24 h Earth day = 0.23; rounded down for ops slack.
+    # - peak_wheel_torque_nm = 0.75: v5-implicit anchor at 13 kg / 4 /
+    #   R=0.10. Slightly above the schema floor; consistent with
+    #   class-typical micro-rover hub torque sizings.
     design = DesignVector(
         wheel_radius_m=0.10,
         wheel_width_m=0.08,
@@ -323,8 +335,7 @@ def _moonranger_entry() -> RoverRegistryEntry:
         solar_area_m2=0.30,
         battery_capacity_wh=100.0,
         avionics_power_w=25.0,
-        nominal_speed_mps=0.05,
-        drive_duty_cycle=0.20,
+        peak_wheel_torque_nm=0.75,
     )
     # Thermal: MoonRanger carries no RHU (Kumar et al. 2020); operates
     # only in lunar daylight at the polar landing site. Polar thermal
@@ -368,10 +379,11 @@ def _rashid1_entry() -> RoverRegistryEntry:
     #   distinguishes from the 20 mm closed-side test wheel)
     # - grouser_count: 14
     # - wheelbase_m: 0.50 (footprint 0.535 x 0.539 m per LPSC 2021)
-    # - nominal_speed_mps: 0.02 ("typical micro-rover operation speed",
-    #   used as the experimental drive velocity in Hurrell 2025)
     # - landing site: Atlas crater, Mare Frigoris (~47 N, 44 E)
     # - mission duration: 1 lunar day (~14 Earth days), no RHU.
+    # - Hurrell 2025 used 0.02 m/s as the experimental drive velocity;
+    #   that is now scenario-side context rather than a design input
+    #   under the v6 schema (cruise speed is derived).
     #
     # Imputations:
     # - solar_area_m2 = 0.25: 0.5 x 0.5 m chassis with deployable mast;
@@ -383,8 +395,9 @@ def _rashid1_entry() -> RoverRegistryEntry:
     # - avionics_power_w = 15: 2x wide-field cameras + CAM-M micro
     #   imager + CAM-T thermal imager + 4x Langmuir probes + Wi-Fi
     #   comms (Els et al. 2021 inventory).
-    # - drive_duty_cycle = 0.15: matches Pragyan's drive cadence for
-    #   comparable mission duration.
+    # - peak_wheel_torque_nm = 0.5: v5-implicit anchor at 10 kg / 4 /
+    #   R=0.10 sits near the schema floor; consistent with the very
+    #   low-slope, very-slow micro-rover design point.
     design = DesignVector(
         wheel_radius_m=0.10,
         wheel_width_m=0.08,
@@ -396,8 +409,7 @@ def _rashid1_entry() -> RoverRegistryEntry:
         solar_area_m2=0.25,
         battery_capacity_wh=50.0,
         avionics_power_w=15.0,
-        nominal_speed_mps=0.02,
-        drive_duty_cycle=0.15,
+        peak_wheel_torque_nm=0.5,
     )
     # Thermal: Rashid-1 carries no RHU. Mid-latitude diurnal swing
     # benefits from balanced absorptivity; the actual flight rover used
@@ -420,10 +432,12 @@ def _rashid1_entry() -> RoverRegistryEntry:
         imputation_notes=(
             "Cited (Hurrell et al. 2025 SSR; Els et al. LPSC 2021): "
             "total mass, n_wheels, wheel radius/width, grouser height "
-            "(flight 15 mm) and count (14), wheelbase, nominal speed. "
-            "Imputed: solar / battery / avionics from a power-budget "
-            "back-solve against the science-payload inventory and "
-            "single-lunar-day mission target."
+            "(flight 15 mm) and count (14), wheelbase. Imputed: solar "
+            "/ battery / avionics from a power-budget back-solve "
+            "against the science-payload inventory and single-lunar-"
+            "day mission target. v6: peak_wheel_torque_nm=0.5 from "
+            "v5-implicit hub-torque anchor at the published 10 kg / "
+            "4-wheel / R=0.10 m design point."
         ),
     )
 

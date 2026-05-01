@@ -10,16 +10,24 @@ Environment variables
 ---------------------
 ``ROVERDEVKIT_QUANTILE_BUNDLES``
     Path to ``quantile_bundles.joblib`` (calibrated quantile XGB heads).
-    Default: ``reports/week11_intervals_v5/quantile_bundles.joblib`` —
-    the v5 retrain on lhs_v5.parquet after the BW kernel gained the
-    Iizuka & Kubota 2011 grouser shear-thrust term (W11 step-2).
+    Default: ``reports/week12_intervals_v7_1/quantile_bundles.joblib`` —
+    the W12 Step B follow-on recalibration on lhs_v7_1.parquet after
+    ``operational_duty_cycle`` was promoted from a per-family
+    constant to a per-row LHS feature uniform on [0, 0.6]. With the
+    v7_1 calibration, the frontend's δ_ops slider stays on the
+    surrogate path with calibrated 90 % PIs across the full
+    override range.
 ``ROVERDEVKIT_TUNED_PARAMS``
     Path to ``tuned_best_params.json`` (tuned XGB hyperparameters).
     Currently informational only; reserved for later steps that may
     need to refit. Default:
-    ``reports/week11_tuned_v5/tuned_best_params.json``.
+    ``reports/week12_tuned_v7/tuned_best_params.json`` (50-trial Optuna
+    sweep on the v7 dataset for the four primary regressors and the
+    ``stalled`` classifier; reused unchanged for v7_1 because the
+    column schema is byte-identical and Optuna would re-converge to
+    near-identical parameters).
 ``ROVERDEVKIT_DATASET_VERSION``
-    Dataset version label echoed in ``/version``. Default ``v5``.
+    Dataset version label echoed in ``/version``. Default ``v7_1``.
 ``ROVERDEVKIT_CORS_ORIGINS``
     Comma-separated allow-list. Defaults to the Vite dev server.
 """
@@ -70,13 +78,13 @@ def get_settings() -> Settings:
     return Settings(
         quantile_bundles_path=_env_path(
             "ROVERDEVKIT_QUANTILE_BUNDLES",
-            REPO_ROOT / "reports" / "week11_intervals_v5" / "quantile_bundles.joblib",
+            REPO_ROOT / "reports" / "week12_intervals_v7_1" / "quantile_bundles.joblib",
         ),
         tuned_params_path=_env_path(
             "ROVERDEVKIT_TUNED_PARAMS",
-            REPO_ROOT / "reports" / "week11_tuned_v5" / "tuned_best_params.json",
+            REPO_ROOT / "reports" / "week12_tuned_v7" / "tuned_best_params.json",
         ),
-        dataset_version=os.environ.get("ROVERDEVKIT_DATASET_VERSION", "v5"),
+        dataset_version=os.environ.get("ROVERDEVKIT_DATASET_VERSION", "v7_1"),
         cors_origins=_env_csv(
             "ROVERDEVKIT_CORS_ORIGINS",
             ("http://localhost:5173", "http://127.0.0.1:5173"),

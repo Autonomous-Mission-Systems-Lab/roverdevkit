@@ -20,10 +20,27 @@ Integration notes
   root exists (the slope is unclimbable), slip is pinned at the upper
   bracket and effective forward velocity drops to zero -- the rover
   spins in place, still drawing motor power.
-- We apply the design vector's ``drive_duty_cycle`` as a *mission-average*
-  scaling on mobility power and forward progress. This is the standard
-  tradespace approximation (project_plan.md §4); pinning down a drive
-  schedule is deferred to v2.
+- We apply the *effective* duty cycle ``δ_eff = min(designed,
+  operational)`` as a mission-average scaling on mobility power and
+  forward progress. This is the standard tradespace approximation
+  (project_plan.md §4); pinning down a drive schedule is deferred to
+  v2. **W12 Step A (2026-04-27) addendum:** when the battery hits its
+  DoD floor and the unthrottled power balance goes negative, the
+  per-step mobility duty is locally throttled to whatever fraction of
+  ``δ_eff`` the instantaneous solar input can sustain
+  (``min(δ_eff, (p_solar - p_avionics) / p_drive)``). This makes
+  ``range_km`` an *energy-feasible* metric rather than a capability
+  envelope; details in ``reports/week12_design/decision.md``.
+- **W12 Step B (2026-04-28) addendum:** cruise speed is now *derived*
+  inside :func:`run_traverse` from the slip-balance torque demand,
+  the mission-average solar power budget, the kinematic envelope, and
+  the design's ``peak_wheel_torque_nm`` — see
+  :mod:`roverdevkit.drivetrain.motor`. ``DesignVector.nominal_speed_mps``
+  is gone. Schema v7 (W12 step B follow-up) further removed
+  ``designed_duty_cycle`` from the design vector after that field
+  turned out to do no engineering work in the v6 mass model; the
+  per-scenario / override ``operational_duty_cycle`` is now used
+  directly as ``δ_eff`` (clamped to ``[0, 1]``).
 - Thermal survival is treated as a whole-mission binary flag
   (:mod:`roverdevkit.power.thermal`) rather than a per-step check --
   the lumped-parameter model is steady-state.
@@ -65,6 +82,11 @@ import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import brentq
 
+from roverdevkit.drivetrain.motor import (
+    CruiseResult,
+    cruise_speed,
+    effective_duty_cycle,
+)
 from roverdevkit.power.battery import BatteryState
 from roverdevkit.power.battery import step as battery_step
 from roverdevkit.power.solar import (
@@ -142,7 +164,23 @@ physical limits at which the Bekker-Wong model is credible."""
 
 @dataclass
 class TraverseLog:
-    """Per-step traverse-sim history arrays plus termination metadata."""
+    """Per-step traverse-sim history arrays plus termination metadata.
+
+    Schema v6 (W12 step B): three new top-level fields make the
+    derived-cruise-speed pipeline observable to callers:
+
+    - ``cruise_speed_mps`` — the rover speed the time loop actually
+      drove at, returned by
+      :func:`roverdevkit.drivetrain.motor.cruise_speed`.
+    - ``effective_duty_cycle`` — schema v7: ``operational_duty_cycle``
+      (per-scenario default, or per-call override) clamped to
+      ``[0, 1]``. The v6 ``min(δ_des, δ_ops)`` semantics collapsed
+      when ``designed_duty_cycle`` was removed from the design vector.
+    - ``cruise_kinematic_clamped`` — ``True`` when the kinematic
+      envelope cap (not the energy-balance solve) bound; tracked so
+      the LHS dataset builder can verify the design doc's
+      "< 1 % of cells clamp" assumption.
+    """
 
     t_s: NDArray[np.float64] = field(default_factory=lambda: np.empty(0))
     position_m: NDArray[np.float64] = field(default_factory=lambda: np.empty(0))
@@ -158,6 +196,11 @@ class TraverseLog:
     battery_floored: bool = False
     rover_stalled: bool = False
     reached_distance: bool = False
+    cruise_speed_mps: float = 0.0
+    effective_duty_cycle: float = 0.0
+    cruise_kinematic_clamped: bool = False
+    peak_torque_demand_nm: float = 0.0
+    peak_torque_capacity_nm: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -363,7 +406,7 @@ def _scm_solve_step_wheel_forces(
 
 def _mobility_power_w(
     forces: WheelForces,
-    nominal_speed_mps: float,
+    cruise_speed_mps: float,
     wheel_radius_m: float,
     n_wheels: int,
     motor_efficiency: float,
@@ -375,9 +418,13 @@ def _mobility_power_w(
     gives ``omega = v / (R * (1 - s))``. When the rover is stalled the
     motor still draws torque * omega at the no-forward-progress slip --
     the wheels are still spinning, just not pulling the rover forward.
+
+    Schema v6 (W12 step B): ``cruise_speed_mps`` is now the *derived*
+    rover speed from :func:`roverdevkit.drivetrain.motor.cruise_speed`,
+    not the pre-v6 design input ``nominal_speed_mps``.
     """
     slip = forces.slip
-    omega = nominal_speed_mps / (wheel_radius_m * max(1e-3, 1.0 - slip))
+    omega = cruise_speed_mps / (wheel_radius_m * max(1e-3, 1.0 - slip))
     mechanical_power_per_wheel = forces.driving_torque_nm * omega
     electrical_power_per_wheel = mechanical_power_per_wheel / max(1e-3, motor_efficiency)
     # If stalled, the rover still commands the wheels but makes no
@@ -385,6 +432,59 @@ def _mobility_power_w(
     # both saturate at the upper bracket.
     _ = stalled
     return n_wheels * electrical_power_per_wheel
+
+
+def _average_solar_power_w(
+    *,
+    scenario: MissionScenario,
+    panel_area_m2: float,
+    panel_efficiency: float,
+    panel_dust_factor: float,
+    panel_tilt_deg: float,
+    panel_azimuth_deg: float,
+    declination_deg: float,
+    noon_hour_offset: float,
+    n_samples: int = 200,
+) -> float:
+    """Mean solar input over the mission window, in W.
+
+    Schema v6 (W12 step B). Used by the energy-balance cruise-speed
+    solve in :func:`roverdevkit.drivetrain.motor.energy_balance_v_cruise`.
+    Sampled (not integrated analytically) because the existing
+    :func:`panel_power_w` already encodes the diurnal / polar
+    geometry, and a flat 200-sample mean over the mission window costs
+    < 1 ms per evaluation — well below the per-mission budget. Number
+    of samples is overridable for tests.
+    """
+    if scenario.mission_duration_earth_days <= 0.0:
+        return 0.0
+    duration_s = scenario.mission_duration_earth_days * 24.0 * 3600.0
+    t_arr = np.linspace(0.0, duration_s, n_samples)
+    p_arr = np.empty(n_samples, dtype=np.float64)
+    for k in range(n_samples):
+        t_hours = t_arr[k] / 3600.0
+        hour_angle = lunar_hour_angle_deg(t_hours, noon_hour=noon_hour_offset)
+        elev = sun_elevation_deg(
+            scenario.latitude_deg, hour_angle, declination_deg=declination_deg
+        )
+        if panel_tilt_deg == 0.0:
+            sun_az = 180.0
+        else:
+            sun_az = sun_azimuth_deg(
+                scenario.latitude_deg,
+                hour_angle,
+                declination_deg=declination_deg,
+            )
+        p_arr[k] = panel_power_w(
+            panel_area_m2=panel_area_m2,
+            panel_efficiency=panel_efficiency,
+            sun_elevation_deg=elev,
+            panel_tilt_deg=panel_tilt_deg,
+            panel_azimuth_deg=panel_azimuth_deg,
+            sun_azimuth_deg=sun_az,
+            dust_degradation_factor=panel_dust_factor,
+        )
+    return float(np.mean(p_arr))
 
 
 # ---------------------------------------------------------------------------
@@ -411,6 +511,7 @@ def run_traverse(
     noon_hour_offset: float = LUNAR_SYNODIC_DAY_HOURS / 4.0,
     correction: WheelLevelCorrection | None = None,
     force_backend: str = "bw",
+    operational_duty_cycle_override: float | None = None,
 ) -> TraverseLog:
     """March the rover through the scenario and return a full traverse log.
 
@@ -456,6 +557,13 @@ def run_traverse(
         current scenario schema and is computed once per mission, so
         the SCM-direct path costs ~1-3 s/mission rather than the
         ~10 minutes a per-step solve would take.
+    operational_duty_cycle_override
+        Schema v6 (W12 step B): per-call override of the scenario's
+        ``operational_duty_cycle``. ``None`` (default) uses the value
+        on the scenario YAML. Schema v7 (W12 step B follow-up): this
+        value is used directly as ``δ_eff`` (clamped to ``[0, 1]``);
+        the v6 ``min(δ_des, δ_ops)`` cap collapsed when
+        ``designed_duty_cycle`` was removed from the design vector.
     """
     if force_backend not in {"bw", "scm"}:
         raise ValueError(f"force_backend must be 'bw' or 'scm', got {force_backend!r}")
@@ -506,23 +614,66 @@ def run_traverse(
     # per-position slope or per-segment soil profile, this lift will
     # need to be reverted (or made conditional on the new fields).
     if force_backend == "scm":
-        forces, stalled = _scm_solve_step_wheel_forces(
+        forces, slip_solver_failed = _scm_solve_step_wheel_forces(
             wheel, soil, load_per_wheel, required_dp_per_wheel
         )
     else:
-        forces, stalled = _solve_step_wheel_forces(
+        forces, slip_solver_failed = _solve_step_wheel_forces(
             wheel, soil, load_per_wheel, required_dp_per_wheel, correction=correction
         )
+
+    # Schema v6/v7 (W12 step B): derive δ_eff and v_cruise here,
+    # replacing the pre-v6 ``design.nominal_speed_mps`` and
+    # ``design.drive_duty_cycle`` design inputs. The torque demand
+    # from the slip-balance solve plus the mission-average solar budget
+    # feed :func:`roverdevkit.drivetrain.motor.cruise_speed`.
+    # ``stalled`` is composed inside that helper from "slip solver
+    # failed" *or* "torque demand exceeds peak_wheel_torque_nm
+    # capacity". Schema v7 collapsed the v6 ``min(δ_des, δ_ops)``
+    # rule into a single per-scenario ``operational_duty_cycle`` after
+    # that field turned out to do no engineering work in the v6 mass
+    # model.
+    ops_duty_used = (
+        scenario.operational_duty_cycle
+        if operational_duty_cycle_override is None
+        else operational_duty_cycle_override
+    )
+    p_solar_avg_w = _average_solar_power_w(
+        scenario=scenario,
+        panel_area_m2=design.solar_area_m2,
+        panel_efficiency=panel_efficiency,
+        panel_dust_factor=panel_dust_factor,
+        panel_tilt_deg=panel_tilt_deg,
+        panel_azimuth_deg=panel_azimuth_deg,
+        declination_deg=declination_deg,
+        noon_hour_offset=noon_hour_offset,
+    )
+    delta_eff = effective_duty_cycle(ops_duty_used)
+    cruise: CruiseResult = cruise_speed(
+        peak_wheel_torque_nm=design.peak_wheel_torque_nm,
+        t_req_per_wheel_nm=float(forces.driving_torque_nm),
+        slip_eq=float(forces.slip),
+        slip_solver_failed=slip_solver_failed,
+        p_solar_avg_w=p_solar_avg_w,
+        p_avionics_w=design.avionics_power_w,
+        wheel_radius_m=design.wheel_radius_m,
+        motor_efficiency=motor_efficiency,
+        delta_eff=delta_eff,
+        n_wheels=design.n_wheels,
+    )
+    stalled = cruise.stalled
+    v_cruise = cruise.v_cruise_mps
+
     p_drive = _mobility_power_w(
         forces,
-        design.nominal_speed_mps,
+        v_cruise,
         design.wheel_radius_m,
         design.n_wheels,
         motor_efficiency,
         stalled,
     )
-    effective_mobility_w = design.drive_duty_cycle * p_drive
-    dx_per_step = 0.0 if stalled else design.nominal_speed_mps * dt_s * design.drive_duty_cycle
+    effective_mobility_w = delta_eff * p_drive
+    dx_per_step = 0.0 if stalled else v_cruise * dt_s * delta_eff
     rover_stalled_once = stalled
 
     for k in range(1, n_steps):
@@ -549,8 +700,37 @@ def run_traverse(
             dust_degradation_factor=panel_dust_factor,
         )
 
-        # Forward progress for the step (uses the lifted dx_per_step).
-        dx = dx_per_step
+        # Energy-feasibility throttle (W12 Step A, 2026-04-27).
+        # When entering this step the battery is already at its floor
+        # and the *unthrottled* power balance would be negative, the
+        # rover physically cannot sustain commanded duty: it must drop
+        # to whatever fraction of its design duty solar can support in
+        # real time. Without this throttle the simulator would happily
+        # report full forward progress while quietly violating the
+        # battery floor for the rest of the mission, which made
+        # range_km a capability envelope rather than an achievable
+        # distance. See reports/week12_design/decision.md and the
+        # 2026-04-27 project_log entry.
+        p_load_full = design.avionics_power_w + effective_mobility_w
+        p_net_full = p_solar - p_load_full
+        floored_at_step_start = (
+            battery.state_of_charge <= battery.min_state_of_charge + 1e-9
+            and p_net_full < 0.0
+        )
+        if floored_at_step_start:
+            p_mob_avail_w = max(0.0, p_solar - design.avionics_power_w)
+            duty_throttled = min(
+                delta_eff,
+                p_mob_avail_w / max(p_drive, 1e-9),
+            )
+            dx = 0.0 if stalled else v_cruise * dt_s * duty_throttled
+            p_load = design.avionics_power_w + duty_throttled * p_drive
+            battery_floored_once = True
+        else:
+            dx = dx_per_step
+            p_load = p_load_full
+
+        # Forward progress for the step (post-throttle).
         remaining = scenario.traverse_distance_m - position
         if dx >= remaining:
             dx = max(0.0, remaining)
@@ -558,7 +738,6 @@ def run_traverse(
         position += dx
 
         # Power balance and battery update.
-        p_load = design.avionics_power_w + effective_mobility_w
         p_net = p_solar - p_load
         battery = battery_step(battery, p_net, dt_s)
         if battery.state_of_charge <= battery.min_state_of_charge + 1e-9 and p_net < 0.0:
@@ -568,7 +747,10 @@ def run_traverse(
         soc_arr[k] = battery.state_of_charge
         power_in_arr[k] = p_solar
         power_out_arr[k] = p_load
-        mobility_arr[k] = effective_mobility_w
+        # Log the actual mobility draw (post-throttle), not the
+        # hypothetical full-duty draw, so downstream diagnostics see
+        # the real per-step power profile.
+        mobility_arr[k] = max(0.0, p_load - design.avionics_power_w)
         slip_arr[k] = forces.slip
         sinkage_arr[k] = forces.sinkage_m
         torque_arr[k] = forces.driving_torque_nm
@@ -600,4 +782,9 @@ def run_traverse(
         battery_floored=battery_floored_once,
         rover_stalled=rover_stalled_once,
         reached_distance=reached_distance,
+        cruise_speed_mps=float(v_cruise),
+        effective_duty_cycle=float(delta_eff),
+        cruise_kinematic_clamped=bool(cruise.kinematic_clamped),
+        peak_torque_demand_nm=float(forces.driving_torque_nm),
+        peak_torque_capacity_nm=float(design.peak_wheel_torque_nm),
     )

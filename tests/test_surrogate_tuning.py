@@ -45,7 +45,10 @@ def _split_xy(
 ) -> tuple[pd.DataFrame, np.ndarray]:
     df_clean = valid_rows(df)
     if feasible_only:
-        mask = df_clean[FEASIBILITY_COLUMN].astype(bool).to_numpy()
+        # Schema v6 (W12 step B): ``FEASIBILITY_COLUMN`` is now ``stalled``
+        # with positive class = infeasible, so we negate before masking
+        # to keep only the feasible (non-stalled) regression rows.
+        mask = (~df_clean[FEASIBILITY_COLUMN].astype(bool)).to_numpy()
         df_clean = df_clean.loc[mask]
     X = build_feature_matrix(df_clean)
     y = df_clean[target].to_numpy()

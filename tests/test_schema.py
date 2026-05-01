@@ -31,8 +31,7 @@ def test_design_vector_rejects_out_of_range() -> None:
             solar_area_m2=0.4,
             battery_capacity_wh=100.0,
             avionics_power_w=15.0,
-            nominal_speed_mps=0.03,
-            drive_duty_cycle=0.3,
+            peak_wheel_torque_nm=1.5,
         )
 
 
@@ -49,8 +48,7 @@ def test_design_vector_rejects_invalid_wheel_count() -> None:
             solar_area_m2=0.4,
             battery_capacity_wh=100.0,
             avionics_power_w=15.0,
-            nominal_speed_mps=0.03,
-            drive_duty_cycle=0.3,
+            peak_wheel_torque_nm=1.5,
         )
 
 
@@ -73,6 +71,6 @@ def test_mission_metrics_constructs() -> None:
         peak_motor_torque_nm=1.4,
         sinkage_max_m=0.012,
         thermal_survival=True,
-        motor_torque_ok=True,
+        stalled=False,
     )
     assert metrics.range_km_std is None

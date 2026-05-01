@@ -45,8 +45,7 @@ def _large_traverser() -> DesignVector:
         solar_area_m2=1.2,
         battery_capacity_wh=300.0,
         avionics_power_w=15.0,
-        nominal_speed_mps=0.08,
-        drive_duty_cycle=0.5,
+        peak_wheel_torque_nm=2.0,
     )
 
 
@@ -63,8 +62,7 @@ def _polar_survivor() -> DesignVector:
         solar_area_m2=0.8,
         battery_capacity_wh=400.0,
         avionics_power_w=10.0,
-        nominal_speed_mps=0.02,
-        drive_duty_cycle=0.2,
+        peak_wheel_torque_nm=1.0,
     )
 
 
@@ -81,8 +79,7 @@ def _slope_climber() -> DesignVector:
         solar_area_m2=0.6,
         battery_capacity_wh=200.0,
         avionics_power_w=15.0,
-        nominal_speed_mps=0.04,
-        drive_duty_cycle=0.3,
+        peak_wheel_torque_nm=4.0,
     )
 
 
@@ -190,8 +187,7 @@ def _baseline_design() -> DesignVector:
         solar_area_m2=0.4,
         battery_capacity_wh=100.0,
         avionics_power_w=15.0,
-        nominal_speed_mps=0.02,
-        drive_duty_cycle=0.15,
+        peak_wheel_torque_nm=1.5,
     )
 
 
@@ -213,6 +209,12 @@ def _sensitivity_scenario() -> MissionScenario:
         mission_duration_earth_days=14.0,
         max_slope_deg=8.0,
         sun_geometry="diurnal",
+        # Schema v7: drive duty cycle is a single per-scenario parameter
+        # (designed_duty_cycle was removed from the design vector). 0.5
+        # is generous for an equatorial mare scenario but ensures the
+        # baseline design is *not* duty-bound, so the chassis_mass and
+        # solar bumps below actually move range_km.
+        operational_duty_cycle=0.5,
     )
 
 
@@ -225,8 +227,7 @@ _SENSITIVITY_BUMPS: tuple[tuple[str, float], ...] = (
     ("avionics_power_w", +10.0),
     ("chassis_mass_kg", +8.0),
     ("wheel_radius_m", +0.04),
-    ("nominal_speed_mps", +0.03),
-    ("drive_duty_cycle", +0.2),
+    ("peak_wheel_torque_nm", +1.5),
 )
 
 

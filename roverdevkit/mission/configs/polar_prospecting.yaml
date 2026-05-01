@@ -14,3 +14,8 @@ soil_simulant: Apollo_regolith_nominal
 mission_duration_earth_days: 30.0
 max_slope_deg: 20.0
 sun_geometry: polar_intermittent
+# Schema v6 (W12 step B): per-scenario default ops duty cycle.
+# Polar missions are systematically commanded slowly (Pragyan ~0.008,
+# Yutu-2 ~0.001 in real ops). 0.05 leaves headroom for less
+# conservative polar concepts; see reports/week12_design/decision.md.
+operational_duty_cycle: 0.05

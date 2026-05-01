@@ -23,3 +23,8 @@ soil_simulant: Apollo_regolith_nominal
 mission_duration_earth_days: 5.0
 max_slope_deg: 5.0                  # typical-ops mean across Yutu-2's Von Karman traverse
 sun_geometry: diurnal
+# Schema v6 (W12 step B): δ_ops calibrated to Yutu-2's
+# historical-conservative ops (~0.001-0.0014 implied from total
+# ~1.6 km / 60+ lunar days). Used only by the registry-rover
+# validation gate; see reports/week12_design/decision.md.
+operational_duty_cycle: 0.001

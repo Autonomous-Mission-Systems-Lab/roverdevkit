@@ -87,7 +87,10 @@ def _eval_one(args: tuple[int, str, dict]) -> dict:
             "sinkage_max_m",
         ):
             base[col] = float("nan")
-        base["motor_torque_ok"] = False
+        # Schema v6 (W12 step B): graceful-failure rows default to
+        # ``stalled = True`` (the safe-conservative side, matching
+        # surrogate.dataset._nan_outputs).
+        base["stalled"] = True
         base["thermal_survival"] = False
         return base
     dt = time.time() - t0
@@ -99,7 +102,7 @@ def _eval_one(args: tuple[int, str, dict]) -> dict:
             "slope_capability_deg": m.slope_capability_deg,
             "peak_motor_torque_nm": m.peak_motor_torque_nm,
             "sinkage_max_m": m.sinkage_max_m,
-            "motor_torque_ok": bool(m.motor_torque_ok),
+            "stalled": bool(m.stalled),
             "thermal_survival": bool(m.thermal_survival),
             "eval_seconds": dt,
         }
@@ -124,7 +127,7 @@ def _summarise(wide: pd.DataFrame) -> pd.DataFrame:
         ("peak_motor_torque_nm", 0.05),
         ("sinkage_max_m", 1e-3),
     ]
-    flip_targets = ["motor_torque_ok"]
+    flip_targets = ["stalled"]
 
     for fam, sub in wide.groupby("scenario_family"):
         n = len(sub)
@@ -238,7 +241,7 @@ def main() -> None:
         "slope_capability_deg",
         "peak_motor_torque_nm",
         "sinkage_max_m",
-        "motor_torque_ok",
+        "stalled",
         "thermal_survival",
         "eval_seconds",
     ]

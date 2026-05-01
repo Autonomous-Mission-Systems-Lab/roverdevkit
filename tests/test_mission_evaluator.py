@@ -15,7 +15,7 @@ import math
 
 import pytest
 
-from roverdevkit.mission.evaluator import evaluate, range_at_utilisation
+from roverdevkit.mission.evaluator import evaluate
 from roverdevkit.mission.scenarios import list_scenarios, load_scenario
 from roverdevkit.schema import DesignVector, MissionMetrics, MissionScenario
 
@@ -157,67 +157,67 @@ def test_scm_correction_loads_when_artifact_present(
 
 
 # ---------------------------------------------------------------------------
-# Capability-envelope vs operational-utilisation rescaling
+# Schema v6/v7 (W12 step B): operational_duty_cycle override
 # ---------------------------------------------------------------------------
+#
+# The pre-v6 ``range_at_utilisation`` post-hoc rescaler is gone. Schema
+# v6 plumbed an ``operational_duty_cycle`` override directly into the
+# evaluator. Schema v7 collapsed the v6 ``min(δ_des, δ_ops)`` rule
+# into ``δ_eff = clamp(δ_ops, [0, 1])`` after ``designed_duty_cycle``
+# was removed from the design vector. The tests below pin the v7
+# contract.
 
 
 @pytest.mark.integration
-def test_range_at_utilisation_matches_capability_at_designed_duty(
+def test_evaluate_default_uses_scenario_operational_duty_cycle(
     rashid_like_design: DesignVector, equatorial_scenario: MissionScenario
 ) -> None:
-    """Passing ``u = drive_duty_cycle`` reproduces the capability range."""
-    metrics = evaluate(rashid_like_design, equatorial_scenario)
-    rescaled = range_at_utilisation(
-        metrics, rashid_like_design, rashid_like_design.drive_duty_cycle
+    """``operational_duty_cycle=None`` reproduces the scenario default."""
+    metrics_default = evaluate(rashid_like_design, equatorial_scenario)
+    metrics_explicit = evaluate(
+        rashid_like_design,
+        equatorial_scenario,
+        operational_duty_cycle=equatorial_scenario.operational_duty_cycle,
     )
-    assert math.isclose(rescaled, metrics.range_km, rel_tol=1e-9)
+    assert math.isclose(metrics_default.range_km, metrics_explicit.range_km, rel_tol=1e-9)
 
 
 @pytest.mark.integration
-def test_range_at_utilisation_scales_linearly_with_duty(
+def test_lower_operational_duty_cycle_does_not_increase_range(
     rashid_like_design: DesignVector, equatorial_scenario: MissionScenario
 ) -> None:
-    """Half the operational duty cycle -> half the rescaled range."""
-    metrics = evaluate(rashid_like_design, equatorial_scenario)
-    half_duty = 0.5 * rashid_like_design.drive_duty_cycle
-    rescaled = range_at_utilisation(metrics, rashid_like_design, half_duty)
-    assert math.isclose(rescaled, 0.5 * metrics.range_km, rel_tol=1e-9)
+    """Halving δ_ops cannot grow forward progress (it scales linearly
+    with δ_eff in the kinematic regime; the energy-binding regime
+    cancels δ_eff out, in which case range is invariant)."""
+    base = evaluate(
+        rashid_like_design,
+        equatorial_scenario,
+        operational_duty_cycle=equatorial_scenario.operational_duty_cycle,
+    )
+    half = evaluate(
+        rashid_like_design,
+        equatorial_scenario,
+        operational_duty_cycle=0.5 * equatorial_scenario.operational_duty_cycle,
+    )
+    assert half.range_km <= base.range_km + 1e-9
 
 
 @pytest.mark.integration
-def test_range_at_utilisation_rejects_over_duty(
+def test_operational_duty_cycle_override_changes_effective_duty(
     rashid_like_design: DesignVector, equatorial_scenario: MissionScenario
 ) -> None:
-    """Passing ``u`` above designed duty is a coding error (hardware not sized)."""
-    metrics = evaluate(rashid_like_design, equatorial_scenario)
-    with pytest.raises(ValueError, match="exceeds designed duty"):
-        range_at_utilisation(metrics, rashid_like_design, rashid_like_design.drive_duty_cycle + 0.1)
+    """Schema v7: δ_eff equals the supplied δ_ops (clamped to [0, 1])."""
+    from roverdevkit.mission.evaluator import evaluate_verbose
 
-
-def test_range_at_utilisation_rejects_negative() -> None:
-    metrics = MissionMetrics(
-        range_km=5.0,
-        energy_margin_pct=50.0,
-        slope_capability_deg=10.0,
-        total_mass_kg=15.0,
-        peak_motor_torque_nm=5.0,
-        sinkage_max_m=0.01,
-        thermal_survival=True,
-        motor_torque_ok=True,
+    detailed_low = evaluate_verbose(
+        rashid_like_design,
+        equatorial_scenario,
+        operational_duty_cycle=0.10,
     )
-    design = DesignVector(
-        wheel_radius_m=0.12,
-        wheel_width_m=0.08,
-        grouser_height_m=0.008,
-        grouser_count=12,
-        n_wheels=6,
-        chassis_mass_kg=12.0,
-        wheelbase_m=0.6,
-        solar_area_m2=0.4,
-        battery_capacity_wh=100.0,
-        avionics_power_w=15.0,
-        nominal_speed_mps=0.02,
-        drive_duty_cycle=0.15,
+    detailed_high = evaluate_verbose(
+        rashid_like_design,
+        equatorial_scenario,
+        operational_duty_cycle=0.40,
     )
-    with pytest.raises(ValueError, match=">= 0"):
-        range_at_utilisation(metrics, design, -0.01)
+    assert detailed_low.log.effective_duty_cycle == pytest.approx(0.10)
+    assert detailed_high.log.effective_duty_cycle == pytest.approx(0.40)

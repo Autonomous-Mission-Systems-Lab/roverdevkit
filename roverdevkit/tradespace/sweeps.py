@@ -54,10 +54,18 @@ SWEEPABLE_VARIABLES: tuple[str, ...] = (
     "solar_area_m2",
     "battery_capacity_wh",
     "avionics_power_w",
-    "nominal_speed_mps",
-    "drive_duty_cycle",
+    "peak_wheel_torque_nm",
 )
 """Design-vector fields the UI lets the user sweep on a grid axis.
+
+SCHEMA_VERSION v6 (W12 step B): ``nominal_speed_mps`` is gone (cruise
+speed is now derived inside the evaluator; sweeping it is no longer
+meaningful) and ``drive_duty_cycle`` was renamed ``designed_duty_cycle``.
+``peak_wheel_torque_nm`` is the new drivetrain-capability sweep axis.
+SCHEMA_VERSION v7 (W12 step B follow-up) drops
+``designed_duty_cycle`` from the design vector entirely; drive duty
+cycle is now a per-scenario quantity (``operational_duty_cycle``) and
+sweeping it lives on the scenario side of the ``/sweep`` route.
 
 ``n_wheels`` is excluded because it is binary {4, 6}; a "sweep" with
 two cells is better expressed by toggling it in the design panel.

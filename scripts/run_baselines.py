@@ -18,7 +18,7 @@ Outputs (under ``--out-dir``):
   design-target lunar micro-rovers (never deployed) included for
   Layer-1 OOD coverage of the surrogate's input space.
   Each row carries an ``is_primary`` flag. ``True`` rows
-  (``total_mass_kg``, ``slope_capability_deg``, ``motor_torque_ok``)
+  (``total_mass_kg``, ``slope_capability_deg``, ``stalled``)
   are the design-axis Layer-1 acceptance set; ``False`` rows
   (``range_km``, ``energy_margin_raw_pct``) are scenario-OOD
   diagnostics — see ``roverdevkit.surrogate.baselines``
@@ -238,7 +238,7 @@ def _print_registry_sanity_summary(sanity: pd.DataFrame) -> None:
         flush=True,
     )
     print(
-        "Acceptance set: total_mass_kg, slope_capability_deg, motor_torque_ok.",
+        "Acceptance set: total_mass_kg, slope_capability_deg, stalled.",
         flush=True,
     )
 
@@ -266,7 +266,7 @@ def _print_registry_sanity_summary(sanity: pd.DataFrame) -> None:
             .to_frame()
         )
         with pd.option_context("display.max_columns", None, "display.width", 160):
-            print("\nClassifier accuracy across algorithms (motor_torque_ok):")
+            print("\nClassifier accuracy across algorithms (stalled):")
             print(clf_summary.round(3).to_string())
 
     print(

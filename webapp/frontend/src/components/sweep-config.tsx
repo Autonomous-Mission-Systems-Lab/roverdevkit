@@ -58,8 +58,7 @@ export function SweepConfig({ disabled }: { disabled?: boolean }) {
   const backend = useSweepStore((s) => s.backend);
   const setBackend = useSweepStore((s) => s.setBackend);
 
-  const cellCount =
-    xAxis.n_points * (yAxis ? yAxis.n_points : 1);
+  const cellCount = xAxis.n_points * (yAxis ? yAxis.n_points : 1);
 
   return (
     <div className="space-y-6">
@@ -168,9 +167,16 @@ export function SweepConfig({ disabled }: { disabled?: boolean }) {
 
 interface AxisEditorProps {
   title: string;
-  axis: { variable: SweepableVariable; lo: number; hi: number; n_points: number };
+  axis: {
+    variable: SweepableVariable;
+    lo: number;
+    hi: number;
+    n_points: number;
+  };
   onVariableChange: (v: SweepableVariable) => void;
-  onFieldChange: (patch: Partial<{ lo: number; hi: number; n_points: number }>) => void;
+  onFieldChange: (
+    patch: Partial<{ lo: number; hi: number; n_points: number }>,
+  ) => void;
   disabled?: boolean;
   excludedVariable?: SweepableVariable;
 }

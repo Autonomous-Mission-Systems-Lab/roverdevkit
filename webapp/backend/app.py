@@ -22,9 +22,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from webapp.backend.config import Settings, get_settings
 from webapp.backend.routes import evaluate as evaluate_routes
 from webapp.backend.routes import health as health_routes
+from webapp.backend.routes import optimize as optimize_routes
+from webapp.backend.routes import pareto as pareto_routes
 from webapp.backend.routes import predict as predict_routes
 from webapp.backend.routes import registry as registry_routes
 from webapp.backend.routes import scenarios as scenarios_routes
+from webapp.backend.routes import shap as shap_routes
 from webapp.backend.routes import sweep as sweep_routes
 
 logger = logging.getLogger(__name__)
@@ -68,6 +71,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(predict_routes.router)
     app.include_router(evaluate_routes.router)
     app.include_router(sweep_routes.router)
+    app.include_router(optimize_routes.router)
+    app.include_router(pareto_routes.router)
+    app.include_router(shap_routes.router)
 
     logger.info(
         "FastAPI app built (artifacts_present=%s, dataset_version=%s)",

@@ -8,29 +8,31 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import type {
-  MotorTorqueDiagnostic,
-  ThermalDiagnostic,
-} from "@/types/api";
+import type { StallDiagnostic, ThermalDiagnostic } from "@/types/api";
 
 /**
  * "Why did this constraint fire?" dialog opened from the panel chips.
  *
  * The footer in `prediction-panel.tsx` renders one trigger per failed
  * constraint; this component is the dialog body for either thermal or
- * motor torque. Both diagnostics arrive from `/evaluate` so the
- * numbers shown here are deterministic ground truth (not surrogate
- * predictions).
+ * the v6 stall diagnostic. Both diagnostics arrive from `/evaluate`
+ * so the numbers shown here are deterministic ground truth (not
+ * surrogate predictions).
+ *
+ * Schema v6 (W12 step B): the v5 `motor_torque` variant was renamed
+ * to `stall` and now exposes the explicit per-wheel torque
+ * demand-vs-capacity comparison the run-traverse stall gate uses,
+ * rather than the v5 BW-sizing peak-vs-ceiling check.
  */
 export function ConstraintDetailsButton({
   variant,
   thermal,
-  motorTorque,
+  stall,
   failed,
 }: {
-  variant: "thermal" | "motor_torque";
+  variant: "thermal" | "stall";
   thermal: ThermalDiagnostic;
-  motorTorque: MotorTorqueDiagnostic;
+  stall: StallDiagnostic;
   failed: boolean;
 }) {
   return (
@@ -38,7 +40,7 @@ export function ConstraintDetailsButton({
       <DialogTrigger asChild>
         <button
           type="button"
-          aria-label={`${variant === "thermal" ? "Thermal" : "Motor torque"} details`}
+          aria-label={`${variant === "thermal" ? "Thermal" : "Stall"} details`}
           className={
             "inline-flex h-4 w-4 items-center justify-center rounded-full text-current/70 hover:text-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]"
           }
@@ -50,7 +52,7 @@ export function ConstraintDetailsButton({
         {variant === "thermal" ? (
           <ThermalBody thermal={thermal} failed={failed} />
         ) : (
-          <MotorTorqueBody mt={motorTorque} failed={failed} />
+          <StallBody stall={stall} failed={failed} />
         )}
       </DialogContent>
     </Dialog>
@@ -104,10 +106,10 @@ function ThermalBody({
           )}
         </DialogTitle>
         <DialogDescription>
-          Single-node radiative balance for the avionics enclosure at
-          steady state. The rover survives only if the hot case stays
-          under the operating ceiling <em>and</em> the cold case stays
-          above the operating floor.
+          Single-node radiative balance for the avionics enclosure at steady
+          state. The rover survives only if the hot case stays under the
+          operating ceiling <em>and</em> the cold case stays above the operating
+          floor.
         </DialogDescription>
       </DialogHeader>
 
@@ -160,17 +162,17 @@ function ThermalBody({
             How it&rsquo;s computed.
           </span>{" "}
           Closed-form Stefan&ndash;Boltzmann balance:{" "}
-          <code>T = (T_sink⁴ + Q_in / (ε σ A))^(1/4)</code>. The hot case
-          uses absorbed solar power plus avionics; the cold case uses
-          hibernation power plus any RHU. Sink temperature is 250 K hot,
-          100 K cold; ε = 0.85, α = 0.3, sunlit-area fraction 0.25.
+          <code>T = (T_sink⁴ + Q_in / (ε σ A))^(1/4)</code>. The hot case uses
+          absorbed solar power plus avionics; the cold case uses hibernation
+          power plus any RHU. Sink temperature is 250 K hot, 100 K cold; ε =
+          0.85, α = 0.3, sunlit-area fraction 0.25.
         </p>
         <p>
           <span className="font-medium text-[var(--color-foreground)]">
             Assumed thermal hardware.
           </span>{" "}
-          Surface area ≈ {fmt2(thermal.surface_area_m2)} m² (rebuilt from
-          the chassis-mass cube-root proxy). Hibernation power{" "}
+          Surface area ≈ {fmt2(thermal.surface_area_m2)} m² (rebuilt from the
+          chassis-mass cube-root proxy). Hibernation power{" "}
           {fmt1(thermal.hibernation_power_w)} W. RHU power{" "}
           {fmt1(thermal.rhu_power_w)} W.
         </p>
@@ -179,16 +181,14 @@ function ThermalBody({
             <span className="font-medium text-[var(--color-foreground)]">
               Why this design fails the cold case.
             </span>{" "}
-            With 0 W of RHU power and only{" "}
-            {fmt1(thermal.hibernation_power_w)} W of hibernation
-            heating, the enclosure radiates to ~
-            {fmt1(thermal.lunar_night_temp_c)} °C during lunar night —
-            below the {fmt1(thermal.min_operating_temp_c)} °C operating
-            floor. Real lunar micro-rovers (Pragyan, Yutu&ndash;2,
-            Rashid&ndash;1, MoonRanger) carry RHUs or supplemental
-            heaters precisely to close this gap. RHU mass is not part
-            of the design vector in this study, so we expose this as a
-            diagnostic flag rather than a free design lever.
+            With 0 W of RHU power and only {fmt1(thermal.hibernation_power_w)} W
+            of hibernation heating, the enclosure radiates to ~
+            {fmt1(thermal.lunar_night_temp_c)} °C during lunar night — below the{" "}
+            {fmt1(thermal.min_operating_temp_c)} °C operating floor. Real lunar
+            micro-rovers (Pragyan, Yutu&ndash;2, Rashid&ndash;1, MoonRanger)
+            carry RHUs or supplemental heaters precisely to close this gap. RHU
+            mass is not part of the design vector in this study, so we expose
+            this as a diagnostic flag rather than a free design lever.
           </p>
         ) : null}
         {!thermal.hot_case_ok ? (
@@ -197,11 +197,10 @@ function ThermalBody({
               Why this design fails the hot case.
             </span>{" "}
             Peak-sun absorbed power plus avionics dissipation drives the
-            enclosure to ~{fmt1(thermal.peak_sun_temp_c)} °C — above
-            the {fmt1(thermal.max_operating_temp_c)} °C operating
-            ceiling. Reducing avionics power, lowering solar
-            absorptivity, or adding radiator area would bring the hot
-            case down.
+            enclosure to ~{fmt1(thermal.peak_sun_temp_c)} °C — above the{" "}
+            {fmt1(thermal.max_operating_temp_c)} °C operating ceiling. Reducing
+            avionics power, lowering solar absorptivity, or adding radiator area
+            would bring the hot case down.
           </p>
         ) : null}
       </div>
@@ -209,19 +208,19 @@ function ThermalBody({
   );
 }
 
-function MotorTorqueBody({
-  mt,
+function StallBody({
+  stall,
   failed,
 }: {
-  mt: MotorTorqueDiagnostic;
+  stall: StallDiagnostic;
   failed: boolean;
 }) {
-  const margin = mt.peak_torque_nm > 0 ? mt.ceiling_nm - mt.peak_torque_nm : 0;
+  const margin = stall.peak_torque_capacity_nm - stall.peak_torque_demand_nm;
   return (
     <>
       <DialogHeader>
         <DialogTitle>
-          Motor torque —{" "}
+          Drivetrain stall —{" "}
           {failed ? (
             <span className="text-[var(--color-destructive)]">fails</span>
           ) : (
@@ -229,9 +228,12 @@ function MotorTorqueBody({
           )}
         </DialogTitle>
         <DialogDescription>
-          Compares the peak per-wheel torque observed during the
-          traverse to the closed-form sizing ceiling the mass model
-          assumed when sizing the drive motors.
+          Compares the peak per-wheel torque the slip-balance solver asks of the
+          drivetrain on the scenario&rsquo;s worst-case slope to the
+          design&rsquo;s explicit <code>peak_wheel_torque_nm</code> capacity.
+          Schema v6 (W12 step B) made this a true drivetrain capability check
+          alongside the run-traverse stall gate; in v5 the comparable ceiling
+          was implicit in the BW-sizing model.
         </DialogDescription>
       </DialogHeader>
 
@@ -246,33 +248,40 @@ function MotorTorqueBody({
           <tbody>
             <tr className="border-t">
               <td className="px-3 py-2">
-                <div className="font-medium">Peak per-wheel torque</div>
+                <div className="font-medium">
+                  Peak slip-balance torque demand
+                </div>
                 <div className="text-xs text-[var(--color-muted-foreground)]">
-                  Largest absolute torque observed during traverse simulation.
+                  Largest per-wheel torque the slip-balance solver requested
+                  during the traverse simulation.
                 </div>
               </td>
               <td className="px-3 py-2 text-right tabular-nums">
-                {fmt2(mt.peak_torque_nm)} N·m
+                {fmt2(stall.peak_torque_demand_nm)} N·m
               </td>
             </tr>
             <tr className="border-t">
               <td className="px-3 py-2">
-                <div className="font-medium">Sizing ceiling</div>
+                <div className="font-medium">Drivetrain torque capacity</div>
                 <div className="text-xs text-[var(--color-muted-foreground)]">
-                  <code>sf · μ · (m·g/N) · R</code> — safety factor ×
-                  peak friction × per-wheel weight × wheel radius.
+                  <code>peak_wheel_torque_nm</code> design input — the largest
+                  sustained per-wheel torque the motor + gearbox can deliver.
                 </div>
               </td>
               <td className="px-3 py-2 text-right tabular-nums">
-                {fmt2(mt.ceiling_nm)} N·m
+                {fmt2(stall.peak_torque_capacity_nm)} N·m
               </td>
             </tr>
             <tr className="border-t">
-              <td className="px-3 py-2 font-medium">Margin (ceiling − peak)</td>
+              <td className="px-3 py-2 font-medium">
+                Margin (capacity − demand)
+              </td>
               <td
                 className={
                   "px-3 py-2 text-right tabular-nums " +
-                  (mt.torque_ok ? "text-emerald-700" : "text-[var(--color-destructive)]")
+                  (stall.stalled
+                    ? "text-[var(--color-destructive)]"
+                    : "text-emerald-700")
                 }
               >
                 {fmt2(margin)} N·m
@@ -283,12 +292,12 @@ function MotorTorqueBody({
               <td className="px-3 py-2 text-right">
                 <span
                   className={
-                    mt.rover_stalled
+                    stall.stalled
                       ? "rounded-full bg-[var(--color-destructive)]/10 px-2 py-0.5 text-xs text-[var(--color-destructive)]"
                       : "rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-700"
                   }
                 >
-                  {mt.rover_stalled ? "yes" : "no"}
+                  {stall.stalled ? "yes" : "no"}
                 </span>
               </td>
             </tr>
@@ -298,10 +307,12 @@ function MotorTorqueBody({
 
       <div className="space-y-2 text-xs text-[var(--color-muted-foreground)]">
         <p>
-          The constraint fires if peak torque exceeds the ceiling
-          <em> or</em> the traverse loop ever stalls (zero forward
-          progress on a slope). To make a borderline design pass:
-          increase wheel radius, add wheels, or reduce total mass.
+          The stall flag fires when slip-balance torque demand exceeds the
+          drivetrain capacity <em>or</em> when the slip solver fails to develop
+          the required drawbar pull on the scenario&rsquo;s loose-soil + slope
+          corner. To clear a borderline design: raise{" "}
+          <code>peak_wheel_torque_nm</code>, increase wheel radius (more
+          leverage), add a wheel pair, or pick a milder scenario.
         </p>
       </div>
     </>

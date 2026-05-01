@@ -24,9 +24,7 @@ export function RegistryOverlayPicker() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">
-          Compare with real rovers
-        </Label>
+        <Label className="text-sm font-medium">Compare with real rovers</Label>
         <span className="text-xs text-[var(--color-muted-foreground)]">
           predictions overlaid on the chart
         </span>
@@ -82,4 +80,3 @@ export function RegistryOverlayPicker() {
     </div>
   );
 }
-

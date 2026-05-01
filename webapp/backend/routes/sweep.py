@@ -89,6 +89,16 @@ def _cached_sweep(_request_key: str, req_json: str) -> SweepResponse:
             ),
         )
     scenario = scenarios[req.scenario_name]
+    if req.operational_duty_cycle is not None:
+        # SCHEMA_VERSION v7_1: δ_ops is a true LHS-sampled surrogate
+        # input, so applying the override here keeps both sweep
+        # backends (surrogate batch predict + per-cell evaluator) in
+        # sync with the Single-design tab's δ_ops slider. The grid
+        # is still one-shot; only the *constant-across-grid* δ_ops
+        # changes.
+        scenario = scenario.model_copy(
+            update={"operational_duty_cycle": req.operational_duty_cycle}
+        )
 
     for ax in (req.x_axis, req.y_axis):
         if ax is None:

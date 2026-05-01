@@ -12,12 +12,7 @@ const ROVER_COLORS: Record<string, string> = {
   "Rashid-1": "#7c3aed",
 };
 
-const FALLBACK_COLORS = [
-  "#0ea5e9",
-  "#84cc16",
-  "#ec4899",
-  "#f59e0b",
-];
+const FALLBACK_COLORS = ["#0ea5e9", "#84cc16", "#ec4899", "#f59e0b"];
 
 export function roverColor(name: string): string {
   if (name in ROVER_COLORS) return ROVER_COLORS[name];

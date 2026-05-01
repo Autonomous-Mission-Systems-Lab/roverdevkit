@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean, median
 
+from roverdevkit.drivetrain.motor import sizing_peak_torque_anchor_nm
 from roverdevkit.mass.parametric_mers import (
     MassBreakdown,
     MassModelParams,
@@ -132,7 +133,25 @@ def predict_row(
     row: RoverValidationRow,
     params: MassModelParams | None = None,
 ) -> RoverValidationResult:
-    """Run ``estimate_mass`` on a single validation row."""
+    """Run ``estimate_mass`` on a single validation row.
+
+    Schema v6 (W12 step B) note. The validation CSV does not carry
+    ``peak_wheel_torque_nm`` — it pre-dates the schema bump and the
+    published rovers it covers don't all expose hub-torque numbers.
+    For the layered mass cross-check, we feed the v5-implicit
+    sizing-anchor torque (computed from the published *total* mass via
+    :func:`sizing_peak_torque_anchor_nm`) so the v6 motor mass matches
+    what the pre-v6 fixed-point loop would have produced for the same
+    rover. This keeps the historical 10-rover cross-check apples-to-
+    apples; for design-vector-driven estimates,
+    :func:`estimate_mass_from_design` uses ``DesignVector
+    .peak_wheel_torque_nm`` directly.
+    """
+    peak_wheel_torque_nm = sizing_peak_torque_anchor_nm(
+        total_mass_kg=row.mass_total_kg,
+        wheel_radius_m=row.wheel_radius_m,
+        n_wheels=row.n_wheels,
+    )
     breakdown = estimate_mass(
         wheel_radius_m=row.wheel_radius_m,
         wheel_width_m=row.wheel_width_m,
@@ -141,6 +160,7 @@ def predict_row(
         solar_area_m2=row.solar_area_m2,
         battery_capacity_wh=row.battery_capacity_wh,
         avionics_power_w=row.avionics_power_w,
+        peak_wheel_torque_nm=peak_wheel_torque_nm,
         grouser_height_m=row.grouser_height_m,
         grouser_count=row.grouser_count,
         params=params,

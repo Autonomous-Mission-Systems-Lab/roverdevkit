@@ -12,3 +12,7 @@ soil_simulant: Apollo_regolith_nominal
 mission_duration_earth_days: 5.0
 max_slope_deg: 18.0
 sun_geometry: diurnal
+# Schema v6 (W12 step B): per-scenario default ops duty cycle.
+# Anchored on MER-A/B daily averages (~0.15-0.20 in typical drive
+# sols on uneven terrain). See reports/week12_design/decision.md.
+operational_duty_cycle: 0.20

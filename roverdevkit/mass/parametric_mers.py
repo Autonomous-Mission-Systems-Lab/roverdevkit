@@ -24,10 +24,14 @@ Subsystem accounting (SMAD Ch. 11, Table 11-43 convention)::
     m_margin     = f_margin * m_dry
     m_total      = m_dry + m_margin
 
-The motor subsystem mass depends on the peak wheel torque, which in turn
-depends on the total vehicle weight on the Moon. We resolve that
-circular dependency with a short fixed-point iteration (typically
-converges in 3-4 steps to 1e-4 relative tolerance).
+Motor mass (schema v6, W12 step B). The motor subsystem mass is now
+computed directly from the design's
+:attr:`roverdevkit.schema.DesignVector.peak_wheel_torque_nm` (a true
+input), so the pre-v6 fixed-point loop over total mass is gone — this
+function is now strictly bottom-up and converges in a single pass.
+The pre-v6 implicit mass-derived torque ceiling lives on in
+:func:`roverdevkit.drivetrain.motor.sizing_peak_torque_anchor_nm` only
+as the LHS prior anchor.
 
 Primary references
 ------------------
@@ -109,15 +113,20 @@ class MassModelParams:
     the gear reduction."""
 
     motor_peak_friction_coef: float = 0.7
-    """Peak tractive friction coefficient used to size motor torque.
-    Represents the worst-case single-wheel pull needed to climb a steep
-    slope or unstick from deep soil (Wong, *Theory of Ground Vehicles*
-    4th ed. Ch. 2)."""
+    """Peak tractive friction coefficient — schema v6 dead parameter.
+
+    Pre-v6 the mass model sized motor torque internally from this
+    coefficient and the rover's lunar weight. v6 makes
+    :attr:`roverdevkit.schema.DesignVector.peak_wheel_torque_nm` a
+    first-class design input, and this coefficient survives only as a
+    default in
+    :func:`roverdevkit.drivetrain.motor.sizing_peak_torque_anchor_nm`
+    (the LHS prior anchor for the v6 dataset rebuild). Kept on
+    :class:`MassModelParams` so existing callers / pickled fixtures
+    don't break; remove on the next mass-model bump."""
 
     motor_sizing_safety_factor: float = 2.0
-    """Derating applied on top of the peak-friction torque to cover thermal
-    soak, startup transients, and design uncertainty. AIAA S-120A-2015
-    default for pre-PDR stages."""
+    """Schema v6 dead parameter — see :attr:`motor_peak_friction_coef`."""
 
     # -- Solar panels ------------------------------------------------------
     solar_specific_area_mass_kg_per_m2: float = 2.5
@@ -184,7 +193,12 @@ class MassBreakdown:
     thermal_kg: float
     margin_kg: float
     n_iterations: int = field(default=0, compare=False)
-    """Number of fixed-point iterations taken to converge motor mass."""
+    """Number of fixed-point iterations taken to converge motor mass.
+
+    Schema v6 (W12 step B): always 1 — motor mass is a direct function
+    of :attr:`roverdevkit.schema.DesignVector.peak_wheel_torque_nm` so
+    the model converges in one pass. Field retained for back-compat
+    with pre-v6 fixtures and the validation harness."""
 
     @property
     def total_kg(self) -> float:
@@ -248,30 +262,27 @@ def _wheels_mass(
 
 def _motors_mass(
     n_wheels: int,
-    wheel_radius_m: float,
-    vehicle_mass_kg: float,
+    peak_wheel_torque_nm: float,
     params: MassModelParams,
 ) -> float:
     """Drive-motor + gearbox mass sized from the peak-wheel torque.
 
-    Peak per-wheel torque::
-
-        tau_peak = SF * mu * (m_total * g / n_wheels) * R
-
-    Per-motor mass = ``m_0 + k_tau * tau_peak``; summed over ``n_wheels``.
+    Schema v6 (W12 step B): ``peak_wheel_torque_nm`` is now a direct
+    design input rather than something derived from the vehicle's
+    lunar weight inside the mass model. Per-motor mass remains
+    ``m_0 + k_tau * tau_peak``; total summed over ``n_wheels``. The
+    pre-v6 mass-derived ceiling lives on in
+    :func:`roverdevkit.drivetrain.motor.sizing_peak_torque_anchor_nm`
+    only as an LHS prior anchor.
     """
-    if vehicle_mass_kg <= 0.0:
-        raise ValueError("vehicle_mass_kg must be positive.")
+    if peak_wheel_torque_nm < 0.0:
+        raise ValueError("peak_wheel_torque_nm must be non-negative.")
+    if n_wheels <= 0:
+        raise ValueError("n_wheels must be positive.")
 
-    weight_per_wheel_n = vehicle_mass_kg * params.gravity_moon_m_per_s2 / n_wheels
-    peak_torque_nm = (
-        params.motor_sizing_safety_factor
-        * params.motor_peak_friction_coef
-        * weight_per_wheel_n
-        * wheel_radius_m
-    )
     per_motor_kg = (
-        params.motor_base_mass_kg + params.motor_specific_torque_kg_per_nm * peak_torque_nm
+        params.motor_base_mass_kg
+        + params.motor_specific_torque_kg_per_nm * peak_wheel_torque_nm
     )
     return n_wheels * per_motor_kg
 
@@ -308,19 +319,19 @@ def estimate_mass(
     solar_area_m2: float,
     battery_capacity_wh: float,
     avionics_power_w: float,
+    peak_wheel_torque_nm: float,
     grouser_height_m: float = 0.0,
     grouser_count: int = 0,
     params: MassModelParams | None = None,
-    max_iter: int = 20,
-    rel_tol: float = 1e-4,
 ) -> MassBreakdown:
     """Assemble a bottom-up subsystem mass breakdown for a rover design.
 
-    Load-independent subsystems (chassis, wheels, solar, battery, avionics)
-    are evaluated once up front. Motor mass is sized against the peak
-    per-wheel torque, which depends on the vehicle's lunar weight and
-    therefore on the total mass; we resolve that coupling with a short
-    fixed-point iteration.
+    Schema v6 (W12 step B). All subsystems are load-independent now
+    that ``peak_wheel_torque_nm`` is a true design input — the pre-v6
+    fixed-point iteration over total mass is gone, and this function
+    converges in a single pass. The ``n_iterations`` field on the
+    returned :class:`MassBreakdown` is kept for backward compatibility
+    but is always 1 in v6.
 
     The keyword-only signature matches the design-variable names on
     :class:`roverdevkit.schema.DesignVector`. See
@@ -336,12 +347,13 @@ def estimate_mass(
         Dry chassis structural mass, kg. A design-variable input.
     solar_area_m2, battery_capacity_wh, avionics_power_w
         Power-subsystem design variables.
+    peak_wheel_torque_nm
+        Peak per-wheel hub torque the drivetrain delivers, Nm. Sizes
+        motor mass directly via ``m_0 + k_tau * tau_peak``.
     grouser_height_m, grouser_count
         Grouser geometry, m and count. Defaults to 0.
     params
         :class:`MassModelParams` override; defaults to the module defaults.
-    max_iter, rel_tol
-        Fixed-point iteration controls for the motor-mass loop.
 
     Returns
     -------
@@ -352,8 +364,7 @@ def estimate_mass(
     ------
     ValueError
         On any non-physical input (negative masses, non-positive
-        geometry) or if the iteration fails to converge within
-        ``max_iter`` steps.
+        geometry).
     """
     params = params or MassModelParams()
 
@@ -366,36 +377,13 @@ def estimate_mass(
     m_solar = _solar_panels_mass(solar_area_m2, params)
     m_battery = _battery_mass(battery_capacity_wh, params)
     m_avionics = _avionics_mass(avionics_power_w, params)
+    m_motors = _motors_mass(n_wheels, peak_wheel_torque_nm, params)
 
-    # First-guess total: chassis + a generous markup for everything else.
-    # Motor sizing is moderately sensitive to this initial value but the
-    # iteration is a contraction, so any reasonable starting point works.
-    m_total = 2.5 * m_chassis
-
-    m_motors = m_harness = m_thermal = m_margin = 0.0  # Appease static analysers.
-    iterations = 0
-    converged = False
-    while iterations < max_iter:
-        iterations += 1
-        m_motors = _motors_mass(n_wheels, wheel_radius_m, m_total, params)
-        m_subsystems = m_chassis + m_wheels + m_motors + m_solar + m_battery + m_avionics
-        m_harness = params.harness_fraction * m_subsystems
-        m_thermal = params.thermal_fraction * (m_subsystems + m_harness)
-        m_dry = m_subsystems + m_harness + m_thermal
-        m_margin = params.margin_fraction * m_dry
-        m_total_new = m_dry + m_margin
-
-        if abs(m_total_new - m_total) / m_total < rel_tol:
-            m_total = m_total_new
-            converged = True
-            break
-        m_total = m_total_new
-
-    if not converged:
-        raise ValueError(
-            f"Mass-model fixed-point iteration failed to converge "
-            f"in {max_iter} steps at rel_tol={rel_tol}."
-        )
+    m_subsystems = m_chassis + m_wheels + m_motors + m_solar + m_battery + m_avionics
+    m_harness = params.harness_fraction * m_subsystems
+    m_thermal = params.thermal_fraction * (m_subsystems + m_harness)
+    m_dry = m_subsystems + m_harness + m_thermal
+    m_margin = params.margin_fraction * m_dry
 
     return MassBreakdown(
         chassis_kg=m_chassis,
@@ -407,7 +395,7 @@ def estimate_mass(
         harness_kg=m_harness,
         thermal_kg=m_thermal,
         margin_kg=m_margin,
-        n_iterations=iterations,
+        n_iterations=1,
     )
 
 
@@ -424,6 +412,7 @@ def estimate_mass_from_design(
         solar_area_m2=design.solar_area_m2,
         battery_capacity_wh=design.battery_capacity_wh,
         avionics_power_w=design.avionics_power_w,
+        peak_wheel_torque_nm=design.peak_wheel_torque_nm,
         grouser_height_m=design.grouser_height_m,
         grouser_count=design.grouser_count,
         params=params,

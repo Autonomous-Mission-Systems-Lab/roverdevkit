@@ -117,21 +117,15 @@ def test_bigger_wheel_radius_raises_slope_capability(
     assert entry.delta_slope_capability_deg > 0.5
 
 
-def test_faster_speed_increases_range_when_not_cap_bound(
+def test_more_peak_wheel_torque_increases_total_mass(
     cross_scenario_sensitivity_by_var: dict[str, SensitivityEntry],
 ) -> None:
-    """In the distance-unlimited sensitivity scenario, doubling the
-    nominal speed must grow the predicted range."""
-    entry = cross_scenario_sensitivity_by_var["nominal_speed_mps"]
-    assert entry.delta_range_km > 0.0
-
-
-def test_higher_duty_cycle_increases_range_when_not_cap_bound(
-    cross_scenario_sensitivity_by_var: dict[str, SensitivityEntry],
-) -> None:
-    """duty cycle multiplies forward progress per step."""
-    entry = cross_scenario_sensitivity_by_var["drive_duty_cycle"]
-    assert entry.delta_range_km > 0.0
+    """Schema v6: peak_wheel_torque_nm sizes the motor and gearbox mass
+    contributions in the parametric mass model. Bumping torque capacity
+    must therefore increase total dry mass.
+    """
+    entry = cross_scenario_sensitivity_by_var["peak_wheel_torque_nm"]
+    assert entry.delta_total_mass_kg > 0.0
 
 
 def test_bigger_solar_area_never_decreases_energy_margin(

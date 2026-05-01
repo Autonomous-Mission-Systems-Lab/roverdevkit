@@ -59,8 +59,7 @@ _EXPECTED_DESIGN_COLS = {
     "design_solar_area_m2",
     "design_battery_capacity_wh",
     "design_avionics_power_w",
-    "design_nominal_speed_mps",
-    "design_drive_duty_cycle",
+    "design_peak_wheel_torque_nm",
 }
 
 _EXPECTED_SCENARIO_COLS = {
@@ -72,6 +71,7 @@ _EXPECTED_SCENARIO_COLS = {
     "scenario_soil_simulant",
     "scenario_mission_duration_earth_days",
     "scenario_max_slope_deg",
+    "scenario_operational_duty_cycle",
     "scenario_sun_geometry",
     "scenario_soil_n",
     "scenario_soil_k_c",
@@ -89,7 +89,7 @@ _EXPECTED_METRIC_COLS = {
     "total_mass_kg",
     "peak_motor_torque_nm",
     "sinkage_max_m",
-    "motor_torque_ok",
+    "stalled",
 }
 # thermal_survival was removed at SCHEMA_VERSION = v2; the surrogate no
 # longer consumes it (the system-level evaluator still computes it as a
@@ -163,8 +163,8 @@ def test_metric_ranges_are_physically_plausible(small_df: pd.DataFrame) -> None:
     assert (ok["total_mass_kg"] > 0).all()
 
 
-def test_motor_torque_ok_is_boolean(small_df: pd.DataFrame) -> None:
-    assert small_df["motor_torque_ok"].dtype == bool
+def test_stalled_is_boolean(small_df: pd.DataFrame) -> None:
+    assert small_df["stalled"].dtype == bool
 
 
 def test_thermal_survival_not_in_schema(small_df: pd.DataFrame) -> None:
@@ -253,7 +253,9 @@ def test_evaluator_failure_is_recorded_not_raised(monkeypatch: pytest.MonkeyPatc
     assert (df["status"] == "RuntimeError").all()
     assert df["range_km"].isna().all()
     assert df["energy_margin_pct"].isna().all()
-    assert (df["motor_torque_ok"] == False).all()  # noqa: E712
+    # Schema v6: failed rows default to ``stalled=True`` (the
+    # safe-conservative side; status != 'ok' filters them out anyway).
+    assert (df["stalled"] == True).all()  # noqa: E712
 
 
 # ---------------------------------------------------------------------------

@@ -9,12 +9,12 @@ evaluator can import it transitively without pulling XGBoost / sklearn.
 
 Columns
 -------
-Inputs (39 columns):
+Inputs (25 columns):
 
-- :data:`DESIGN_FEATURE_COLUMNS` (12) — the raw design vector.
-- :data:`SCENARIO_NUMERIC_COLUMNS` (9) — continuous scenario + soil
-  parameters (latitude, mission duration, max slope, Bekker n / k_c /
-  k_phi / cohesion / friction / shear modulus).
+- :data:`DESIGN_FEATURE_COLUMNS` (11) — the raw design vector.
+- :data:`SCENARIO_NUMERIC_COLUMNS` (10) — continuous scenario + soil
+  parameters (latitude, mission duration, max slope, ground-ops duty
+  cycle, Bekker n / k_c / k_phi / cohesion / friction / shear modulus).
 - :data:`SCENARIO_CATEGORICAL_COLUMNS` (4) — scenario-family discrete
   features. Kept as pandas ``category`` dtype so XGBoost can consume
   them natively via ``enable_categorical=True`` without one-hot
@@ -65,15 +65,26 @@ DESIGN_FEATURE_COLUMNS: list[str] = [
     "design_solar_area_m2",
     "design_battery_capacity_wh",
     "design_avionics_power_w",
-    "design_nominal_speed_mps",
-    "design_drive_duty_cycle",
+    "design_peak_wheel_torque_nm",
 ]
-"""12-D design vector, prefixed to match the Parquet schema."""
+"""11-D design vector, prefixed to match the Parquet schema.
+
+SCHEMA_VERSION v6 (W12 step B): ``design_nominal_speed_mps`` ->
+``design_peak_wheel_torque_nm`` (cruise speed is now derived inside
+the evaluator, no longer a free design input);
+``design_drive_duty_cycle`` -> ``design_designed_duty_cycle``.
+
+SCHEMA_VERSION v7 (W12 step B follow-up): drops
+``design_designed_duty_cycle`` after that field turned out to do no
+engineering work in the v6 mass model. Drive duty cycle lives on the
+scenario (``scenario_operational_duty_cycle``) only; per-call
+overrides are wired through :class:`MissionScenario` at inference."""
 
 SCENARIO_NUMERIC_COLUMNS: list[str] = [
     "scenario_latitude_deg",
     "scenario_mission_duration_earth_days",
     "scenario_max_slope_deg",
+    "scenario_operational_duty_cycle",
     "scenario_soil_n",
     "scenario_soil_k_c",
     "scenario_soil_k_phi",
@@ -81,11 +92,21 @@ SCENARIO_NUMERIC_COLUMNS: list[str] = [
     "scenario_soil_friction_angle_deg",
     "scenario_soil_shear_modulus_k_m",
 ]
-"""Continuous scenario + jittered Bekker-soil inputs (9 columns).
+"""Continuous scenario + jittered Bekker-soil inputs (10 columns).
 
 ``scenario_traverse_distance_m`` is intentionally excluded: it is
 family-fixed (non-binding) and would otherwise leak the scenario
-identity into a supposedly continuous feature."""
+identity into a supposedly continuous feature.
+
+SCHEMA_VERSION v7_1 (W12 step B follow-on, 2026-04-28): added
+``scenario_operational_duty_cycle`` so the surrogate sees δ_ops as a
+true continuous input. Pre-v7_1 the surrogate keyed off the
+family categorical only, which made calibrated PIs available only
+at the four per-family δ_ops anchors and forced the webapp to fall
+through to evaluator-only mode whenever the user moved the δ_ops
+slider away from its default. With δ_ops now an LHS feature
+(uniform [0, 0.6] independently of family), the calibrated quantile
+heads cover the full slider range."""
 
 SCENARIO_CATEGORICAL_COLUMNS: list[str] = [
     "scenario_family",
@@ -126,21 +147,27 @@ PRIMARY_REGRESSION_TARGETS: list[str] = [
 ]
 """Subset reported in the Week-6 accuracy gate (project_plan.md §7 L1)."""
 
-CLASSIFICATION_TARGETS: list[str] = ["motor_torque_ok"]
+CLASSIFICATION_TARGETS: list[str] = ["stalled"]
 """Single binary feasibility target.
 
-``motor_torque_ok`` captures whether the rover can generate sufficient
-drawbar pull to climb the scenario's worst-case slope under
-Bekker-Wong terramechanics with the sampled (jittered) soil
-parameters. This is a real physics-driven binary outcome; learning it
-exercises the surrogate's joint understanding of grouser geometry,
-soil shear parameters, mass, and slope."""
+SCHEMA_VERSION v6 (W12 step B): switched from ``motor_torque_ok`` to
+``stalled`` to match the new explicit drivetrain stall gate (per-wheel
+torque demand vs ``DesignVector.peak_wheel_torque_nm``). ``stalled``
+is the *infeasible* class (1 = stalled), inverted from
+``motor_torque_ok``'s OK-is-1 convention; baseline / classifier
+training scripts re-bind class-weight semantics accordingly. The
+underlying physics-driven binary outcome is unchanged: it captures
+whether the rover can generate enough drawbar pull (and has enough
+torque envelope) to climb the scenario's worst-case slope under
+Bekker-Wong terramechanics with the sampled soil parameters."""
 
-FEASIBILITY_COLUMN: str = "motor_torque_ok"
+FEASIBILITY_COLUMN: str = "stalled"
 """Alias for the single feasibility column. Kept as a constant so
 downstream baselines / classifiers reference one canonical name even
 if the underlying definition changes (e.g. when thermal is restored as
-a real trade-off in a future mass-model upgrade)."""
+a real trade-off in a future mass-model upgrade). Schema v6 flipped
+this from ``motor_torque_ok`` to ``stalled``; positive class is now
+the failure mode (= ``run_traverse(...).rover_stalled``)."""
 
 
 # ---------------------------------------------------------------------------

@@ -65,8 +65,7 @@ const DEFAULTS = {
 export const useSweepStore = create<SweepState>()((set, get) => ({
   ...DEFAULTS,
   setTarget: (target) => set({ target }),
-  setXAxis: (axis) =>
-    set((state) => ({ xAxis: { ...state.xAxis, ...axis } })),
+  setXAxis: (axis) => set((state) => ({ xAxis: { ...state.xAxis, ...axis } })),
   setXVariable: (variable) => {
     // Picking a new x variable resets bounds to that field's
     // schema range so the lo/hi defaults always sit inside it.

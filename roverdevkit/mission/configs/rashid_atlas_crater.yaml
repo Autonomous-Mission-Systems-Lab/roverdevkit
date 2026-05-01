@@ -27,3 +27,8 @@ soil_simulant: FJS-1
 mission_duration_earth_days: 14.0     # one lunar day (Rashid-1 design target)
 max_slope_deg: 10.0
 sun_geometry: diurnal
+# Schema v6 (W12 step B): δ_ops calibrated to the Rashid-1 design
+# target of ~1 km / 14 days at v_cruise ~6.6 cm/s (Hurrell et al.
+# 2025). Implied δ = (1000/(14*86400))/0.066 ≈ 0.013. Used only by
+# the registry-rover validation gate.
+operational_duty_cycle: 0.013

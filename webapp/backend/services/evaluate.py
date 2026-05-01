@@ -10,10 +10,19 @@ still supply the prediction interval around that median.
 We use ``evaluate_verbose`` (rather than the lighter ``evaluate``) so we
 can surface the *why* behind the constraint flags: the peak / cold
 enclosure temperatures from the lumped-parameter thermal model and the
-peak motor torque vs the sizing ceiling. The cost of the verbose path
-is identical -- the underlying physics call is the same -- and the
-extra fields are dropped on the floor for callers that only want
+explicit drivetrain stall gate (peak per-wheel hub torque demand vs
+``DesignVector.peak_wheel_torque_nm``). The cost of the verbose path is
+identical -- the underlying physics call is the same -- and the extra
+fields are dropped on the floor for callers that only want
 ``MissionMetrics``.
+
+Schema v6 (W12 step B): the previous ``MotorTorqueDiagnostic`` was
+replaced by :class:`StallDiagnostic`. The pre-v6 diagnostic compared the
+peak observed torque to a closed-form per-wheel ceiling derived from
+``mass × g / N × R × sf × μ`` inside the mass model; v6 makes the
+ceiling an explicit design input (``peak_wheel_torque_nm``) and the
+stall gate is an explicit slip-balance comparison inside
+:mod:`roverdevkit.drivetrain.motor`.
 """
 
 from __future__ import annotations
@@ -21,7 +30,6 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from roverdevkit.mass.parametric_mers import MassModelParams
 from roverdevkit.mission.evaluator import evaluate_verbose
 from roverdevkit.power.thermal import ThermalResult
 from roverdevkit.schema import DesignVector, MissionMetrics, MissionScenario
@@ -30,40 +38,28 @@ from roverdevkit.terramechanics.correction_model import WheelLevelCorrection
 
 
 @dataclass(frozen=True)
-class MotorTorqueDiagnostic:
-    """Peak motor torque vs the sizing-time ceiling.
+class StallDiagnostic:
+    """Drivetrain stall status (schema v6).
 
-    The sizing-time ceiling is a closed-form per-wheel torque bound
-    derived inside the mass model
-    (:func:`roverdevkit.mass.parametric_mers._motors_mass`); we
-    re-derive it here from the same closed form so the API stays
-    independent of that private helper, and so a future schema bump in
-    the mass model surfaces here as a deliberate test failure.
+    Encodes the explicit stall gate:
+    ``stalled = (T_req_per_wheel_nm > peak_wheel_torque_nm) or
+    slip_solver_failed``. ``peak_torque_demand_nm`` is the slip-balance
+    torque the wheel-level solve computed; ``peak_torque_capacity_nm``
+    is the design input (``DesignVector.peak_wheel_torque_nm``) echoed
+    back so the frontend can render both numbers side-by-side.
     """
 
-    peak_torque_nm: float
-    """Largest absolute per-wheel torque observed during the traverse."""
+    stalled: bool
+    """``True`` iff the rover stalled under the scenario's worst-case
+    load (drives :data:`MissionMetrics.stalled`)."""
 
-    ceiling_nm: float
-    """Sizing-time per-wheel torque ceiling.
+    peak_torque_demand_nm: float
+    """Largest absolute per-wheel torque the slip-balance solve
+    demanded during the traverse."""
 
-    ``ceiling = sf * mu * (m * g / N) * R`` with ``sf`` the motor
-    sizing safety factor, ``mu`` the peak friction coefficient,
-    ``m * g / N`` the per-wheel weight, and ``R`` the wheel radius.
-    """
-
-    rover_stalled: bool
-    """Did the traverse loop hit a stall (zero forward progress)?"""
-
-    @property
-    def torque_ok(self) -> bool:
-        """Did peak torque stay under the sizing ceiling?"""
-        return self.peak_torque_nm <= self.ceiling_nm
-
-    @property
-    def survives(self) -> bool:
-        """End-to-end mobility flag (matches ``MissionMetrics.motor_torque_ok``)."""
-        return self.torque_ok and not self.rover_stalled
+    peak_torque_capacity_nm: float
+    """Design-input drivetrain capacity
+    (``DesignVector.peak_wheel_torque_nm``)."""
 
 
 @dataclass(frozen=True)
@@ -77,33 +73,11 @@ class EvaluatorOutput:
 
     metrics: MissionMetrics
     thermal: ThermalResult
-    motor_torque: MotorTorqueDiagnostic
+    stall: StallDiagnostic
+    effective_duty_cycle: float
+    cruise_speed_mps: float
     elapsed_ms: float
     used_scm_correction: bool
-
-
-def _sizing_peak_torque_nm(
-    total_mass_kg: float,
-    wheel_radius_m: float,
-    n_wheels: int,
-    params: MassModelParams,
-) -> float:
-    """Re-derive the per-wheel torque ceiling the mass model sizes against.
-
-    Mirrors :func:`roverdevkit.mission.evaluator._sizing_peak_torque_nm`
-    -- duplicated here so the service module does not depend on a
-    private helper in the core. Both formulas read ``sf * mu *
-    (m*g/N) * R``; if the mass model ever rewrites the ceiling, both
-    copies must change together (a unit test in
-    ``roverdevkit/tests/`` already pins the mass-model copy).
-    """
-    weight_per_wheel_n = total_mass_kg * params.gravity_moon_m_per_s2 / n_wheels
-    return (
-        params.motor_sizing_safety_factor
-        * params.motor_peak_friction_coef
-        * weight_per_wheel_n
-        * wheel_radius_m
-    )
 
 
 def evaluate_design(
@@ -111,13 +85,14 @@ def evaluate_design(
     scenario: MissionScenario,
     *,
     correction: WheelLevelCorrection | None,
+    operational_duty_cycle: float | None = None,
 ) -> EvaluatorOutput:
     """Run the corrected mission evaluator on one design × one scenario.
 
     Parameters
     ----------
     design
-        Validated 12-D design vector (Pydantic has already enforced the
+        Validated 11-D design vector (Pydantic has already enforced the
         bounds at the HTTP boundary).
     scenario
         One of the canonical scenarios resolved server-side.
@@ -126,15 +101,19 @@ def evaluate_design(
         process by :func:`webapp.backend.loaders.get_correction`). Pass
         ``None`` to fall back to the BW-only evaluator; the route
         decides whether that fallback is acceptable.
+    operational_duty_cycle
+        Schema v6 (W12 step B): per-call override of
+        ``MissionScenario.operational_duty_cycle``. ``None`` (default)
+        uses the scenario's calibrated value. Schema v7 (W12 step B
+        follow-up): used directly as ``δ_eff`` (clamped to ``[0, 1]``).
 
     Returns
     -------
     EvaluatorOutput
-        The full :class:`MissionMetrics` plus a wall-clock measurement,
-        a flag indicating whether the SCM correction was actually
-        applied, the :class:`ThermalResult` (peak / cold temperatures
-        and limits), and a :class:`MotorTorqueDiagnostic` with peak
-        torque, the sizing ceiling, and the rover-stalled flag.
+        :class:`MissionMetrics` plus a wall-clock measurement, an SCM-
+        correction flag, the :class:`ThermalResult`, the
+        :class:`StallDiagnostic`, and the runtime-resolved
+        ``effective_duty_cycle`` / ``cruise_speed_mps``.
     """
     t0 = time.perf_counter()
     detailed = evaluate_verbose(
@@ -142,24 +121,22 @@ def evaluate_design(
         scenario,
         use_scm_correction=correction is not None,
         correction=correction,
+        operational_duty_cycle=operational_duty_cycle,
     )
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
-    motor_torque = MotorTorqueDiagnostic(
-        peak_torque_nm=float(detailed.metrics.peak_motor_torque_nm),
-        ceiling_nm=_sizing_peak_torque_nm(
-            detailed.metrics.total_mass_kg,
-            design.wheel_radius_m,
-            design.n_wheels,
-            MassModelParams(),
-        ),
-        rover_stalled=bool(detailed.log.rover_stalled),
+    stall = StallDiagnostic(
+        stalled=bool(detailed.metrics.stalled),
+        peak_torque_demand_nm=float(detailed.log.peak_torque_demand_nm),
+        peak_torque_capacity_nm=float(detailed.log.peak_torque_capacity_nm),
     )
 
     return EvaluatorOutput(
         metrics=detailed.metrics,
         thermal=detailed.thermal,
-        motor_torque=motor_torque,
+        stall=stall,
+        effective_duty_cycle=float(detailed.log.effective_duty_cycle),
+        cruise_speed_mps=float(detailed.log.cruise_speed_mps),
         elapsed_ms=elapsed_ms,
         used_scm_correction=correction is not None,
     )

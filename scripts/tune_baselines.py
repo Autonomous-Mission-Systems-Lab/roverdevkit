@@ -1,7 +1,7 @@
 """Optuna-tune the XGBoost surrogate baselines on a Parquet dataset.
 
 Companion to ``scripts/run_baselines.py``. This script tunes only
-XGBoost (per-target regressors + the ``motor_torque_ok`` classifier);
+XGBoost (per-target regressors + the ``stalled`` feasibility classifier);
 the rationale for the scope is in
 ``roverdevkit.surrogate.tuning`` module docstring.
 
@@ -106,7 +106,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--no-classifier",
         action="store_true",
-        help="Skip tuning the motor_torque_ok classifier.",
+        help="Skip tuning the stalled feasibility classifier.",
     )
     p.add_argument(
         "--no-registry-check",
@@ -137,7 +137,12 @@ def _split_xy(
     """
     df_clean = valid_rows(df)
     if feasible_only:
-        mask = df_clean[FEASIBILITY_COLUMN].astype(bool).to_numpy()
+        # Schema v6 (W12 step B): ``FEASIBILITY_COLUMN`` is now ``stalled``
+        # with positive class = infeasible, so we negate before masking
+        # to keep only the feasible (non-stalled) regression rows. The
+        # classifier path keeps the raw 0/1 labels (1 = stalled = the
+        # positive failure class).
+        mask = (~df_clean[FEASIBILITY_COLUMN].astype(bool)).to_numpy()
         df_clean = df_clean.loc[mask]
     X = build_feature_matrix(df_clean)
     y = df_clean[target].to_numpy()
@@ -287,7 +292,9 @@ def main(argv: list[str] | None = None) -> int:
         # Score on test
         y_te_pred = np.asarray(result.final_model.predict(X_te))
         df_test_feas = valid_rows(df_test)
-        feas_mask = df_test_feas[FEASIBILITY_COLUMN].astype(bool).to_numpy()
+        # Schema v6: negate ``stalled`` (True == infeasible) to keep the
+        # feasible-only test rows the regression metrics expect.
+        feas_mask = (~df_test_feas[FEASIBILITY_COLUMN].astype(bool)).to_numpy()
         df_test_feas = df_test_feas.loc[feas_mask]
         m = _regression_metrics_with_family(
             df_test_feas, y_te_pred, target=target, algorithm="xgboost_tuned"
@@ -524,7 +531,7 @@ def _print_registry_summary(sanity: pd.DataFrame) -> None:
             .rename("classifier_accuracy")
             .to_frame()
         )
-        print("\nClassifier accuracy (motor_torque_ok):")
+        print("\nClassifier accuracy (stalled):")
         print(s.round(3).to_string())
     if not diagnostic.empty:
         print("\n=== Tuned registry sanity (SCENARIO-OOD diagnostic) ===", flush=True)

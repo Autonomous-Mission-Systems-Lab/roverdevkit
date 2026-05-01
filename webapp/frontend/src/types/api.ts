@@ -25,7 +25,21 @@ export type TerrainClass =
 
 export type SunGeometry = "continuous" | "diurnal" | "polar_intermittent";
 
-/** Mirror of `roverdevkit.schema.DesignVector`. */
+/**
+ * Mirror of `roverdevkit.schema.DesignVector` (schema v7, W12 step B
+ * follow-up).
+ *
+ * v6 changes: `nominal_speed_mps` removed (cruise speed is derived in
+ * the evaluator from drivetrain torque + slip-balance + energy-balance
+ * + kinematic envelope); `peak_wheel_torque_nm` added as a true
+ * drivetrain-capability input.
+ *
+ * v7 changes: `designed_duty_cycle` removed after that field turned
+ * out to do no engineering work in the v6 mass model. Drive duty
+ * cycle now lives entirely on the scenario
+ * (`MissionScenario.operational_duty_cycle`) with optional per-call
+ * override at inference time.
+ */
 export interface DesignVector {
   wheel_radius_m: number;
   wheel_width_m: number;
@@ -37,11 +51,18 @@ export interface DesignVector {
   solar_area_m2: number;
   battery_capacity_wh: number;
   avionics_power_w: number;
-  nominal_speed_mps: number;
-  drive_duty_cycle: number;
+  peak_wheel_torque_nm: number;
 }
 
-/** Mirror of `roverdevkit.schema.MissionScenario`. */
+/**
+ * Mirror of `roverdevkit.schema.MissionScenario`.
+ *
+ * `operational_duty_cycle` is the per-scenario ground-ops drive duty
+ * and, since schema v7, the *only* drive duty parameter. The
+ * evaluator uses it directly as δ_eff (clamped to [0, 1]). The
+ * frontend reads the calibrated default here and lets the user
+ * override it via the "Operations" panel.
+ */
 export interface MissionScenario {
   name: string;
   latitude_deg: number;
@@ -51,6 +72,7 @@ export interface MissionScenario {
   mission_duration_earth_days: number;
   max_slope_deg: number;
   sun_geometry: SunGeometry;
+  operational_duty_cycle: number;
 }
 
 export interface SoilParametersOut {
@@ -105,14 +127,32 @@ export interface FeatureRow {
 export interface PredictRequest {
   design: DesignVector;
   scenario_name: string;
+  /**
+   * Optional per-query override for `MissionScenario.operational_duty_cycle`.
+   * SCHEMA_VERSION v7_1: δ_ops is a true LHS-sampled surrogate input,
+   * so any in-bounds override stays on the surrogate path with
+   * calibrated PIs (`mode = "surrogate"`).
+   */
+  operational_duty_cycle?: number | null;
   repair_crossings?: boolean;
 }
+
+/**
+ * Mirror of the FastAPI `PredictMode`. SCHEMA_VERSION v7_1 always
+ * returns `"surrogate"`; the `"evaluator_only"` literal is retained
+ * for forwards-compat with any future evaluator-fallback paths (e.g.
+ * out-of-bounds inputs). The frontend keeps the `<NoPiBanner />`
+ * gate on `mode` so a future fallback degrades cleanly without a UI
+ * change.
+ */
+export type PredictMode = "surrogate" | "evaluator_only";
 
 export interface PredictResponse {
   scenario_name: string;
   quantiles: [number, number, number];
   predictions: PredictTarget[];
   feature_row: FeatureRow;
+  mode: PredictMode;
 }
 
 /**
@@ -125,6 +165,13 @@ export interface PredictResponse {
 export interface EvaluateRequest {
   design: DesignVector;
   scenario_name: string;
+  /**
+   * Optional per-query override for `MissionScenario.operational_duty_cycle`.
+   * Schema v7: the evaluator uses this value directly as δ_eff
+   * (clamped to [0, 1]); when omitted we use the scenario's
+   * calibrated default.
+   */
+  operational_duty_cycle?: number | null;
 }
 
 export interface EvaluateMetric {
@@ -150,20 +197,39 @@ export interface ThermalDiagnostic {
   cold_case_ok: boolean;
 }
 
-/** Mirror of the FastAPI `MotorTorqueDiagnosticOut`. */
-export interface MotorTorqueDiagnostic {
-  survives: boolean;
-  peak_torque_nm: number;
-  ceiling_nm: number;
-  rover_stalled: boolean;
-  torque_ok: boolean;
+/**
+ * Mirror of the FastAPI `StallDiagnosticOut` (schema v6).
+ *
+ * Replaces the v5 `MotorTorqueDiagnostic`. The drivetrain stalls when
+ * the slip-balance torque demand exceeds the design's
+ * `peak_wheel_torque_nm` capacity, or when the slip solver cannot
+ * develop the required drawbar pull on the scenario's worst-case slope.
+ */
+export interface StallDiagnostic {
+  stalled: boolean;
+  peak_torque_demand_nm: number;
+  peak_torque_capacity_nm: number;
 }
 
 export interface EvaluateResponse {
   scenario_name: string;
   metrics: EvaluateMetric[];
   thermal: ThermalDiagnostic;
-  motor_torque: MotorTorqueDiagnostic;
+  /** Schema v6: replaces the v5 `motor_torque` field. */
+  stall: StallDiagnostic;
+  /**
+   * Schema v7: `operational_duty_cycle` (per-scenario default or
+   * per-call override) clamped to [0, 1]. The v6 `min(δ_des, δ_ops)`
+   * semantics collapsed when `designed_duty_cycle` was removed from
+   * the design vector. Surfaced so the single-design panel can echo
+   * the duty the evaluator actually drove the rover at.
+   */
+  effective_duty_cycle: number;
+  /**
+   * Derived rover cruise speed used by the time loop. Replaces the v5
+   * `DesignVector.nominal_speed_mps` design input.
+   */
+  cruise_speed_mps: number;
   used_scm_correction: boolean;
   elapsed_ms: number;
 }
@@ -224,8 +290,7 @@ export type SweepableVariable =
   | "solar_area_m2"
   | "battery_capacity_wh"
   | "avionics_power_w"
-  | "nominal_speed_mps"
-  | "drive_duty_cycle";
+  | "peak_wheel_torque_nm";
 
 export const SWEEPABLE_VARIABLES: readonly SweepableVariable[] = [
   "wheel_radius_m",
@@ -237,8 +302,7 @@ export const SWEEPABLE_VARIABLES: readonly SweepableVariable[] = [
   "solar_area_m2",
   "battery_capacity_wh",
   "avionics_power_w",
-  "nominal_speed_mps",
-  "drive_duty_cycle",
+  "peak_wheel_torque_nm",
 ] as const;
 
 export type SweepBackend = "auto" | "evaluator" | "surrogate";
@@ -250,6 +314,14 @@ export interface SweepRequest {
   base_design: DesignVector;
   scenario_name: string;
   backend?: SweepBackend;
+  /**
+   * Optional per-query override for `MissionScenario.operational_duty_cycle`.
+   * SCHEMA_VERSION v7_1: δ_ops is a true LHS-sampled surrogate input,
+   * so the override is honoured on both sweep backends — surrogate
+   * batch predict and per-cell deterministic evaluator — keeping the
+   * sweep tab in sync with the Single design tab's slider.
+   */
+  operational_duty_cycle?: number | null;
 }
 
 export interface SweepResponse {
@@ -284,6 +356,119 @@ export interface SweepSensitivity {
   axis_spread_x: number;
   /** Median marginal y-spread; null for 1-D sweeps. */
   axis_spread_y: number | null;
+}
+
+export type OptimizeBackend = "surrogate" | "evaluator";
+export type ObjectiveDirection = "min" | "max";
+export type ConstraintSense = "min" | "max";
+export type OptimizeJobStatus =
+  | "queued"
+  | "running"
+  | "completed"
+  | "cancelled"
+  | "failed";
+
+export interface OptimizeObjectiveIn {
+  target: PrimaryTarget;
+  direction: ObjectiveDirection;
+}
+
+export interface OptimizeConstraintIn {
+  target: PrimaryTarget;
+  sense: ConstraintSense;
+  value: number;
+}
+
+export interface OptimizeRequest {
+  scenario_name: string;
+  backend?: OptimizeBackend;
+  objectives: OptimizeObjectiveIn[];
+  constraints?: OptimizeConstraintIn[];
+  population_size?: number;
+  n_generations?: number;
+  seed?: number;
+  operational_duty_cycle?: number | null;
+}
+
+export interface OptimizeJobResponse {
+  job_id: string;
+  status: OptimizeJobStatus;
+  stream_url: string;
+  result_url: string;
+  cancel_url: string;
+}
+
+export interface OptimizeCheckpointOut {
+  gen: number;
+  hypervolume: number;
+  pareto_size: number;
+  best_per_objective: Record<string, number>;
+}
+
+export interface OptimizeParetoPoint {
+  design: DesignVector;
+  metrics: Record<PrimaryTarget, number>;
+}
+
+export interface OptimizeResultResponse {
+  job_id: string;
+  status: OptimizeJobStatus;
+  backend_used: OptimizeBackend | null;
+  checkpoints: OptimizeCheckpointOut[];
+  pareto_front: OptimizeParetoPoint[];
+  error: string | null;
+}
+
+export interface OptimizeCancelResponse {
+  job_id: string;
+  status: OptimizeJobStatus;
+}
+
+export interface ParetoFrontSummary {
+  scenario_name: string;
+  pareto_size: number;
+  backend: string;
+  dataset_version: string | null;
+  front_url: string;
+}
+
+export interface ParetoFrontListResponse {
+  fronts: ParetoFrontSummary[];
+}
+
+export interface ParetoFrontResponse {
+  scenario_name: string;
+  source: "canonical";
+  metadata: Record<string, unknown>;
+  pareto_front: OptimizeParetoPoint[];
+}
+
+export interface ShapFeatureScore {
+  feature: string;
+  value: number;
+}
+
+export interface ShapTargetImportance {
+  target: PrimaryTarget;
+  features: ShapFeatureScore[];
+}
+
+export interface ShapGlobalResponse {
+  targets: ShapTargetImportance[];
+}
+
+export interface ShapExplainRequest {
+  design: DesignVector;
+  scenario_name: string;
+  target: PrimaryTarget;
+  operational_duty_cycle?: number | null;
+}
+
+export interface ShapLocalResponse {
+  target: PrimaryTarget;
+  prediction: number;
+  base_value: number;
+  contributions: ShapFeatureScore[];
 }
 
 export interface RegistryEntrySummary {
@@ -400,21 +585,14 @@ export const DESIGN_BOUNDS: Record<keyof DesignVector, FieldBounds> = {
     label: "Avionics power",
     description: "P_a, continuous avionics draw.",
   },
-  nominal_speed_mps: {
-    min: 0.01,
-    max: 0.1,
-    step: 0.005,
-    unit: "m/s",
-    label: "Nominal drive speed",
-    description: "v, drive speed when commanded.",
-  },
-  drive_duty_cycle: {
-    min: 0.02,
-    max: 0.6,
-    step: 0.01,
-    unit: "",
-    label: "Drive duty cycle",
-    description: "δ, fraction of mission spent driving.",
+  peak_wheel_torque_nm: {
+    min: 0.3,
+    max: 20.0,
+    step: 0.05,
+    unit: "Nm",
+    label: "Peak wheel torque",
+    description:
+      "T_hub^peak, peak per-wheel hub torque the drivetrain (motor + gearbox combined) can sustain. Sizes motor mass and gates whether the rover stalls on slope; cruise speed is derived from this and the slip-balance torque demand.",
   },
 };
 

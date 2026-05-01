@@ -35,7 +35,10 @@ def predict(req: PredictRequest) -> PredictResponse:
     2. Look up nominal Bekker-Wong soil parameters for the scenario's
        simulant.
     3. Assemble the 25-D feature row in the surrogate's training-time
-       column order.
+       column order, applying any per-call
+       ``operational_duty_cycle`` override before flattening so the
+       surrogate sees the same δ_ops the deterministic evaluator
+       would.
     4. Dispatch to every primary target's ``QuantileHeads`` head and
        collect ``(q05, q50, q95)`` triples.
 
@@ -44,6 +47,13 @@ def predict(req: PredictRequest) -> PredictResponse:
     ``reports/week8_intervals_v4/SUMMARY.md`` for the median sanity
     guardrail), so this single artifact powers both point estimates
     and PI envelopes.
+
+    Schema v7_1 (W12 step B follow-on): ``operational_duty_cycle`` is
+    a true surrogate input feature (LHS-sampled per row over [0, 0.6]),
+    so any in-bounds δ_ops is in-distribution and the calibrated PIs
+    apply across the full frontend slider range. The pre-v7_1
+    "evaluator-only fallback when override differs from default" gate
+    has been removed; ``mode`` is always ``"surrogate"``.
     """
     scenarios = get_canonical_scenarios()
     if req.scenario_name not in scenarios:
@@ -56,28 +66,32 @@ def predict(req: PredictRequest) -> PredictResponse:
     scenario = scenarios[req.scenario_name]
     soil = get_soil_for_simulant(scenario.soil_simulant)
 
+    if req.operational_duty_cycle is not None:
+        scenario = scenario.model_copy(
+            update={"operational_duty_cycle": req.operational_duty_cycle}
+        )
+
+    X = build_feature_row(req.design, scenario, soil)
+
     try:
         bundles = get_quantile_bundles()
     except FileNotFoundError as exc:
         raise HTTPException(
             status_code=503,
-            detail=("surrogate artifact not loaded; run scripts/calibrate_intervals.py first."),
+            detail=(
+                "surrogate artifact not loaded; run scripts/calibrate_intervals.py first."
+            ),
         ) from exc
-
-    X = build_feature_row(req.design, scenario, soil)
     preds = predict_quantiles(bundles, X, repair_crossings=req.repair_crossings)
-
-    targets: list[PredictTarget] = []
-    for target in PRIMARY_REGRESSION_TARGETS:
-        cell = preds[target]
-        targets.append(
-            PredictTarget(
-                target=target,  # type: ignore[arg-type]
-                q05=cell["q05"],
-                q50=cell["q50"],
-                q95=cell["q95"],
-            )
+    targets = [
+        PredictTarget(
+            target=t,  # type: ignore[arg-type]
+            q05=preds[t]["q05"],
+            q50=preds[t]["q50"],
+            q95=preds[t]["q95"],
         )
+        for t in PRIMARY_REGRESSION_TARGETS
+    ]
 
     feature_row = FeatureRow(
         columns=list(X.columns),
@@ -88,4 +102,5 @@ def predict(req: PredictRequest) -> PredictResponse:
         scenario_name=req.scenario_name,
         predictions=targets,
         feature_row=feature_row,
+        mode="surrogate",
     )

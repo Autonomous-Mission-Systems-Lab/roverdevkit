@@ -1,4 +1,4 @@
-# RoverDevKit: An AI-Augmented Tradespace Exploration Tool for Lunar Micro-Rover Conceptual Design
+# RoverDevKit: An Open-Source Tradespace Exploration Tool for Lunar Micro-Rover Conceptual Design
 
 ## Project Brief
 

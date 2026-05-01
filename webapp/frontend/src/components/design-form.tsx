@@ -13,9 +13,7 @@ import { DESIGN_BOUNDS, type DesignVector } from "@/types/api";
  * design-vector field names; each entry is the list of selected
  * rovers that have a numeric value to plot at that field.
  */
-export type DesignFormTicks = Partial<
-  Record<keyof DesignVector, SliderTick[]>
->;
+export type DesignFormTicks = Partial<Record<keyof DesignVector, SliderTick[]>>;
 
 export interface DesignFormProps {
   disabled?: boolean;

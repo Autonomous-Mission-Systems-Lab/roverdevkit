@@ -69,10 +69,7 @@ export function DialogHeader({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn(
-        "flex flex-col space-y-1.5 text-left pr-8",
-        className,
-      )}
+      className={cn("flex flex-col space-y-1.5 text-left pr-8", className)}
       {...props}
     />
   );
@@ -99,10 +96,7 @@ export const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn(
-      "text-sm text-[var(--color-muted-foreground)]",
-      className,
-    )}
+    className={cn("text-sm text-[var(--color-muted-foreground)]", className)}
     {...props}
   />
 ));

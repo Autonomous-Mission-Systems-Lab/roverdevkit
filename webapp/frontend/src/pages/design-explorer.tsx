@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { Play } from "lucide-react";
 
 import { DesignForm, type DesignFormTicks } from "@/components/design-form";
+import { NoPiBanner } from "@/components/no-pi-banner";
+import { OperationsPanel } from "@/components/operations-panel";
 import {
   PredictionPanel,
   type PredictionPanelMeta,
@@ -17,10 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  useEvaluate,
-  useRegistryEvaluations,
-} from "@/hooks/use-evaluate";
+import { useEvaluate, useRegistryEvaluations } from "@/hooks/use-evaluate";
 import { usePredict } from "@/hooks/use-predict";
 import { useRegistry } from "@/hooks/use-registry";
 import { roverColor } from "@/lib/rover-colors";
@@ -47,6 +46,7 @@ import {
 export function DesignExplorer() {
   const design = useDesignStore((s) => s.design);
   const scenarioName = useDesignStore((s) => s.scenarioName);
+  const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
   const overlayRovers = useDesignStore((s) => s.overlayRovers);
 
   const evaluate = useEvaluate();
@@ -106,11 +106,19 @@ export function DesignExplorer() {
     const evalByTarget = new Map(
       evaluate.data.metrics.map((m) => [m.target, m.value]),
     );
+    // Schema v7_1 (W12 step B follow-on): δ_ops is now an LHS feature,
+    // so the surrogate keeps its calibrated PIs across the whole
+    // override range. ``mode`` is always ``"surrogate"`` from the
+    // live route, but we still gate on it so the band is suppressed
+    // if a future evaluator-only fallback is added.
+    const showSurrogateBand = predict.data && predict.data.mode === "surrogate";
     const surrByTarget = new Map(
-      (predict.data?.predictions ?? []).map((p) => [
-        p.target,
-        { q05: p.q05, q95: p.q95 },
-      ]),
+      showSurrogateBand
+        ? predict.data!.predictions.map((p) => [
+            p.target,
+            { q05: p.q05, q95: p.q95 },
+          ])
+        : [],
     );
     return PRIMARY_REGRESSION_TARGET_ORDER.map((target: PrimaryTarget) => {
       const value = evalByTarget.get(target);
@@ -130,22 +138,41 @@ export function DesignExplorer() {
         used_scm_correction: evaluate.data.used_scm_correction,
         evaluator_ms: evaluate.data.elapsed_ms,
         thermal: evaluate.data.thermal,
-        motor_torque: evaluate.data.motor_torque,
+        // Schema v6 (W12 step B): the v5 ``motor_torque`` field was
+        // renamed to ``stall`` and now exposes per-wheel torque
+        // demand-vs-capacity directly.
+        stall: evaluate.data.stall,
+        effective_duty_cycle: evaluate.data.effective_duty_cycle,
+        cruise_speed_mps: evaluate.data.cruise_speed_mps,
       }
     : undefined;
 
   const handlePredict = () => {
-    evaluate.mutate({ design, scenario_name: scenarioName });
-    predict.mutate({ design, scenario_name: scenarioName });
+    // Plumb the (optional) δ_ops override through to both routes.
+    // SCHEMA_VERSION v7_1: δ_ops is a true LHS feature, so the
+    // surrogate keeps its calibrated PIs across the entire slider
+    // range; both /evaluate and /predict honour the override.
+    const opsDuty = opsDutyOverride ?? null;
+    evaluate.mutate({
+      design,
+      scenario_name: scenarioName,
+      operational_duty_cycle: opsDuty,
+    });
+    predict.mutate({
+      design,
+      scenario_name: scenarioName,
+      operational_duty_cycle: opsDuty,
+    });
   };
+
+  const evaluatorOnlyMode = predict.data?.mode === "evaluator_only";
 
   const isPending = evaluate.isPending;
   const surrogatePending = !evaluate.isPending && predict.isPending;
   // Bubble up the most informative error: evaluator failure is fatal
   // (no chart at all); a surrogate-only failure still lets the chart
   // render with the median, just without the PI band.
-  const error =
-    evaluate.error ?? (rows === undefined ? predict.error : null);
+  const error = evaluate.error ?? (rows === undefined ? predict.error : null);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -162,6 +189,7 @@ export function DesignExplorer() {
           <ScenarioPicker />
           <RegistryOverlayPicker />
           <DesignForm disabled={isPending} ticks={formTicks} />
+          <OperationsPanel disabled={isPending} />
           <Button
             type="button"
             onClick={handlePredict}
@@ -175,15 +203,18 @@ export function DesignExplorer() {
         </CardContent>
       </Card>
 
-      <PredictionPanel
-        rows={rows}
-        meta={meta}
-        isPending={isPending}
-        error={error}
-        surrogatePending={surrogatePending}
-        overlays={overlays}
-        overlayLoading={overlayInputs.length > 0 && overlayQueries.isPending}
-      />
+      <div className="space-y-3">
+        {evaluatorOnlyMode ? <NoPiBanner /> : null}
+        <PredictionPanel
+          rows={rows}
+          meta={meta}
+          isPending={isPending}
+          error={error}
+          surrogatePending={surrogatePending}
+          overlays={overlays}
+          overlayLoading={overlayInputs.length > 0 && overlayQueries.isPending}
+        />
+      </div>
     </div>
   );
 }

@@ -13,16 +13,29 @@ import type {
   EvaluateRequest,
   EvaluateResponse,
   HealthResponse,
+  OptimizeCancelResponse,
+  OptimizeJobResponse,
+  OptimizeRequest,
+  OptimizeResultResponse,
+  ParetoFrontListResponse,
+  ParetoFrontResponse,
   PredictRequest,
   PredictResponse,
   RegistryListResponse,
   ScenarioListResponse,
+  ShapExplainRequest,
+  ShapGlobalResponse,
+  ShapLocalResponse,
   SweepRequest,
   SweepResponse,
   VersionResponse,
 } from "@/types/api";
 
 const API_BASE = (import.meta.env.VITE_API_BASE ?? "") as string;
+
+export function apiUrl(path: string): string {
+  return `${API_BASE}${path}`;
+}
 
 class ApiError extends Error {
   status: number;
@@ -37,7 +50,7 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const url = `${API_BASE}${path}`;
+  const url = apiUrl(path);
   const headers = new Headers(init.headers);
   if (init.body && !headers.has("content-type")) {
     headers.set("content-type", "application/json");
@@ -81,6 +94,33 @@ export const api = {
     }),
   sweep: (req: SweepRequest) =>
     request<SweepResponse>("/sweep", {
+      method: "POST",
+      body: JSON.stringify(req),
+    }),
+  optimize: (req: OptimizeRequest) =>
+    request<OptimizeJobResponse>("/optimize", {
+      method: "POST",
+      body: JSON.stringify(req),
+    }),
+  optimizeResult: (pathOrJobId: string) =>
+    request<OptimizeResultResponse>(
+      pathOrJobId.startsWith("/") ? pathOrJobId : `/optimize/${pathOrJobId}/result`,
+    ),
+  cancelOptimize: (pathOrJobId: string) =>
+    request<OptimizeCancelResponse>(
+      pathOrJobId.startsWith("/") ? pathOrJobId : `/optimize/${pathOrJobId}/cancel`,
+      { method: "POST" },
+    ),
+  listParetoFronts: () => request<ParetoFrontListResponse>("/pareto/fronts"),
+  paretoFront: (pathOrScenario: string) =>
+    request<ParetoFrontResponse>(
+      pathOrScenario.startsWith("/")
+        ? pathOrScenario
+        : `/pareto/fronts/${pathOrScenario}`,
+    ),
+  shapGlobal: () => request<ShapGlobalResponse>("/shap/global"),
+  shapExplain: (req: ShapExplainRequest) =>
+    request<ShapLocalResponse>("/shap/explain", {
       method: "POST",
       body: JSON.stringify(req),
     }),

@@ -11,16 +11,21 @@ this function computes.
 
 Capability envelope vs operational utilisation
 ----------------------------------------------
-The outputs describe what the *hardware can deliver* if ops commands it
-to drive at the design vector's ``drive_duty_cycle`` for the whole
-mission window. Real missions typically command **below** the designed
-duty (Pragyan ~0.02, Yutu-2 ~0.015, Sojourner ~0.01) for reasons the
-evaluator does not model: uplink / command cycles, science campaigns,
-thermal hot-soak pauses, fault response. Utilisation-adjusted range at
-a lower commanded duty ``u`` is a post-hoc rescaling --
-``range_u = range_km * u / drive_duty_cycle`` for ``u <= drive_duty_cycle``
--- not an evaluator input. This is the same engineering-vs-operations
-distinction that JPL Team X and ESA CDF studies use.
+Schema v6 (W12 step B) introduced an explicit
+engineering-vs-operations duty-cycle split (``designed_duty_cycle``
+on the design vector vs ``operational_duty_cycle`` on the scenario,
+with the evaluator running the loop at ``δ_eff = min(δ_des, δ_ops)``)
+to match the same distinction JPL Team X and ESA CDF studies use.
+Schema v7 (W12 step B follow-up) collapsed that split back into a
+single per-scenario ``operational_duty_cycle`` after
+``designed_duty_cycle`` turned out to do no engineering work in the
+v6 mass model — the only role of ``δ_des`` was to upper-bound
+``δ_eff``, which a user can equivalently express by lowering
+``operational_duty_cycle``. The pre-v6 ``range_at_utilisation``
+post-hoc rescaler remains gone; per-call ops duty is exposed via the
+``operational_duty_cycle`` override on :func:`evaluate`. Calibrated
+defaults follow published ground-ops cadence (mare 0.30, crater 0.20,
+highland 0.15, polar 0.05).
 
 Pipeline
 --------
@@ -48,14 +53,16 @@ Design notes
 ------------
 - The evaluator **always returns** a :class:`MissionMetrics` object; it
   does not short-circuit on design failures. Constraint flags
-  (``thermal_survival``, ``motor_torque_ok``) and continuous metrics
+  (``thermal_survival``, ``stalled``) and continuous metrics
   (``energy_margin_pct``, ``range_km``) encode the failure modes instead.
   This is critical for training the Phase-2 surrogate over the full
   design space including infeasible regions.
-- ``motor_torque_ok`` is judged against the same peak-torque envelope
-  the mass model used to size the motor subsystem
-  (:func:`roverdevkit.mass.parametric_mers._motors_mass`). Keeping the
-  two definitions tied together prevents silent drift.
+- Schema v6 (W12 step B): ``stalled`` replaces the v5 ``motor_torque_ok``
+  field. The stall gate is now an explicit comparison against
+  :attr:`roverdevkit.schema.DesignVector.peak_wheel_torque_nm` — the
+  drivetrain stalls when the slip-balance torque demand exceeds that
+  capacity, or when the slip solver could not develop the required
+  drawbar pull. See :mod:`roverdevkit.drivetrain.motor`.
 """
 
 from __future__ import annotations
@@ -108,29 +115,6 @@ class DetailedEvaluation:
     log: TraverseLog
     mass: MassBreakdown
     thermal: ThermalResult
-
-
-def _sizing_peak_torque_nm(
-    total_mass_kg: float,
-    wheel_radius_m: float,
-    n_wheels: int,
-    params: MassModelParams,
-) -> float:
-    """Peak per-wheel torque the motor subsystem is sized to deliver.
-
-    Mirrors the calculation inside
-    :func:`roverdevkit.mass.parametric_mers._motors_mass`. The safety
-    factor is baked in -- this is the *available* torque ceiling, so
-    ``motor_torque_ok`` is True iff the traverse-observed peak torque
-    stays under this number.
-    """
-    weight_per_wheel_n = total_mass_kg * params.gravity_moon_m_per_s2 / n_wheels
-    return (
-        params.motor_sizing_safety_factor
-        * params.motor_peak_friction_coef
-        * weight_per_wheel_n
-        * wheel_radius_m
-    )
 
 
 def _energy_margin_pct(log: TraverseLog, min_soc: float) -> float:
@@ -186,6 +170,7 @@ def evaluate_verbose(
     use_scm_correction: bool = False,
     correction: WheelLevelCorrection | None = None,
     force_backend: str = "bw",
+    operational_duty_cycle: float | None = None,
 ) -> DetailedEvaluation:
     """Full evaluator: headline metrics plus traverse log and mass breakdown.
 
@@ -238,6 +223,13 @@ def evaluate_verbose(
         slip solve). ``"scm"`` ignores ``correction`` /
         ``use_scm_correction`` since SCM-direct is the ground truth
         the correction tries to approximate.
+    operational_duty_cycle
+        Schema v6 (W12 step B): per-call override of
+        ``scenario.operational_duty_cycle``. ``None`` (default) uses
+        the scenario YAML's calibrated value. Schema v7 (W12 step B
+        follow-up) uses this value directly as ``δ_eff`` (clamped to
+        ``[0, 1]``); the v6 ``min(δ_des, δ_ops)`` cap collapsed when
+        ``designed_duty_cycle`` was removed from the design vector.
     """
     if correction is None and use_scm_correction and force_backend != "scm":
         correction = load_correction_or_none(DEFAULT_CORRECTION_PATH, on_missing="warn")
@@ -292,6 +284,7 @@ def evaluate_verbose(
         gravity_m_per_s2=active_g,
         correction=correction,
         force_backend=force_backend,
+        operational_duty_cycle_override=operational_duty_cycle,
     )
 
     range_km = float(log.position_m[-1]) / 1000.0
@@ -300,11 +293,8 @@ def evaluate_verbose(
     peak_torque_nm = float(np.max(np.abs(log.wheel_torque_nm))) if log.wheel_torque_nm.size else 0.0
     sinkage_max_m = float(np.max(log.sinkage_m)) if log.sinkage_m.size else 0.0
 
-    torque_ceiling = _sizing_peak_torque_nm(
-        total_mass_kg, design.wheel_radius_m, design.n_wheels, mass_params
-    )
     _ = active_g  # documents that gravity flows through mass_params above
-    motor_torque_ok = bool(peak_torque_nm <= torque_ceiling) and not log.rover_stalled
+    stalled = bool(log.rover_stalled)
 
     # Guard against NaN/inf creeping out of any sub-model; cap to safe
     # defaults so downstream pydantic validation always succeeds.
@@ -328,7 +318,7 @@ def evaluate_verbose(
         peak_motor_torque_nm=peak_torque_nm,
         sinkage_max_m=sinkage_max_m,
         thermal_survival=thermal_ok,
-        motor_torque_ok=motor_torque_ok,
+        stalled=stalled,
     )
     return DetailedEvaluation(
         metrics=metrics, log=log, mass=breakdown, thermal=thermal_result
@@ -346,6 +336,7 @@ def evaluate(
     use_scm_correction: bool = False,
     correction: WheelLevelCorrection | None = None,
     force_backend: str = "bw",
+    operational_duty_cycle: float | None = None,
 ) -> MissionMetrics:
     """Run the full mission evaluator on one design in one scenario.
 
@@ -365,56 +356,5 @@ def evaluate(
         use_scm_correction=use_scm_correction,
         correction=correction,
         force_backend=force_backend,
+        operational_duty_cycle=operational_duty_cycle,
     ).metrics
-
-
-def range_at_utilisation(
-    metrics: MissionMetrics,
-    design: DesignVector,
-    operational_duty_cycle: float,
-) -> float:
-    """Rescale capability-envelope range to an operational duty cycle.
-
-    ``MissionMetrics.range_km`` is the capability envelope at the design
-    vector's ``drive_duty_cycle``. Real missions typically command a
-    lower duty than the hardware can sustain (Pragyan ~0.02, Yutu-2
-    ~0.015, Sojourner ~0.01). This helper answers the ops-layer query
-    "how far does this rover go if operators only command it to drive
-    fraction ``u`` of the time?" via linear rescaling of forward progress.
-
-    The rescaling is exact when the rover's power balance at the lower
-    duty remains in the same regime (battery never floors, thermal never
-    flips). Outside that regime (much lower duty moves the rover into a
-    steady-state battery-positive mode it was not in at design duty) the
-    rescaling is a strict upper bound, because less driving means more
-    solar charging time and a richer energy balance -- i.e. range can
-    only go *up* relative to the linear projection, never down.
-
-    Parameters
-    ----------
-    metrics
-        Output of :func:`evaluate`.
-    design
-        The design vector that produced ``metrics``.
-    operational_duty_cycle
-        Desired operational utilisation ``u``. Must be in
-        ``[0, design.drive_duty_cycle]``; passing a value above the
-        designed duty is a coding error (the hardware was not sized for
-        it) and raises ``ValueError``.
-
-    Returns
-    -------
-    float
-        Predicted range in km at the operational duty cycle.
-    """
-    if operational_duty_cycle < 0.0:
-        raise ValueError(f"operational_duty_cycle must be >= 0 (got {operational_duty_cycle})")
-    if operational_duty_cycle > design.drive_duty_cycle + 1e-9:
-        raise ValueError(
-            f"operational_duty_cycle {operational_duty_cycle} exceeds "
-            f"designed duty {design.drive_duty_cycle}; the hardware "
-            "was not sized to sustain that utilisation."
-        )
-    if design.drive_duty_cycle <= 1e-9:
-        return 0.0
-    return metrics.range_km * (operational_duty_cycle / design.drive_duty_cycle)

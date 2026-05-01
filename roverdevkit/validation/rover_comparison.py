@@ -26,9 +26,10 @@ So the acceptance criteria are explicitly:
 3. **Thermal survival match.** Sim's hot+cold steady-state prediction
    matches the published outcome exactly. Week-5's clearest binary
    check.
-4. **No stall / motor overload.** ``motor_torque_ok`` must be True and
-   ``rover_stalled`` False, reflecting that the rover *can* move at all
-   in the scenario soil + slope.
+4. **No stall / motor overload.** ``stalled`` must be False (schema v6),
+   reflecting that the rover *can* move at all in the scenario soil +
+   slope and that the slip-balance torque demand stays inside the
+   designed per-wheel torque envelope.
 5. **Peak solar power in-band.** Predicted within the published
    low/high band, where the band already accounts for dust,
    temperature derating, and seasonal irradiance.
@@ -191,7 +192,7 @@ def compare_one(
     range_feasible = range_m >= truth.traverse_m_low
     range_below_sanity_ceiling = range_m <= range_sanity_ceiling_multiple * truth.traverse_m_high
     thermal_matches = metrics.thermal_survival == truth.thermal_survival_published
-    motor_and_traversal_ok = bool(metrics.motor_torque_ok)
+    motor_and_traversal_ok = not bool(metrics.stalled)
     peak_solar_in_band = (
         truth.peak_solar_power_w_low <= peak_solar_predicted <= truth.peak_solar_power_w_high
     )
@@ -279,7 +280,7 @@ def acceptance_gate(summary: ComparisonSummary) -> None:
                 f"published {r.truth.thermal_survival_published}"
             )
         if not r.motor_and_traversal_ok:
-            reasons.append("motor_torque_ok is False or rover stalled")
+            reasons.append("rover stalled (schema v6 stall gate)")
         if not r.peak_solar_in_band:
             reasons.append(
                 f"peak solar out of band: predicted "
