@@ -85,6 +85,9 @@ reports/*
 # Internal planning notes
 /project_*.md
 
+# Paper drafting workspace (manuscript, figures notebook, supporting notes)
+/paper/
+
 # Logs
 logs/
 *.log

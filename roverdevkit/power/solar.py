@@ -307,7 +307,7 @@ def solar_power_timeseries(
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Generate a power-vs-time profile over one or more lunar diurnal cycles.
 
-    Useful for plotting (see notebooks/paper_figures.ipynb) and as a
+    Useful for plotting (see paper/paper_figures.ipynb) and as a
     reference implementation against which the traverse simulator can be
     sanity-checked.
 

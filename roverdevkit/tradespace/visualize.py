@@ -8,7 +8,7 @@ projections (range vs mass, mass vs slope, ...), surrogate-vs-evaluator
 accuracy plots, partial-dependence plots, etc.
 
 The only thing exported today is :func:`set_paper_rcparams`, which
-``notebooks/paper_figures.ipynb`` calls before drawing so that every
+``paper/paper_figures.ipynb`` calls before drawing so that every
 static figure shares a consistent font, line-width, and DPI. Concrete
 plotting functions land here as the paper figure work progresses.
 """
