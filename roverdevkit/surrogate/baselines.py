@@ -1,7 +1,7 @@
-"""Week-6 baseline surrogate models (project_plan.md §6 step-4).
+"""Baseline surrogate models for analytical evaluator datasets.
 
 This module trains and evaluates the four canonical baseline families
-the Week-6 acceptance gate is reported against:
+the baseline surrogate accuracy gate is reported against:
 
 - **Ridge** — linear baseline; serves as the floor any non-linear model
   must beat.
@@ -50,8 +50,8 @@ All randomised model components (RF, XGBoost subsampling, MLP weight
 init, MLP train/val split) are seeded from the ``random_state``
 parameter on :func:`fit_baselines`.
 
-Hyperparameter tuning is intentionally **deferred to Week 7** so the
-Week-6 numbers report sensible-default performance and the Week-7
+Hyperparameter tuning is intentionally **deferred to SCM-correction** so the
+baseline-surrogate numbers report sensible-default performance and the SCM-correction
 Optuna lift is cleanly attributable.
 """
 
@@ -133,8 +133,7 @@ Layer-1 truth values are the much smaller registry-scenario evaluator
 outputs, so the relative error is dominated by an absolute-scale
 mismatch with no bearing on physical model accuracy.
 
-See ``data/analytical/SCHEMA.md`` v3 entry and ``project_log.md``
-2026-04-25 LHS v3 entry for the full diagnosis."""
+See ``data/analytical/SCHEMA.md`` for the schema history and full diagnosis."""
 
 # Numeric columns that must be scaled for Ridge / MLP. Tree models
 # (RF, XGB) don't care, but the same preprocessor is used for them so
@@ -180,7 +179,7 @@ class FittedBaselines:
         on :data:`FEASIBILITY_COLUMN`.
     fit_seconds
         ``{(algo, target | "<classifier>"): seconds}`` wall-clock per
-        fit. Useful for the Week-6 writeup; not used by downstream
+        fit. Useful for the baseline-surrogate writeup; not used by downstream
         evaluation.
     """
 
@@ -375,7 +374,7 @@ def fit_baselines(
         sees both feasible and infeasible (post-``status``) rows; the
         regressors only see ``stalled == False`` (i.e. feasible) rows.
     targets
-        Regression targets to fit. Defaults to the four Week-6
+        Regression targets to fit. Defaults to the four baseline-surrogate
         primary targets.
     regression_algorithms, classifier_algorithms
         Subsets of :data:`REGRESSION_ALGORITHMS` /
@@ -616,7 +615,7 @@ def evaluate_baselines(
 
 
 # ---------------------------------------------------------------------------
-# Acceptance gates (project_plan.md §6 / §7 Layer-1)
+# Acceptance gates for surrogate accuracy and registry sanity checks
 # ---------------------------------------------------------------------------
 
 ACCEPTANCE_GATES: dict[str, dict[str, float]] = {
@@ -626,7 +625,7 @@ ACCEPTANCE_GATES: dict[str, dict[str, float]] = {
     "total_mass_kg": {"r2": 0.85},
     FEASIBILITY_COLUMN: {"auc": 0.90},
 }
-"""Plan-defined Week-6 thresholds keyed by target.
+"""Plan-defined baseline-surrogate thresholds keyed by target.
 
 Used by :func:`acceptance_gate` to decide pass/fail per (algorithm,
 target) on the test split. A model passes if **all** of its target's
@@ -670,7 +669,7 @@ def acceptance_gate(
 
 
 # ---------------------------------------------------------------------------
-# Registry-rover sanity check (Layer-1 from project_plan.md §7)
+# Registry-rover sanity check
 # ---------------------------------------------------------------------------
 
 
@@ -729,6 +728,10 @@ def _row_for_registry_rover(
         "scenario_soil_cohesion_kpa": float("nan"),
         "scenario_soil_friction_angle_deg": float("nan"),
         "scenario_soil_shear_modulus_k_m": float("nan"),
+        # Payload mission requirements (schema v9): the registry rover's
+        # published payload, carried on its validation scenario YAML.
+        "scenario_payload_mass_kg": scenario.payload_mass_kg,
+        "scenario_payload_power_w": scenario.payload_power_w,
         # Categorical: use the LHS family the rover most resembles so
         # XGBoost native-categorical handling has a value within the
         # learned codebook. Lunar-only registry as of 2026-04-25; the
@@ -796,12 +799,12 @@ def predict_for_registry_rovers(
     Default roster covers two flown lunar rovers (Pragyan, Yutu-2)
     plus two design-target lunar micro-rovers (MoonRanger, Rashid-1).
     The Mars-gravity Sojourner sentinel was removed when the project
-    narrowed to lunar micro-rovers (project_log.md 2026-04-25).
+    narrowed to lunar micro-rovers.
 
     Layer-1 framing
     ---------------
     Output rows carry an ``is_primary`` boolean that splits the targets
-    into two groups (``project_log.md`` 2026-04-25 LHS v3 entry):
+    into two groups:
 
     - ``is_primary=True`` — :data:`LAYER1_PRIMARY_TARGETS`
       (``total_mass_kg``, ``slope_capability_deg``, ``stalled``).

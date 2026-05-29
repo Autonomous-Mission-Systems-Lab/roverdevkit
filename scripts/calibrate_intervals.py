@@ -1,9 +1,9 @@
 """Fit quantile XGBoost heads and calibrate 90 % prediction intervals.
 
-Companion to ``scripts/tune_baselines.py`` for project_plan.md §6 / W8
-step-4. Reads the W8 step-3 tuned hyperparameters from
+Companion to ``scripts/tune_baselines.py`` for calibrated interval training
+step-4. Reads the tuned-median tuned hyperparameters from
 ``--tuned-params`` (default
-``reports/week8_tuned_v4/tuned_best_params.json``), refits each
+``reports/tuned_v4/tuned_best_params.json``), refits each
 primary regression target as three quantile heads
 (``τ ∈ {0.05, 0.50, 0.95}``) on the v4 corpus, and reports empirical
 90 % coverage and PI width on the canonical test split overall and per
@@ -13,7 +13,7 @@ Outputs (under ``--out-dir``):
 
 - ``coverage.csv`` — long-format coverage / width / crossing-rate
   frame. One row per ``(target, scenario_family, repair)``.
-- ``median_sanity.csv`` — τ=0.5 head test R² vs the W8 step-3 tuned
+- ``median_sanity.csv`` — τ=0.5 head test R² vs the tuned-median tuned
   median R² as the §6.2 sanity guardrail.
 - ``quantile_bundles.joblib`` — dict ``{target: QuantileHeads}``
   serialised together for downstream NSGA-II / Pareto-uncertainty
@@ -27,13 +27,13 @@ Examples
     # Full v4 calibration (≈3-6 min on 8 cores)
     python scripts/calibrate_intervals.py \\
         --dataset data/analytical/lhs_v4.parquet \\
-        --tuned-params reports/week8_tuned_v4/tuned_best_params.json \\
-        --out-dir reports/week8_intervals_v4
+        --tuned-params reports/tuned_v4/tuned_best_params.json \\
+        --out-dir reports/intervals_v4
 
     # Smoke (single target, no save)
     python scripts/calibrate_intervals.py \\
         --dataset data/analytical/lhs_v4.parquet \\
-        --tuned-params reports/week8_tuned_v4/tuned_best_params.json \\
+        --tuned-params reports/tuned_v4/tuned_best_params.json \\
         --out-dir /tmp/intervals_smoke \\
         --targets range_km
 """
@@ -76,7 +76,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--tuned-params",
         type=Path,
         required=True,
-        help="Path to tuned_best_params.json from W8 step-3.",
+        help="Path to tuned_best_params.json from tuned-median.",
     )
     p.add_argument("--out-dir", type=Path, required=True)
     p.add_argument(
@@ -98,7 +98,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--early-stopping-rounds",
         type=int,
         default=25,
-        help="Patience on val pinball loss. Mirrors W8 step-3.",
+        help="Patience on val pinball loss. Mirrors tuned-median.",
     )
     p.add_argument(
         "--log-level",
@@ -111,7 +111,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def _split_xy(df: pd.DataFrame, target: str) -> tuple[pd.DataFrame, np.ndarray, pd.Series]:
     """Build feasible-only (X, y, scenario_family) for one regression target."""
     df_clean = valid_rows(df)
-    # Schema v6 (W12 step B): ``FEASIBILITY_COLUMN`` is now ``stalled``
+    # Schema v6 (v6 schema update): ``FEASIBILITY_COLUMN`` is now ``stalled``
     # with positive class = infeasible, so we negate before masking to
     # keep only the feasible (non-stalled) rows the regression heads
     # were trained on.
@@ -192,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
             cov["repair"] = "sorted" if repair else "raw"
             coverage_frames.append(cov)
 
-        # Sanity guardrail: median (τ=0.5) head R² vs W8 step-3 tuned R²
+        # Sanity guardrail: median (τ=0.5) head R² vs tuned-median tuned R²
         preds = bundle.predict(X_te, repair_crossings=False)
         keys = list(preds.keys())  # q_lo, q_mid, q_hi
         y_pred_mid = preds[keys[1]]
@@ -240,7 +240,7 @@ def main(argv: list[str] | None = None) -> int:
     pd.DataFrame(fit_rows).to_csv(fit_path, index=False)
     log.info("wrote %s", fit_path)
 
-    # Append the W8 step-3 tuned R² for the same target if the report is on disk
+    # Append the tuned-median tuned R² for the same target if the report is on disk
     step3_summary_path = args.tuned_params.parent / "tuned_summary.csv"
     if step3_summary_path.exists():
         step3 = pd.read_csv(step3_summary_path)
@@ -267,7 +267,7 @@ def main(argv: list[str] | None = None) -> int:
         cols = ["target", "n", "nominal", "empirical", "mean_width", "crossing_rate"]
         print(cov_overall[cols].round(4).to_string(index=False))
 
-    print("\n=== Median (τ=0.5) sanity vs W8 step-3 tuned ===", flush=True)
+    print("\n=== Median (τ=0.5) sanity vs tuned-median tuned ===", flush=True)
     with pd.option_context("display.max_columns", None, "display.width", 200):
         keep = [
             c

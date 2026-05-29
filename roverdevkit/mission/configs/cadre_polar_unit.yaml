@@ -1,0 +1,41 @@
+# Validation scenario — NASA JPL CADRE flotilla single unit.
+# Not a canonical tradespace scenario; used only by
+# roverdevkit/validation/rover_registry.py for the design-target
+# Layer-1 surrogate sanity check (CADRE is a multi-rover technology
+# demonstration; this scenario describes one unit operating as a
+# member of the flotilla).
+#
+# Source: Rothenbuchner et al. 2023 IEEE Aerospace #2300 "Cooperative
+# Autonomous Distributed Robotic Exploration (CADRE)"; NASA/JPL CADRE
+# project page; CADRE flotilla press materials (2024-2025 launch and
+# deployment window onto a Commercial Lunar Payload Services lander).
+# Each CADRE unit is a ~2 kg 4-wheel rover designed for multi-rover
+# coordination demonstrations and Nokia/Bell Labs LTE communications
+# trials at the lunar south pole region. As of the registry's snapshot
+# the rovers had launched but ground-truth surface operations data was
+# still propagating; entry is treated as `is_flown=False` design-target
+# until the published surface-mission report is available.
+#
+# `traverse_distance_m` is non-binding: CADRE's mission demonstration
+# is choreography over short distances (tens of metres), not range.
+# Set as a soft cap an order of magnitude above the demonstration
+# target.
+name: cadre_polar_unit
+latitude_deg: -85.0
+traverse_distance_m: 200.0
+terrain_class: polar_regolith
+soil_simulant: Apollo_regolith_loose
+mission_duration_earth_days: 14.0
+max_slope_deg: 8.0
+sun_geometry: polar_intermittent
+# δ_ops calibrated for a coordinated-demonstration flotilla rover:
+# slow ground-ops cadence, frequent stop-look-rendezvous moves rather
+# than continuous drive. Class-typical for sub-class polar micro-rovers
+# (between Pragyan 0.008 and MoonRanger 0.20).
+operational_duty_cycle: 0.05
+# Schema v9: CADRE per-unit payload = stereo-camera + LTE comms-ranging
+# experiment payload, ~0.3 kg. payload_power_w held at 0 for this
+# validation scenario (experiment payload off during the short
+# coordinated drive moves).
+payload_mass_kg: 0.3
+payload_power_w: 0.0

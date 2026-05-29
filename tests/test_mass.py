@@ -7,7 +7,7 @@ Covers:
     - fixed-point iteration convergence (iterations count, and that result
       is independent of the starting guess within tolerance);
     - design-vector wrapper round-tripping through the pydantic schema;
-    - the Week-3 validation gate: median absolute percent error on
+    - the mass-validation gate: median absolute percent error on
       in-class rovers must be <= 30 % (plan section 8).
 """
 
@@ -31,7 +31,7 @@ from roverdevkit.schema import DesignVector
 
 def _rashid_like_kwargs(**overrides: Any) -> dict[str, Any]:
     """Reasonable Rashid-class design vector for tests."""
-    # Schema v6 (W12 step B): ``peak_wheel_torque_nm`` is a true design
+    # Schema v6 (v6 schema update): ``peak_wheel_torque_nm`` is a true design
     # input that sizes motor mass directly. 1.0 Nm is in the middle of
     # the Rashid / Pragyan-class hub-torque band.
     base: dict[str, Any] = dict(
@@ -220,7 +220,7 @@ class TestEstimateMass:
         assert b.total_kg > b.chassis_kg
 
     def test_iteration_converges_in_a_single_pass(self) -> None:
-        # Schema v6 (W12 step B): peak_wheel_torque_nm is a direct design
+        # Schema v6 (v6 schema update): peak_wheel_torque_nm is a direct design
         # input, so the pre-v6 fixed-point iteration on motor mass vs.
         # total mass is gone and ``n_iterations`` is pinned to 1.
         b = estimate_mass(**_rashid_like_kwargs())
@@ -257,6 +257,38 @@ class TestEstimateMass:
             estimate_mass(**_rashid_like_kwargs(chassis_mass_kg=0.0))
 
 
+class TestPayloadMass:
+    """Schema v9: scientific payload is a top-level mass line item added
+    *outside* the dry-mass growth margin."""
+
+    def test_payload_defaults_to_zero(self) -> None:
+        b = estimate_mass(**_rashid_like_kwargs())
+        assert b.payload_kg == pytest.approx(0.0)
+
+    def test_payload_added_one_for_one_to_total(self) -> None:
+        b0 = estimate_mass(**_rashid_like_kwargs())
+        b5 = estimate_mass(**_rashid_like_kwargs(), payload_mass_kg=5.0)
+        # Payload is *not* grown by the margin: total rises by exactly
+        # the payload mass, and no subsystem or margin term changes.
+        assert b5.payload_kg == pytest.approx(5.0)
+        assert b5.total_kg - b0.total_kg == pytest.approx(5.0)
+        assert b5.margin_kg == pytest.approx(b0.margin_kg)
+        assert b5.dry_kg == pytest.approx(b0.dry_kg)
+
+    def test_dry_kg_excludes_payload_and_margin(self) -> None:
+        b = estimate_mass(**_rashid_like_kwargs(), payload_mass_kg=4.0)
+        assert b.dry_kg == pytest.approx(b.total_kg - b.margin_kg - b.payload_kg)
+
+    def test_rejects_negative_payload(self) -> None:
+        with pytest.raises(ValueError):
+            estimate_mass(**_rashid_like_kwargs(), payload_mass_kg=-1.0)
+
+    def test_from_design_forwards_payload(self, rashid_like_design: DesignVector) -> None:
+        b0 = estimate_mass_from_design(rashid_like_design)
+        b3 = estimate_mass_from_design(rashid_like_design, payload_mass_kg=3.0)
+        assert b3.total_kg - b0.total_kg == pytest.approx(3.0)
+
+
 class TestEstimateMassFromDesign:
     def test_round_trips_through_design_vector(self, rashid_like_design: DesignVector) -> None:
         b_direct = estimate_mass(
@@ -281,8 +313,8 @@ class TestEstimateMassFromDesign:
 
 
 class TestPublishedRoverValidation:
-    """The plan's Week-5 validation gate is <= 30 % error on real rovers
-    (section 8). We enforce it as a test here at Week-3 on the mass-only
+    """The plan's real-rover validation gate is <= 30 % error on real rovers
+    (section 8). We enforce it as a test here at mass-validation on the mass-only
     cross-check to catch regressions early."""
 
     def test_median_in_class_error_below_30_percent(self) -> None:

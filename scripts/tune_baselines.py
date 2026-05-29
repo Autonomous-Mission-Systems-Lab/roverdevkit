@@ -30,7 +30,7 @@ Examples
     # Full v4 tuning run (50 trials per target, ~10-20 min on 8 cores)
     python scripts/tune_baselines.py \\
         --dataset data/analytical/lhs_v4.parquet \\
-        --out-dir reports/week8_tuned_v4
+        --out-dir reports/tuned_v4
 
     # Smoke (10 trials per target, no classifier, ~1 min)
     python scripts/tune_baselines.py \\
@@ -137,7 +137,7 @@ def _split_xy(
     """
     df_clean = valid_rows(df)
     if feasible_only:
-        # Schema v6 (W12 step B): ``FEASIBILITY_COLUMN`` is now ``stalled``
+        # Schema v6 (v6 schema update): ``FEASIBILITY_COLUMN`` is now ``stalled``
         # with positive class = infeasible, so we negate before masking
         # to keep only the feasible (non-stalled) regression rows. The
         # classifier path keeps the raw 0/1 labels (1 = stalled = the

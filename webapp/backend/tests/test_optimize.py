@@ -48,12 +48,16 @@ def test_optimize_evaluator_job_completes_and_returns_front(client: TestClient) 
 
 
 def test_optimize_evaluator_budget_cap_returns_422(client: TestClient) -> None:
+    # The webapp optimize route sets evaluator_eval_cap=5000 on the
+    # NSGA2Runner so a worst-case live job finishes inside ~2 min wall
+    # clock at the corrected evaluator's ~22 ms/call. Anything beyond
+    # that returns 422 with a message referencing the cap.
     response = client.post(
         "/optimize",
-        json=_payload(population_size=101, n_generations=10),
+        json=_payload(population_size=200, n_generations=50),
     )
     assert response.status_code == 422, response.text
-    assert "capped at 1000 evaluations" in response.json()["detail"]
+    assert "capped at 5000 evaluations" in response.json()["detail"]
 
 
 def test_optimize_unknown_scenario_returns_404(client: TestClient) -> None:

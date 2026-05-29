@@ -1,4 +1,4 @@
-"""Generate a Phase-2 analytical dataset (LHS sampler -> evaluator -> Parquet).
+"""Generate a surrogate-training analytical dataset (LHS sampler -> evaluator -> Parquet).
 
 Single canonical entry point for any dataset rebuild: pilot, full
 training run, or release-time benchmark slice. The same flags drive
@@ -14,7 +14,7 @@ Examples
         --out data/analytical/lhs_pilot.parquet \\
         --seed 42 \\
         --workers 1 \\
-        --notes "Week-6 step-2 pilot rebuild under v2."
+        --notes "baseline-surrogate pilot pilot rebuild under v2."
 
     # Full 40k training set on the v3 widened bounds (current canonical)
     python scripts/build_dataset.py \\
@@ -225,7 +225,7 @@ def main(argv: list[str] | None = None) -> int:
             ", ".join(f"{k}={v}" for k, v in top_reasons.items()),
         )
     if "stalled" in df.columns:
-        # Schema v6 (W12 step B): infeasibility flag flipped from
+        # Schema v6 (v6 schema update): infeasibility flag flipped from
         # ``motor_torque_ok`` to ``stalled`` (positive class = bad).
         # Report the *non-stalled* rate so the headline number stays
         # comparable to pre-v6 datasets ("higher is better").

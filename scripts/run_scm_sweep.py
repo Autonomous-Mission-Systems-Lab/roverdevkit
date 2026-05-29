@@ -1,8 +1,8 @@
-"""Week-7 SCM single-wheel batch sweep with resumable parquet output.
+"""SCM-correction SCM single-wheel batch sweep with resumable parquet output.
 
 Generates the (Bekker-Wong, PyChrono SCM) paired single-wheel dataset that
-feeds the Week-7.5 gate (correction-magnitude decision) and, if the gate
-fires, the wheel-level correction model. See ``project_plan.md`` §6 W7
+feeds the SCM-correction gate gate (correction-magnitude decision) and, if the gate
+fires, the wheel-level correction model.
 for the design and budget.
 
 Examples

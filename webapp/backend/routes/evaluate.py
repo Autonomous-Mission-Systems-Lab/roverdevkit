@@ -7,7 +7,7 @@ against. The single-design panel uses ``/evaluate`` for the median
 value of each metric (and for real-rover overlays) and ``/predict``
 only for the surrogate's calibrated 90 % prediction-interval band.
 
-The corrected evaluator runs in ~40 ms after the W7.7 traverse-loop
+The corrected evaluator runs in ~40 ms after the BW/SCM bake-off traverse-loop
 lift-out, which is imperceptible for one-click UX. The 50k+-evaluation
 inner loops (NSGA-II, feasibility heatmaps) keep using the surrogate
 because even 40 ms × 50k is ~30 minutes of wall-clock.
@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException
 
 from roverdevkit.surrogate.features import PRIMARY_REGRESSION_TARGETS
 from webapp.backend.loaders import get_canonical_scenarios, get_correction
+from webapp.backend.services import apply_scenario_overrides
 from webapp.backend.schemas import (
     EvaluateMetric,
     EvaluateRequest,
@@ -66,7 +67,11 @@ def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
                 f"Pick one of {sorted(scenarios.keys())}."
             ),
         )
-    scenario = scenarios[req.scenario_name]
+    scenario = apply_scenario_overrides(
+        scenarios[req.scenario_name],
+        payload_mass_kg=req.payload_mass_kg,
+        payload_power_w=req.payload_power_w,
+    )
     correction = get_correction()
 
     output = evaluate_design(

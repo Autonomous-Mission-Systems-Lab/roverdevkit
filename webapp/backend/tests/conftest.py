@@ -6,7 +6,7 @@ once per test session. We do **not** mock the surrogate or the
 scenario loaders -- the whole point of this test suite is to catch
 artifact-on-disk drift before it hits the frontend.
 
-If the W8 step-4 quantile bundle is missing the suite will skip the
+If the quantile-calibration quantile bundle is missing the suite will skip the
 predict tests rather than fail outright; this lets a contributor who
 has not yet generated the artifact still run health / scenarios /
 registry tests locally.
@@ -49,14 +49,16 @@ def artifacts_present() -> bool:
 
 @pytest.fixture(scope="session")
 def surrogate_v7_1_compatible() -> bool:
-    """Whether the on-disk surrogate is schema-v7_1 compatible.
+    """Whether the on-disk surrogate is schema-compatible with the live
+    feature-row builder (currently schema v9).
 
-    Schema v7_1 (W12 step B follow-on) promotes
-    ``scenario_operational_duty_cycle`` to a true surrogate input
-    feature; v7 bundles do not expect it and KeyError at predict time
-    once the v7_1 feature-row builder includes it. Predict /
-    surrogate-sweep tests skip on schema mismatch instead of failing
-    red until the v7_1 recalibrate lands.
+    Schema v7_1 promoted ``scenario_operational_duty_cycle`` to a true
+    surrogate input; schema v9 added ``scenario_payload_mass_kg`` and
+    ``scenario_payload_power_w``. A bundle trained before these columns
+    existed KeyErrors at predict time once the feature-row builder
+    includes them, so predict / evaluate / surrogate-sweep tests skip
+    on schema mismatch instead of failing red until the v9 recalibrate
+    lands. (Fixture name retained for call-site stability.)
     """
     settings = get_settings()
     if not settings.artifacts_present:
@@ -73,6 +75,8 @@ def surrogate_v7_1_compatible() -> bool:
         "design_peak_wheel_torque_nm" in feature_columns
         and "design_designed_duty_cycle" not in feature_columns
         and "scenario_operational_duty_cycle" in feature_columns
+        and "scenario_payload_mass_kg" in feature_columns
+        and "scenario_payload_power_w" in feature_columns
     )
 
 

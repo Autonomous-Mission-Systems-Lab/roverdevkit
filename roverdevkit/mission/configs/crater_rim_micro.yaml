@@ -1,0 +1,38 @@
+# Class-generic crater-rim micro-rover scenario (rediscovery library).
+#
+# Used only by the Layer-5 rediscovery harness
+# (`roverdevkit.validation.rover_rediscovery`). NOT a canonical
+# tradespace scenario (the canonical crater-rim scenario lives in
+# `crater_rim_survey.yaml` and is returned by `list_scenarios()`);
+# this scenario is excluded from `list_scenarios()` and exposed by
+# `list_class_generic_micro_scenarios()` instead.
+#
+# Leakage controls (why this exists as a separate file)
+# -----------------------------------------------------
+# The canonical `crater_rim_survey.yaml` pins
+# `operational_duty_cycle: 0.20`, calibrated against MER-A / MER-B
+# daily averages on uneven terrain. No registry rover is operating on
+# this scenario family today, so the leakage risk is currently latent
+# — but the class-generic library still pins δ_ops to a flat 0.10
+# across all four scenarios for symmetry.
+#
+# Everything else (latitude, traverse-distance non-binding budget,
+# duration, max_slope, sun_geometry, terrain_class, soil_simulant)
+# inherits from the canonical scenario because those are environmental
+# facts the rover does not choose.
+name: crater_rim_micro
+latitude_deg: 0.0
+traverse_distance_m: 25000.0
+terrain_class: mare_nominal
+soil_simulant: Apollo_regolith_nominal
+mission_duration_earth_days: 5.0
+max_slope_deg: 18.0
+sun_geometry: diurnal
+operational_duty_cycle: 0.10
+# Schema v9: payload left at 0 (class-neutral). The rediscovery harness
+# forwards each target rover's published payload as a per-call override
+# to both the rover re-evaluation and every NSGA-II candidate, so the
+# scenario itself carries no per-rover payload label (same leakage
+# logic as the flat δ_ops anchor above).
+payload_mass_kg: 0.0
+payload_power_w: 0.0

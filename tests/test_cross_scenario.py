@@ -1,7 +1,7 @@
 """Cross-scenario ranking + one-at-a-time sensitivity tests.
 
 Tests the "is the evaluator right in the right *direction* when
-parameters change?" requirement from project_plan.md §6 W5.
+parameters change?" validation requirement.
 
 Split into two families:
 1. Ranking invariants - qualitative comparisons between hand-crafted
@@ -68,20 +68,28 @@ def test_every_canonical_scenario_evaluates_all_archetypes(
         }
 
 
-def test_total_mass_is_consistent_across_scenarios(
+def test_bus_mass_is_consistent_across_scenarios(
     cross_scenario_rankings: dict[str, ArchetypeRanking],
 ) -> None:
-    """Total mass depends only on the design vector, not the scenario.
+    """Bus mass depends only on the design vector, not the scenario.
 
-    A surprising cross-scenario mass variance would signal that the
-    evaluator is coupling mass to mission duration or terrain - a bug.
+    Schema v9: total vehicle mass = design *bus* mass + the scenario's
+    ``payload_mass_kg`` mission requirement. The bus mass must still be
+    scenario-invariant; a surprising variance after subtracting the
+    scenario payload would signal that the evaluator is (wrongly)
+    coupling bus mass to mission duration or terrain. Total mass is
+    deliberately *not* invariant any more — it tracks the per-scenario
+    payload requirement.
     """
-    masses_per_archetype: dict[str, set[float]] = {}
-    for rank in cross_scenario_rankings.values():
+    from roverdevkit.mission.scenarios import load_scenario
+
+    bus_per_archetype: dict[str, set[float]] = {}
+    for scenario_name, rank in cross_scenario_rankings.items():
+        payload = load_scenario(scenario_name).payload_mass_kg
         for name, m in rank.per_archetype.items():
-            masses_per_archetype.setdefault(name, set()).add(round(m.total_mass_kg, 6))
-    for name, masses in masses_per_archetype.items():
-        assert len(masses) == 1, f"{name}: total_mass_kg varies across scenarios {masses}"
+            bus_per_archetype.setdefault(name, set()).add(round(m.total_mass_kg - payload, 6))
+    for name, masses in bus_per_archetype.items():
+        assert len(masses) == 1, f"{name}: bus mass varies across scenarios {masses}"
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +159,7 @@ def test_bigger_battery_never_decreases_energy_margin(
 # The clipped SOC-based margin saturates at 0 % and 100 %; the raw
 # integrated-energy margin must remain sensitive to generation /
 # consumption levers even in saturated regimes. These tests guard the
-# Phase-2 surrogate-training signal added in schema.MissionMetrics.
+# surrogate-training surrogate-training signal added in schema.MissionMetrics.
 
 
 def test_raw_energy_margin_strictly_increases_with_solar_area(
@@ -169,6 +177,6 @@ def test_raw_energy_margin_strictly_decreases_with_avionics_power(
     cross_scenario_sensitivity_by_var: dict[str, SensitivityEntry],
 ) -> None:
     """Parasitic load must drop the integrated-energy margin; this is
-    the main Phase-2 signal the surrogate will learn."""
+    the main surrogate-training signal the surrogate will learn."""
     entry = cross_scenario_sensitivity_by_var["avionics_power_w"]
     assert entry.delta_energy_margin_raw_pct < -1e-6

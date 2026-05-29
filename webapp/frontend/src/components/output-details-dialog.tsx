@@ -15,10 +15,10 @@ const SURROGATE_METRICS: Record<
   PrimaryTarget,
   { medianR2: string; coverage: string }
 > = {
-  range_km: { medianR2: "0.980", coverage: "90.8%" },
-  energy_margin_raw_pct: { medianR2: "0.978", coverage: "93.0%" },
-  slope_capability_deg: { medianR2: "0.986", coverage: "90.6%" },
-  total_mass_kg: { medianR2: "1.000", coverage: "92.7%" },
+  range_km: { medianR2: "0.980", coverage: "97.3%" },
+  energy_margin_raw_pct: { medianR2: "0.960", coverage: "93.1%" },
+  slope_capability_deg: { medianR2: "0.988", coverage: "93.4%" },
+  total_mass_kg: { medianR2: "1.000", coverage: "91.5%" },
 };
 
 const WHEEL_CORRECTION_METRICS = [
@@ -161,8 +161,10 @@ function SurrogatePerformance({ target }: { target: PrimaryTarget }) {
       <p className="text-[var(--color-muted-foreground)]">
         The displayed q05-q95 interval comes from quantile XGBoost heads trained
         on evaluator-generated data. The median shown in the table is the
-        deterministic evaluator output; the surrogate supplies uncertainty around
-        it and powers bulk optimization.
+        deterministic evaluator output; the surrogate supplies the uncertainty
+        envelope around it (and the SHAP attributions on the Explain Design
+        tab). The Optimize Design tab's NSGA-II search uses the corrected
+        physics evaluator directly as its fitness function.
       </p>
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
         <Metric label="Median R²" value={perf.medianR2} />

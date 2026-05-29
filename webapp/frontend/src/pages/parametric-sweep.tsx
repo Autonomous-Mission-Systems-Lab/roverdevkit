@@ -38,6 +38,8 @@ export function ParametricSweep() {
   const overlayRovers = useDesignStore((s) => s.overlayRovers);
   const scenarioName = useDesignStore((s) => s.scenarioName);
   const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
+  const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
+  const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
 
   const target = useSweepStore((s) => s.target);
   const xAxis = useSweepStore((s) => s.xAxis);
@@ -69,6 +71,11 @@ export function ParametricSweep() {
       scenario_name: scenarioName,
       backend,
       operational_duty_cycle: opsDutyOverride ?? null,
+      // Schema v9: payload is a constant-across-grid mission requirement
+      // (only design variables vary on the sweep axes); carry the same
+      // override the Single design tab used.
+      payload_mass_kg: payloadMassOverride,
+      payload_power_w: payloadPowerOverride,
     });
   };
 

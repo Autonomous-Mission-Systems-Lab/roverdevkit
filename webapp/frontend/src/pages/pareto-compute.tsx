@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Play, Square } from "lucide-react";
 
-import { ScenarioPicker } from "@/components/scenario-picker";
+import { MissionInputsPanel } from "@/components/mission-inputs-panel";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -39,13 +39,19 @@ import { useParetoStore } from "@/store/pareto-store";
 import type {
   ConstraintSense,
   ObjectiveDirection,
-  OptimizeBackend,
   OptimizeCheckpointOut,
   OptimizeJobResponse,
   OptimizeResultResponse,
   PrimaryTarget,
 } from "@/types/api";
 import { PRIMARY_REGRESSION_TARGET_ORDER, TARGET_META } from "@/types/api";
+
+/**
+ * Hard ceiling enforced by the backend optimize route's evaluator cap
+ * (see `webapp/backend/routes/optimize.py`). Lives here so the UI can
+ * warn the user before they queue a job that will 422.
+ */
+const EVALUATOR_EVAL_CAP = 5000;
 
 const DEFAULT_OBJECTIVES: Record<PrimaryTarget, ObjectiveDirection> = {
   range_km: "max",
@@ -62,8 +68,14 @@ interface ConstraintState {
   value: number;
 }
 
+// The 0.1 km range floor is enabled by default so NSGA-II never
+// rewards stalled designs (``range_km = 0``) just because they happen
+// to score well on slope capability. Disabling the constraint puts
+// stalled designs back on the Pareto front when they win another
+// objective, which is usually not what a user wants. The other
+// constraints are off by default and intended as optional add-ons.
 const DEFAULT_CONSTRAINTS: Record<PrimaryTarget, ConstraintState> = {
-  range_km: { enabled: false, sense: "min", value: 1.0 },
+  range_km: { enabled: true, sense: "min", value: 0.1 },
   energy_margin_raw_pct: { enabled: false, sense: "min", value: 0.0 },
   slope_capability_deg: { enabled: false, sense: "min", value: 10.0 },
   total_mass_kg: { enabled: false, sense: "max", value: 40.0 },
@@ -72,10 +84,11 @@ const DEFAULT_CONSTRAINTS: Record<PrimaryTarget, ConstraintState> = {
 export function ParetoCompute() {
   const scenarioName = useDesignStore((s) => s.scenarioName);
   const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
+  const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
+  const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
 
-  const [backend, setBackend] = useState<OptimizeBackend>("surrogate");
-  const [populationSize, setPopulationSize] = useState(64);
-  const [nGenerations, setNGenerations] = useState(100);
+  const [populationSize, setPopulationSize] = useState(32);
+  const [nGenerations, setNGenerations] = useState(50);
   const [seed, setSeed] = useState(0);
   const [objectiveEnabled, setObjectiveEnabled] = useState<ObjectiveState>({
     range_km: true,
@@ -137,7 +150,7 @@ export function ParetoCompute() {
     try {
       const queued = await startOptimize.mutateAsync({
         scenario_name: scenarioName,
-        backend,
+        backend: "evaluator",
         objectives: objectivePayload,
         constraints: PRIMARY_REGRESSION_TARGET_ORDER.filter(
           (target) => constraints[target].enabled,
@@ -150,6 +163,11 @@ export function ParetoCompute() {
         n_generations: nGenerations,
         seed,
         operational_duty_cycle: opsDutyOverride ?? null,
+        // Schema v9: every NSGA-II candidate is scored carrying this
+        // payload mass/power, so the front reflects the mission's real
+        // mass budget instead of floating chassis to the LHS floor.
+        payload_mass_kg: payloadMassOverride,
+        payload_power_w: payloadPowerOverride,
       });
       setJob(queued);
       openStream(queued, objectivePayload);
@@ -211,19 +229,20 @@ export function ParetoCompute() {
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(20rem,0.85fr)_minmax(0,1.45fr)]">
-      <div>
+      <div className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle>Find optimized designs</CardTitle>
             <CardDescription>
               Choose mission objectives and constraints, then search the design
-              space for high-performing tradeoff designs. Surrogate fitness is
-              the fast default; evaluator fitness is capped at 1000 evaluations.
+              space for high-performing tradeoff designs. The live search runs
+              NSGA-II with the corrected physics evaluator as the fitness
+              function, capped at {EVALUATOR_EVAL_CAP.toLocaleString()}{" "}
+              evaluations so a job finishes within a minute or so.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <ScenarioPicker />
-            <BackendPicker backend={backend} setBackend={setBackend} />
+            <MissionInputsPanel disabled={startOptimize.isPending} />
             <ObjectiveEditor
               enabled={objectiveEnabled}
               directions={objectiveDirections}
@@ -239,10 +258,12 @@ export function ParetoCompute() {
               setNGenerations={setNGenerations}
               setSeed={setSeed}
             />
-            {backend === "evaluator" && evaluationBudget > 1000 ? (
+            {evaluationBudget > EVALUATOR_EVAL_CAP ? (
               <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                Evaluator fitness is capped at 1000 evaluations; lower population
-                or generations before running.
+                Live NSGA-II is capped at {EVALUATOR_EVAL_CAP.toLocaleString()}{" "}
+                evaluator calls (~2 min wall clock). Lower population or
+                generations before running, or run{" "}
+                <code>make pareto-fronts</code> offline for higher budgets.
               </p>
             ) : null}
             <Button
@@ -251,7 +272,7 @@ export function ParetoCompute() {
               disabled={
                 startOptimize.isPending ||
                 selectedObjectives.length === 0 ||
-                (backend === "evaluator" && evaluationBudget > 1000)
+                evaluationBudget > EVALUATOR_EVAL_CAP
               }
               className="w-full"
               size="lg"
@@ -311,29 +332,6 @@ export function ParetoCompute() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-function BackendPicker({
-  backend,
-  setBackend,
-}: {
-  backend: OptimizeBackend;
-  setBackend: (backend: OptimizeBackend) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor="opt-backend">Fitness backend</Label>
-      <Select value={backend} onValueChange={(v) => setBackend(v as OptimizeBackend)}>
-        <SelectTrigger id="opt-backend">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="surrogate">Surrogate (fast, default)</SelectItem>
-          <SelectItem value="evaluator">Evaluator (ground truth, capped)</SelectItem>
-        </SelectContent>
-      </Select>
     </div>
   );
 }

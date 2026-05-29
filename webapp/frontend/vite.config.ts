@@ -40,6 +40,7 @@ export default defineConfig({
       "/optimize": "http://localhost:8000",
       "/pareto": "http://localhost:8000",
       "/shap": "http://localhost:8000",
+      "/validate": "http://localhost:8000",
     },
   },
 });

@@ -46,6 +46,7 @@ from webapp.backend.loaders import (
     get_soil_for_simulant,
 )
 from webapp.backend.schemas import SweepRequest, SweepResponse, SweepSensitivityOut
+from webapp.backend.services import apply_scenario_overrides
 from webapp.backend.services.sweep import run_sweep
 
 logger = logging.getLogger(__name__)
@@ -88,17 +89,18 @@ def _cached_sweep(_request_key: str, req_json: str) -> SweepResponse:
                 f"Pick one of {sorted(scenarios.keys())}."
             ),
         )
-    scenario = scenarios[req.scenario_name]
-    if req.operational_duty_cycle is not None:
-        # SCHEMA_VERSION v7_1: δ_ops is a true LHS-sampled surrogate
-        # input, so applying the override here keeps both sweep
-        # backends (surrogate batch predict + per-cell evaluator) in
-        # sync with the Single-design tab's δ_ops slider. The grid
-        # is still one-shot; only the *constant-across-grid* δ_ops
-        # changes.
-        scenario = scenario.model_copy(
-            update={"operational_duty_cycle": req.operational_duty_cycle}
-        )
+    # SCHEMA_VERSION v7_1: δ_ops is a true LHS-sampled surrogate input,
+    # and schema v9 adds payload mass/power as LHS-sampled mission
+    # requirements. Applying the overrides here keeps both sweep
+    # backends (surrogate batch predict + per-cell evaluator) in sync
+    # with the Mission-Inputs panel. The grid is still one-shot; only
+    # the *constant-across-grid* scenario inputs change.
+    scenario = apply_scenario_overrides(
+        scenarios[req.scenario_name],
+        operational_duty_cycle=req.operational_duty_cycle,
+        payload_mass_kg=req.payload_mass_kg,
+        payload_power_w=req.payload_power_w,
+    )
 
     for ax in (req.x_axis, req.y_axis):
         if ax is None:

@@ -57,10 +57,10 @@ def test_polar_scenario_has_high_latitude() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Schema v6 (W12 step B): operational_duty_cycle calibration on YAMLs
+# Schema v6 (v6 schema update): operational_duty_cycle calibration on YAMLs
 # ---------------------------------------------------------------------------
 # Pin the four canonical scenarios to the calibration agreed in
-# reports/week12_design/decision.md so an accidental YAML edit doesn't
+# data/analytical/SCHEMA.md so an accidental YAML edit doesn't
 # silently shift the surrogate's training distribution. Mare 0.30,
 # crater 0.20, highland 0.15, polar 0.05 — see decision.md §"δ_ops
 # calibration" for the published-rover-anchored derivation.
@@ -78,9 +78,9 @@ def test_canonical_scenario_operational_duty_cycle_matches_calibration(
     name: str, expected: float
 ) -> None:
     """``operational_duty_cycle`` on each canonical scenario YAML matches
-    the W12 step B calibration. Catch silent YAML drift before it
+    the v6 schema update calibration. Catch silent YAML drift before it
     contaminates the LHS dataset."""
     s = load_scenario(name)
     assert s.operational_duty_cycle == pytest.approx(expected, abs=1e-9), (
-        f"{name}: operational_duty_cycle drifted from the W12 calibration"
+        f"{name}: operational_duty_cycle drifted from the schema-v7 calibration"
     )

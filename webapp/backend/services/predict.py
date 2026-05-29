@@ -42,7 +42,7 @@ def build_feature_row(
     *,
     scenario_family: str | None = None,
 ) -> pd.DataFrame:
-    """Build the 25-column input frame the surrogate expects.
+    """Build the 27-column input frame the surrogate expects.
 
     SCHEMA_VERSION v7_1: ``scenario_operational_duty_cycle`` is now a
     surrogate input column (it became a per-row LHS feature in v7_1).
@@ -98,6 +98,11 @@ def build_feature_row(
         "scenario_soil_cohesion_kpa": soil.cohesion_kpa,
         "scenario_soil_friction_angle_deg": soil.friction_angle_deg,
         "scenario_soil_shear_modulus_k_m": soil.shear_modulus_k_m,
+        # Payload mission requirements (schema v9) — sampled
+        # family-agnostic uniform [0, 30] in the LHS, so the webapp
+        # Mission-Inputs sliders stay in-distribution.
+        "scenario_payload_mass_kg": scenario.payload_mass_kg,
+        "scenario_payload_power_w": scenario.payload_power_w,
         # Scenario categoricals (4)
         "scenario_family": family,
         "scenario_terrain_class": scenario.terrain_class,

@@ -1,13 +1,13 @@
-"""Week-7 step-5 gate sweep: BW vs BW+correction on a small LHS sample.
+"""SCM-correction gate sweep: BW vs BW+correction on a small LHS sample.
 
-Generates the formal Week-7.5 gate input. For each LHS draw produced by
+Generates the formal SCM-correction gate gate input. For each LHS draw produced by
 :func:`roverdevkit.surrogate.sampling.generate_samples` we evaluate the
 mission **twice** — once on the analytical (Bekker-Wong only) path and
 once with the wheel-level SCM correction composed in via
 :mod:`roverdevkit.mission.traverse_sim` — and write a paired-metrics
 parquet plus a tabular gate summary.
 
-Gate criterion (project_plan.md §6 W7.5)
+Gate criterion
 ----------------------------------------
 The wheel-level correction is *not* automatically promoted into the
 analytical surrogate. It is promoted only if the mission-level
@@ -23,7 +23,7 @@ discrepancy clears one of two thresholds:
   even on rank-only criteria.
 
 The script prints a verdict per criterion and an overall recommendation.
-The decision itself is recorded in `reports/week7_5_gate/` after the
+The decision itself is recorded in `reports/scm_correction_gate/` after the
 sweep — this script just gathers the evidence.
 
 Usage
@@ -217,7 +217,7 @@ def gate_summary(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def overall_verdict(summary: pd.DataFrame) -> tuple[bool, list[str]]:
-    """Apply the §6 W7.5 rule: gate fires if any family triggers either threshold.
+    """Apply the §6 SCM-correction gate rule: gate fires if any family triggers either threshold.
 
     Returns ``(gate_fires, reasons)``.
     """

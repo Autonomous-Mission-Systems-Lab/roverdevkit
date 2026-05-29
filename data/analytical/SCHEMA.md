@@ -6,31 +6,66 @@ Each row is **one** `(design, scenario, soil)` triple evaluated by
 `roverdevkit.mission.evaluator.evaluate_verbose`, flattened into a
 single Parquet row.
 
-- **Schema version:** `v7_1` (see `dataset.SCHEMA_VERSION`).
-  - **v7_1 (current):** `scenario_operational_duty_cycle`
+- **Schema version:** `v9` (see `dataset.SCHEMA_VERSION`).
+  - **v9 (current):** scientific payload promoted to an explicit
+    **mission requirement**. Two new scenario-side inputs —
+    `scenario_payload_mass_kg` and `scenario_payload_power_w` — added
+    to `SCENARIO_NUMERIC_COLUMNS`; surrogate input columns 25 → 27
+    (column-additive). Motivation: prior schemas folded scientific
+    payload into the `design_chassis_mass_kg` input by per-rover
+    convention, which (a) made the webapp chassis field ambiguous,
+    (b) left the bottom-up mass model under-predicting full-up rover
+    mass by up to ~47 % (Yutu-2, ~25 kg payload), and (c) let the
+    NSGA-II optimiser float chassis to the LHS floor and skip the
+    payload mass real rovers must carry, biasing the rediscovery
+    Pareto-dominance comparison. Payload mass is now a top-level mass
+    line item *outside* the AIAA S-120A dry-mass growth margin
+    (`m_total = m_dry + m_margin + m_payload`), matching standard
+    aerospace mass-budget practice (payload is a known requirement,
+    not poorly-known bus hardware). Payload power adds to the
+    continuous ops-time electrical load alongside avionics and to the
+    hot-case thermal dissipation. Both are sampled family-agnostic
+    uniform (`payload_mass_kg ∈ [0, 30]`, `payload_power_w ∈ [0, 30]`)
+    so the entire webapp Mission-Inputs slider range is
+    in-distribution, mirroring the v7_1 δ_ops promotion. Payload lives
+    on `MissionScenario` (a requirement set by the mission), not on
+    `DesignVector` (a variable the rover designer trades); the design
+    vector stays 11-D. A per-call override on `evaluate` /
+    `/evaluate` / `/predict` lets the UI and the rediscovery harness
+    substitute a rover's published payload. Hyperparameter re-tuning
+    is re-run because the input dimensionality changed.
+  - **v8 (retired):** ultra-micro LHS-bound widening. Dropped the
+    `chassis_mass_kg` (3.0 → 0.5), `peak_wheel_torque_nm` (0.3 →
+    0.05), and `battery_capacity_wh` (20.0 → 5.0) LHS floors to match
+    the schema floors lowered for the CADRE / Tenacious registry
+    expansion, so ultra-micro rovers sit inside training support
+    rather than OOD. Parquet column schema byte-identical to v7_1;
+    the version bump exists so a v7_1-trained surrogate (narrower
+    floors) isn't silently reused on the widened v8 support.
+  - **v7_1 (retired):** `scenario_operational_duty_cycle`
     promoted from a per-family constant (mare 0.30, polar 0.05,
     highland 0.15, crater 0.20) to a per-row LHS feature uniform on
     `[0, 0.6]` *independently of family*, and added to
     `SCENARIO_NUMERIC_COLUMNS` as a true surrogate input. Surrogate
-    input columns 24 → 25 (column-additive). Motivation: the v7
-    deployment forced the live `/predict` route into evaluator-only
-    mode whenever the user moved the frontend δ_ops slider away from
-    its scenario default, because the surrogate had no training
-    support there. Sampling δ_ops over the full UI range puts the
-    entire slider in-distribution. Median R² drops 0.01–0.04 vs v7
-    (one extra continuous input to fit) but 90 % coverage on the
-    feasible test set is on-target across all four primary targets.
-    Optuna re-tune was *skipped* because the column schema is
-    byte-identical to v7 and re-running the search converges back to
-    the same parameters.
+    input columns 24 → 25 (column-additive). Motivation: under the
+    previous v7 schema, the live `/predict` route fell back to
+    evaluator-only mode whenever the operational duty cycle moved
+    away from the scenario default, because the surrogate had no
+    training support there. Sampling δ_ops over the full UI range
+    puts the entire slider in-distribution. Median R² drops 0.01–0.04
+    versus v7 (one extra continuous input to fit) but 90 % coverage
+    on the feasible test set is on-target across all four primary
+    targets. Hyperparameter re-tuning was skipped because the column
+    schema is byte-identical to v7 and re-running the search
+    converges back to the same parameters.
   - **v7 (retired):** dropped `design_designed_duty_cycle`
-    from the design-side schema after the v6 review surfaced that
-    the field did no engineering work in the mass model — its only
-    role was to upper-bound `δ_eff = min(δ_des, δ_ops)`, which a
-    user can equivalently express by lowering δ_ops. Drive duty
-    cycle becomes a single per-scenario `operational_duty_cycle`
-    parameter with optional per-call override. Design dimensionality
-    12 → 11; surrogate input columns 25 → 24.
+    from the design-side schema after the v6 schema was found not
+    to use the field in the mass model — its only role was to
+    upper-bound `δ_eff = min(δ_des, δ_ops)`, which a user can
+    equivalently express by lowering δ_ops. Drive duty cycle becomes
+    a single per-scenario `operational_duty_cycle` parameter with
+    optional per-call override. Design dimensionality 12 → 11;
+    surrogate input columns 25 → 24.
   - **v6 (retired):** drivetrain-aware design vector.
     Dropped `design_nominal_speed_mps` (cruise speed is now derived
     inside the evaluator from a torque-balance + slip-balance +
@@ -71,7 +106,7 @@ single Parquet row.
     on a sample, with traverse metrics shifting 12-15 % at the
     median).
   - **v4 (retired):** every row is evaluated with the wheel-level SCM correction (`data/scm/correction_v1.joblib`, `WheelLevelCorrection`) applied inside the analytical traverse loop. The `use_scm_correction` flag is recorded in the Parquet metadata footer. The Parquet column schema is byte-identical to v3; the version bump exists so a v3-trained surrogate (BW-only) isn't silently reused on a v4 dataset (BW + correction). The correction reduces feasibility flips vs SCM-direct and shrinks continuous-target error while running much faster than SCM-direct.
-  - **v3 (retired, 2026-04-25):** widened LHS bounds on `wheel_width_m` (0.15 → 0.20), `grouser_height_m` (0.012 → 0.020), and `chassis_mass_kg` (35 → 50) so the flown / design-target lunar micro-rovers in `roverdevkit.validation.rover_registry` (Yutu-2 ex-payload mass ~30-40 kg, Rashid-1 grouser 15 mm, Lunokhod-class wheel widths 20 cm) sit inside the surrogate's training support rather than at corner points. The Parquet column schema is byte-identical to v2; the version bump exists so a v2-trained surrogate isn't silently reused on a v3 dataset.
+  - **v3 (retired):** widened LHS bounds on `wheel_width_m` (0.15 → 0.20), `grouser_height_m` (0.012 → 0.020), and `chassis_mass_kg` (35 → 50) so the flown / design-target lunar micro-rovers in `roverdevkit.validation.rover_registry` (Yutu-2 ex-payload mass ~30-40 kg, Rashid-1 grouser 15 mm, Lunokhod-class wheel widths 20 cm) sit inside the surrogate's training support rather than at corner points. The Parquet column schema is byte-identical to v2; the version bump exists so a v2-trained surrogate isn't silently reused on a v3 dataset.
   - **v2 (retired):** removed `thermal_survival` from the metric column set. The system-level evaluator still computes it as a diagnostic but the surrogate does not consume or predict it. Rationale: the mass model treats RHU power and MLI quality as free, so `thermal_survival` reduces to a near-trivial gate ("did you add an RHU?") with no real design trade-off. The Pragyan/Yutu-2 thermal distinction stays in the rover validation harness. A future mass-model upgrade that charges RHU/MLI mass would let thermal re-enter the schema as a real Pareto target.
   - **v1 (retired):** included `thermal_survival` as a feasibility flag.
 - **Fidelity level (this file):** `analytical` — Bekker-Wong terramechanics
@@ -81,12 +116,13 @@ single Parquet row.
   to the BW solve at every wheel-force step within `brentq`. The
   `use_scm_correction` flag in the Parquet footer records whether this
   composition was active at build time (always `True` for v5).
-- **Canonical filename:** `lhs_v7_1.parquet` — current main training
+- **Canonical filename:** `lhs_v9.parquet` — current main training
   set, 40k rows at 10k × 4 scenario families on the v3 widened
   bounds with v4 SCM correction, the v5 grouser-aware BW kernel,
   the v5_1 energy-feasible-range throttle, the v6 drivetrain-aware
-  design vector, the v7 single-duty-knob simplification, and the
-  v7_1 LHS-sampled δ_ops. Pilot (`lhs_pilot.parquet`) and challenge
+  design vector, the v7 single-duty-knob simplification, the
+  v7_1 LHS-sampled δ_ops, and the v9 LHS-sampled scientific payload
+  mass/power. Pilot (`lhs_pilot.parquet`) and challenge
   (`challenge_v1.parquet`) files are generated on demand from
   `scripts/build_dataset.py`; only the canonical training set is
   treated as a tracked artifact. Earlier versions (`lhs_v1` through
@@ -146,7 +182,7 @@ speed is derived) and `design_drive_duty_cycle` (v6 renamed to
 `design_designed_duty_cycle`, v7 dropped entirely — drive duty cycle
 lives on the scenario as `scenario_operational_duty_cycle`).
 
-### Scenario inputs (16 columns)
+### Scenario inputs (18 columns)
 
 Family-fixed columns (`scenario_family`, `scenario_terrain_class`,
 `scenario_soil_simulant`, `scenario_sun_geometry`,
@@ -171,6 +207,8 @@ family. The remaining columns are jittered per sample.
 | `scenario_soil_cohesion_kpa` | float64 | Soil cohesion, [0.1, 1.0] kPa. |
 | `scenario_soil_friction_angle_deg` | float64 | Internal friction angle, [30, 50]°. |
 | `scenario_soil_shear_modulus_k_m` | float64 | Janosi-Hanamoto K, [0.010, 0.025] m. |
+| `scenario_payload_mass_kg` | float64 | Scientific-payload mass (mission requirement). v9 added this as a per-row LHS feature uniform on `[0, 30]` *independently of family*. Added to total vehicle mass as a line item outside the dry-mass growth margin; the per-scenario default is kept on the YAML / `ScenarioFamily` for canonical webapp slider position. |
+| `scenario_payload_power_w` | float64 | Scientific-payload continuous ops-time power (mission requirement). v9 added this as a per-row LHS feature uniform on `[0, 30]`. Added to the continuous electrical load (alongside avionics) in the traverse budget and to the hot-case thermal dissipation. |
 
 ### Mission-metric targets (8 columns)
 

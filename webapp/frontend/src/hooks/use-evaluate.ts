@@ -33,7 +33,13 @@ export function useEvaluate() {
 export function useRegistryEvaluations(
   rovers: Array<{ rover_name: string; design: DesignVector }>,
   scenarioName: string,
+  overrides?: {
+    payload_mass_kg?: number | null;
+    payload_power_w?: number | null;
+  },
 ) {
+  const payloadMass = overrides?.payload_mass_kg ?? null;
+  const payloadPower = overrides?.payload_power_w ?? null;
   return useQueries({
     queries: rovers.map((r) => ({
       queryKey: [
@@ -41,9 +47,16 @@ export function useRegistryEvaluations(
         r.rover_name,
         scenarioName,
         JSON.stringify(r.design),
+        payloadMass,
+        payloadPower,
       ] as const,
       queryFn: (): Promise<EvaluateResponse> =>
-        api.evaluate({ design: r.design, scenario_name: scenarioName }),
+        api.evaluate({
+          design: r.design,
+          scenario_name: scenarioName,
+          payload_mass_kg: payloadMass,
+          payload_power_w: payloadPower,
+        }),
       staleTime: Infinity,
       gcTime: 60 * 60 * 1000,
       refetchOnWindowFocus: false,

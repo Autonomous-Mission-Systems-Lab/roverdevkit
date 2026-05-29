@@ -183,7 +183,7 @@ def test_underpowered_rover_eventually_floors_battery(soil_nominal) -> None:
 def test_range_matches_capability_envelope_when_energy_is_non_binding(
     soil_nominal,
 ) -> None:
-    """W12 Step A regression (energy non-binding case).
+    """schema-v7 Step A regression (energy non-binding case).
 
     Constructed to keep the battery comfortably above floor at every
     step: a short (1 Earth-day) noon-anchored mission on a flat,
@@ -230,12 +230,12 @@ def test_range_matches_capability_envelope_when_energy_is_non_binding(
 
 
 def test_range_below_envelope_on_designed_to_floor_case(soil_nominal) -> None:
-    """W12 Step A regression (energy-binding case).
+    """schema-v7 Step A regression (energy-binding case).
 
     Same low-solar / high-avionics / high-duty design as
     test_underpowered_rover_eventually_floors_battery; here we additionally
     assert that the energy-feasibility throttle reduces delivered range
-    strictly below the capability envelope. Before W12 Step A this test
+    strictly below the capability envelope. Before schema-v7 Step A this test
     would have failed (range was duty * speed * time regardless of
     energy budget).
     """

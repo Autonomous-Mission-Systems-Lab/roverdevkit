@@ -5,7 +5,7 @@ surrogate, and tradespace layers. Using Pydantic gives us validation at the
 boundaries (e.g. reject a wheel radius outside the design-space bounds) and
 free JSON/YAML serialization for scenario config files.
 
-Design-variable ranges follow :file:`project_plan.md` §3.1.
+Design-variable ranges are chosen to cover the 5-50 kg lunar micro-rover class and the public rover registry.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ class DesignVector(BaseModel):
 
     Units are SI unless otherwise noted.
 
-    Schema v7 (W12 step B follow-up) consolidated the v6 designed /
+    Schema v7 (v7 schema follow-up) consolidated the v6 designed /
     operational duty-cycle split back into a single per-scenario
     ``operational_duty_cycle``. The v6 ``designed_duty_cycle`` design
     field carried no engineering content — the v6 mass model never
@@ -36,7 +36,7 @@ class DesignVector(BaseModel):
     11-D design space, matches surrogate dimensionality to the
     user-facing form, and removes the LHS-saturation artefact in
     high-δ_des / low-δ_ops cells. See
-    ``reports/week12_design/decision.md`` for the full rationale.
+    the version history in ``data/analytical/SCHEMA.md`` for the full rationale.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -62,7 +62,7 @@ class DesignVector(BaseModel):
             "micro-rover wheels (Rashid-1 flew 15 mm, Yutu-class wheels "
             "use ~12 mm). The LHS sampler in surrogate.sampling currently "
             "draws to 12 mm only; widening it to the schema ceiling is a "
-            "dataset-regen task tracked in the project log."
+            "dataset-regeneration task for a future surrogate release."
         ),
     )
     grouser_count: int = Field(ge=0, le=24, description="Number of grousers N_g")
@@ -70,27 +70,40 @@ class DesignVector(BaseModel):
 
     # Chassis
     chassis_mass_kg: float = Field(
-        ge=3.0,
+        ge=0.5,
         le=50.0,
         description=(
             "Dry chassis mass m_c. Upper bound 50 kg widened from 35 kg "
             "in the v3 LHS bounds widening so the heavier flown lunar "
             "micro-rovers (Yutu-class, ~30-40 kg ex-payload) sit inside "
             "the surrogate's training support rather than at a corner. "
-            "Floor 3 kg keeps the design space anchored to actual "
-            "micro-rover scale."
+            "Floor lowered from 3 kg to 0.5 kg (2026-05-27) to admit "
+            "in-class flotilla / ultra-micro rovers (NASA JPL CADRE "
+            "units ~0.8 kg chassis; iSpace Tenacious ~2 kg chassis). "
+            "The v4 LHS dataset was sampled on the 3-50 kg range so "
+            "designs below 3 kg are OOD for the existing surrogate "
+            "until the v5 regeneration."
         ),
     )
     wheelbase_m: float = Field(ge=0.3, le=1.2, description="Wheelbase L_wb")
 
     # Power
     solar_area_m2: float = Field(ge=0.1, le=1.5, description="Solar array area A_s")
-    battery_capacity_wh: float = Field(ge=20.0, le=500.0, description="Battery capacity C_b")
+    battery_capacity_wh: float = Field(
+        ge=5.0,
+        le=500.0,
+        description=(
+            "Battery capacity C_b. Floor lowered from 20 Wh to 5 Wh "
+            "(2026-05-27) to admit CADRE-class flotilla rovers "
+            "(~10 Wh per unit). Designs below 20 Wh are OOD for the "
+            "v4 surrogate until the v5 LHS regeneration."
+        ),
+    )
     avionics_power_w: float = Field(ge=5.0, le=40.0, description="Continuous avionics draw P_a")
 
     # Operations
     peak_wheel_torque_nm: float = Field(
-        ge=0.3,
+        ge=0.05,
         le=20.0,
         description=(
             "Peak per-wheel hub torque T_hub^peak that the drivetrain "
@@ -98,15 +111,19 @@ class DesignVector(BaseModel):
             "the parametric mass model and gates whether the rover stalls "
             "on slope. Cruise speed is *derived* from this, the slip-balance "
             "torque demand, and the steady-state power budget — not a free "
-            "design variable. Bounds: 0.3 Nm captures the smallest published "
-            "lunar micro-rover (Rashid-1, ~0.3 Nm peak); 20 Nm covers "
-            "over-sized direct-drive concepts at the top of the design "
-            "space. Schema-bumped to v6 (W12 step B) to replace "
+            "design variable. Bounds: 0.05 Nm captures CADRE-class "
+            "flotilla rovers (2 kg / 4-wheel / R=0.08 at lunar gravity "
+            "anchors at ~0.06 Nm per wheel); 20 Nm covers over-sized "
+            "direct-drive concepts at the top of the design space. "
+            "Floor lowered from 0.3 Nm (2026-05-27) to admit the "
+            "ultra-micro registry entries; designs below 0.3 Nm are "
+            "OOD for the v4 surrogate until the v5 LHS regeneration. "
+            "Schema-bumped to v6 (v6 schema update) to replace "
             "``nominal_speed_mps`` with a true drivetrain capability "
-            "input; see reports/week12_design/decision.md."
+            "input; see the version history in ``data/analytical/SCHEMA.md``."
         ),
     )
-    # Schema v7 (W12 step B follow-up) removed the v6
+    # Schema v7 (v7 schema follow-up) removed the v6
     # ``designed_duty_cycle`` field. Drive duty cycle is now a
     # per-scenario quantity (``MissionScenario.operational_duty_cycle``)
     # with an optional per-call API override; see the class docstring
@@ -133,7 +150,7 @@ class MissionScenario(BaseModel):
     Scenarios are typically loaded from YAML in
     :mod:`roverdevkit.mission.scenarios`. The four canonical scenarios
     (``ScenarioName``) are what the tradespace optimiser sweeps in
-    Phase 3; validation scenarios (Week 5 rover-comparison harness)
+    webapp; validation scenarios (real-rover comparison harness)
     reuse the same schema with descriptive names, so ``name`` is a free
     string rather than the Literal. Invalid values never reach the
     optimiser because that path goes through ``load_scenario()``, which
@@ -163,11 +180,51 @@ class MissionScenario(BaseModel):
             "design field after that field turned out to do no engineering "
             "work in the v6 mass model. Calibrated against published "
             "rover-on-mission ops cadence (mare 0.30, crater 0.20, highland "
-            "0.15, polar 0.05; see reports/week12_design/decision.md). "
+            "0.15, polar 0.05; see ``data/analytical/SCHEMA.md``). "
             "Users can override via the /evaluate / /predict API "
-            "parameter; the surrogate is only trained at scenario defaults "
-            "so off-default queries fall back to the deterministic "
-            "evaluator (no PIs)."
+            "parameter; the surrogate is trained on δ_ops as an LHS "
+            "feature (v7_1) so off-default queries keep calibrated PIs."
+        ),
+    )
+    # Schema v9: scientific payload is a mission *requirement* carried
+    # on the scenario, not a design variable on ``DesignVector``. The
+    # mission's science team specifies payload mass and power; the
+    # rover bus is then sized around it. Modelling payload here (rather
+    # than folding it into ``chassis_mass_kg``) keeps the chassis input
+    # purely structural, makes the bottom-up mass model reproduce
+    # full-up published rover mass, and gives the optimiser the same
+    # mass cost the real rover carried. See ``data/analytical/SCHEMA.md``
+    # v9 entry for the full rationale.
+    payload_mass_kg: float = Field(
+        ge=0.0,
+        le=30.0,
+        default=0.0,
+        description=(
+            "Scientific-payload mass m_payload, kg, in [0, 30]. A mission "
+            "requirement: the instrument suite the science team specifies "
+            "(e.g. Pragyan APXS+LIBS ~3 kg, Yutu-2 GPR+VNIS+APXS ~25 kg). "
+            "Added to total vehicle mass as a top-level line item "
+            "*outside* the AIAA S-120A dry-mass growth margin "
+            "(``m_total = m_dry + m_margin + m_payload``) because payload "
+            "mass is a known requirement, not poorly-known bus hardware. "
+            "Users can override via the /evaluate / /predict API "
+            "parameter; the surrogate is trained on payload as an LHS "
+            "feature (v9) so off-default queries keep calibrated PIs. "
+            "Ceiling 30 kg covers the heaviest in-class lunar micro-rover "
+            "payload (Yutu-2)."
+        ),
+    )
+    payload_power_w: float = Field(
+        ge=0.0,
+        le=30.0,
+        default=0.0,
+        description=(
+            "Scientific-payload continuous ops-time power draw P_payload, "
+            "W, in [0, 30]. A mission requirement. Added to the "
+            "continuous electrical load alongside avionics in the "
+            "traverse power budget, and to the hot-case internal thermal "
+            "dissipation. Users can override via the /evaluate / /predict "
+            "API parameter; trained as an LHS feature (v9)."
         ),
     )
 
@@ -182,7 +239,7 @@ class MissionMetrics(BaseModel):
 
     All fields describe the **achievable performance** of a design under
     its scenario's effective duty cycle ``δ_eff = min(δ_des, δ_ops)``.
-    Schema bumped to v6 (W12 step B) when ``range_km`` was migrated from
+    Schema bumped to v6 (v6 schema update) when ``range_km`` was migrated from
     a tautological capability envelope to a real engineering metric
     responsive to drivetrain torque, soil, slope, and power budget.
     Real-rover-conservatism (Pragyan ~0.02, Yutu-2 ~0.015) is now
@@ -202,7 +259,7 @@ class MissionMetrics(BaseModel):
     # the whole traverse. Unlike ``energy_margin_pct`` (SOC-based, clipped
     # at 0-100), this one is unbounded on both sides: negative means the
     # rover consumed more than it generated, >100 means surplus exceeded
-    # consumption. Kept as a separate field so Week-6 LHS surrogates see
+    # consumption. Kept as a separate field so LHS-trained surrogates see
     # a smooth target; reporting gates keep using the clipped version.
     energy_margin_raw_pct: float = 0.0
 

@@ -1,6 +1,6 @@
 """Smoke tests for ``POST /predict``.
 
-These tests require the W8 step-4 quantile bundle on disk; if it is
+These tests require the quantile-calibration quantile bundle on disk; if it is
 missing they skip rather than fail so a contributor without the
 artifact can still run the rest of the suite.
 """
@@ -56,14 +56,56 @@ def test_predict_feature_row_includes_categoricals(
     assert response.status_code == 200
     body = response.json()
     cols = body["feature_row"]["columns"]
-    # 25 columns: 11 design (v7 dropped designed_duty_cycle) + 10 scenario
-    # numerics (v7_1 added scenario_operational_duty_cycle) + 4 scenario
+    # 27 columns: 11 design (v7 dropped designed_duty_cycle) + 12 scenario
+    # numerics (v7_1 added scenario_operational_duty_cycle; v9 added
+    # scenario_payload_mass_kg + scenario_payload_power_w) + 4 scenario
     # categoricals.
-    assert len(cols) == 25
+    assert len(cols) == 27
     assert "scenario_operational_duty_cycle" in cols
+    assert "scenario_payload_mass_kg" in cols
+    assert "scenario_payload_power_w" in cols
     # Family is forwarded from the scenario name on the canonical four.
     fam_idx = cols.index("scenario_family")
     assert body["feature_row"]["values"][fam_idx] == "polar_prospecting"
+
+
+def test_predict_payload_override_reaches_feature_row(
+    client: TestClient,
+    sample_design: dict[str, float | int],
+) -> None:
+    """Schema v9: a per-call payload override must land in the echoed
+    feature row so the surrogate scores the mission's own payload, not
+    the scenario default.
+    """
+    payload = {
+        "design": sample_design,
+        "scenario_name": "equatorial_mare_traverse",
+        "payload_mass_kg": 12.5,
+        "payload_power_w": 7.0,
+    }
+    response = client.post("/predict", json=payload)
+    assert response.status_code == 200, response.text
+    row = response.json()["feature_row"]
+    cols = row["columns"]
+    mass_idx = cols.index("scenario_payload_mass_kg")
+    power_idx = cols.index("scenario_payload_power_w")
+    assert row["values"][mass_idx] == pytest.approx(12.5)
+    assert row["values"][power_idx] == pytest.approx(7.0)
+
+
+def test_predict_rejects_out_of_bounds_payload(
+    client: TestClient,
+    sample_design: dict[str, float | int],
+) -> None:
+    response = client.post(
+        "/predict",
+        json={
+            "design": sample_design,
+            "scenario_name": "equatorial_mare_traverse",
+            "payload_power_w": -1.0,
+        },
+    )
+    assert response.status_code == 422
 
 
 def test_predict_unknown_scenario_returns_404(

@@ -21,16 +21,18 @@ from roverdevkit.surrogate.features import (
 
 
 def test_design_feature_count() -> None:
-    # Schema v7 (W12 step B follow-up) dropped designed_duty_cycle.
+    # Schema v7 (v7 schema follow-up) dropped designed_duty_cycle.
     assert len(DESIGN_FEATURE_COLUMNS) == 11
 
 
 def test_input_columns_compose_from_groups() -> None:
     expected = DESIGN_FEATURE_COLUMNS + SCENARIO_NUMERIC_COLUMNS + SCENARIO_CATEGORICAL_COLUMNS
     assert expected == INPUT_COLUMNS
-    # Schema v7_1 (W12 step B follow-on) added scenario_operational_duty_cycle
-    # to SCENARIO_NUMERIC_COLUMNS so the surrogate sees δ_ops as a true input.
-    assert len(INPUT_COLUMNS) == 25  # 11 + 10 + 4
+    # Schema v7_1 added scenario_operational_duty_cycle; schema v9 added
+    # scenario_payload_mass_kg + scenario_payload_power_w to
+    # SCENARIO_NUMERIC_COLUMNS so the surrogate sees payload as true inputs.
+    assert len(SCENARIO_NUMERIC_COLUMNS) == 12
+    assert len(INPUT_COLUMNS) == 27  # 11 + 12 + 4
 
 
 def test_regression_targets_include_primaries() -> None:
@@ -46,7 +48,7 @@ def test_inputs_disjoint_from_targets() -> None:
 
 
 def test_feasibility_classifier_is_stalled_only() -> None:
-    """Schema v6 (W12 step B): the single feasibility classifier is
+    """Schema v6 (v6 schema update): the single feasibility classifier is
     ``stalled`` (positive class = infeasible). See ``data/analytical/SCHEMA.md``
     for the v5 -> v6 polarity flip and the v1 -> v2 thermal removal.
     """

@@ -23,6 +23,8 @@ def _to_summary(entry: RoverRegistryEntry) -> RegistryEntrySummary:
         thermal_architecture=asdict(entry.thermal_architecture),
         panel_efficiency=entry.panel_efficiency,
         panel_dust_factor=entry.panel_dust_factor,
+        panel_tilt_deg=entry.panel_tilt_deg,
+        panel_azimuth_deg=entry.panel_azimuth_deg,
         imputation_notes=entry.imputation_notes,
     )
 

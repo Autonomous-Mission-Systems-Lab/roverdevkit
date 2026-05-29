@@ -13,7 +13,6 @@ dependencies:
   - matplotlib>=3.8
   - plotly>=5.18
   - jupyterlab>=4.0
-  - ipywidgets>=8.1
   - pyyaml>=6.0
   - tqdm>=4.66
   # PyChrono (Path 2 — SCM corrections). If install fails on macOS/ARM,

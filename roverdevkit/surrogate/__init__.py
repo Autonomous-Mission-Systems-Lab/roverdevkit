@@ -1,6 +1,6 @@
 """Mission-level surrogate as an acceleration and uncertainty layer.
 
-**Reframed scope (project_log.md 2026-04-26).** After the W7.7 traverse-loop
+**Scope note.** After the traverse-loop
 lift-out the corrected mission evaluator runs at ~40 ms / mission, so this
 package is no longer the project's "fast path." It is an *optional* layer
 on top of the corrected evaluator that exists for:
@@ -10,10 +10,10 @@ on top of the corrected evaluator that exists for:
    Pareto front).
 2. Bulk sensitivity / Sobol / 1M-point grids where 40 ms × N becomes
    uncomfortable.
-3. Calibrated 90 % prediction intervals via quantile XGBoost (W8 step-4).
+3. Calibrated 90 % prediction intervals via quantile XGBoost (quantile-calibration).
 4. Probabilistic feasibility for NSGA-II constraint handling
    (classifier AUC, not deterministic boolean).
-5. Phase-5 benchmark baseline.
+5. benchmark benchmark baseline.
 6. Deployment portability (a pickled XGBoost is much smaller than the
    full evaluator stack).
 
@@ -35,12 +35,12 @@ Modules:
   physics-informed transforms).
 - :mod:`.baselines` — Ridge / RF / XGBoost per target + joint MLP +
   feasibility classifier. The default-hyperparameter pipeline used by
-  W6 / W8 step-2.
-- :mod:`.tuning` — Optuna TPE on XGBoost (W8 step-3).
+  baseline-surrogate / baseline.
+- :mod:`.tuning` — Optuna TPE on XGBoost (tuned-median).
 - :mod:`.metrics` — R²/RMSE/MAPE, AUC/F1, per-scenario-family
   breakdowns, the canonical ``benchmark_score`` API.
 
-Target accuracy (project_plan.md §7 Layer 1, surrogate vs corrected
+Target accuracy (surrogate vs corrected
 evaluator):
     R² > 0.95 for range_km and energy_margin_raw_pct; R² > 0.85 for
     slope_capability_deg and total_mass_kg; AUC > 0.90 for

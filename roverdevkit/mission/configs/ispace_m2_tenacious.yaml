@@ -1,0 +1,33 @@
+# Validation scenario — iSpace HAKUTO-R Mission 2 Tenacious micro-rover.
+# Not a canonical tradespace scenario; used only by
+# roverdevkit/validation/rover_registry.py for the design-target
+# Layer-1 surrogate sanity check (rover never operated on the lunar
+# surface — Resilience lander failure on descent, June 2025).
+#
+# Source: iSpace HAKUTO-R Mission 2 mission overview and press kit;
+# news reports of the June 2025 lander loss; iSpace mission docs for
+# the 5 kg Tenacious rover and its scoop-and-shovel sample-collection
+# demonstration. Targeted landing site: Mare Frigoris area at mid-
+# northern latitude, similar terrain class to Rashid-1's Atlas crater
+# landing site.
+#
+# `sun_geometry: diurnal` because the target landing site is mid-
+# latitude, not polar.
+name: ispace_m2_tenacious
+latitude_deg: 60.0
+traverse_distance_m: 500.0
+terrain_class: mare_nominal
+soil_simulant: Apollo_regolith_nominal
+mission_duration_earth_days: 14.0
+max_slope_deg: 8.0
+sun_geometry: diurnal
+# δ_ops calibrated for a short, science-demonstration micro-rover:
+# slow ground-ops cadence with stops for sample-scoop / Moonhouse
+# deployment. Between Rashid-1 (0.013, design-target) and MoonRanger
+# (0.20, aspirational).
+operational_duty_cycle: 0.013
+# Schema v9: Tenacious science payload = HD camera + scoop-collected
+# sample demonstration payload, ~0.3 kg. payload_power_w held at 0 for
+# this validation scenario (payload off during drive windows).
+payload_mass_kg: 0.3
+payload_power_w: 0.0

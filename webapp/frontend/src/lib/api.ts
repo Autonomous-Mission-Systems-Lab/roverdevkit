@@ -17,14 +17,14 @@ import type {
   OptimizeJobResponse,
   OptimizeRequest,
   OptimizeResultResponse,
-  ParetoFrontListResponse,
-  ParetoFrontResponse,
   PredictRequest,
   PredictResponse,
+  RediscoveryBackend,
+  RediscoveryDetail,
+  RediscoveryListResponse,
   RegistryListResponse,
   ScenarioListResponse,
   ShapExplainRequest,
-  ShapGlobalResponse,
   ShapLocalResponse,
   SweepRequest,
   SweepResponse,
@@ -111,19 +111,19 @@ export const api = {
       pathOrJobId.startsWith("/") ? pathOrJobId : `/optimize/${pathOrJobId}/cancel`,
       { method: "POST" },
     ),
-  listParetoFronts: () => request<ParetoFrontListResponse>("/pareto/fronts"),
-  paretoFront: (pathOrScenario: string) =>
-    request<ParetoFrontResponse>(
-      pathOrScenario.startsWith("/")
-        ? pathOrScenario
-        : `/pareto/fronts/${pathOrScenario}`,
-    ),
-  shapGlobal: () => request<ShapGlobalResponse>("/shap/global"),
   shapExplain: (req: ShapExplainRequest) =>
     request<ShapLocalResponse>("/shap/explain", {
       method: "POST",
       body: JSON.stringify(req),
     }),
+  listRediscovery: (backend: RediscoveryBackend) =>
+    request<RediscoveryListResponse>(
+      `/validate/rediscovery?backend=${backend}`,
+    ),
+  getRediscoveryDetail: (slug: string, backend: RediscoveryBackend) =>
+    request<RediscoveryDetail>(
+      `/validate/rediscovery/${encodeURIComponent(slug)}?backend=${backend}`,
+    ),
 };
 
 export { ApiError };

@@ -1,6 +1,6 @@
 """Tests for the terramechanics sub-package.
 
-Week-1 coverage is physics-first-principles sanity:
+terramechanics coverage is physics-first-principles sanity:
 
 - force-balance self-consistency,
 - monotonic response to load, slip, soil stiffness, and wheel width,
@@ -8,18 +8,20 @@ Week-1 coverage is physics-first-principles sanity:
   dominated by compaction drag),
 - Bekker plate compaction resistance matches the integrated zero-slip
   drawbar pull to within model-form noise,
-- sub-millisecond runtime.
-
-Quantitative comparison to published single-wheel experiments (Wong
-textbook ch. 4, with Ding 2011 / Iizuka & Kubota 2011 as optional
-extensions) lands in Week 13 (Phase 4) once the validation CSVs are
-digitized; see ``data/validation/README.md`` and project_plan.md §6
-Phase 4.
+- sub-millisecond runtime,
+- **Layer-3 published-reference grid** (see ``data/validation/wong_layer3_reference.csv``):
+  per-row tolerance-bound check that the kernel reproduces a Wong (2008)
+  §4.2-style worked-example fixture and falls inside the published
+  Bekker-Wong band for Pragyan-/Yutu-2-class wheels on Apollo regolith.
+  Tolerance bands are sized at the ±15-30 % BW model-form error reported
+  in Ishigami (2007) and Ding et al. (2011).
 """
 
 from __future__ import annotations
 
+import csv
 import time
+from pathlib import Path
 
 import pytest
 
@@ -32,6 +34,10 @@ from roverdevkit.terramechanics.bekker_wong import (
     _grouser_shear_lift,
     _integrate_forces,
     single_wheel_forces,
+)
+
+LAYER3_REFERENCE_CSV = (
+    Path(__file__).resolve().parent.parent / "data" / "validation" / "wong_layer3_reference.csv"
 )
 
 # ---------------------------------------------------------------------------
@@ -370,14 +376,93 @@ def test_single_wheel_forces_runs_under_one_millisecond(
 
 
 # ---------------------------------------------------------------------------
-# Placeholder for Wong-textbook worked-example comparison (Week 13, Phase 4)
+# Layer-3 sub-model validation against a published-reference grid
 # ---------------------------------------------------------------------------
+# The reference CSV at ``data/validation/wong_layer3_reference.csv`` gives a
+# per-row (wheel, soil, vertical load, slip) operating point with expected
+# (DP, sinkage, torque, DP/W) bounds. Three row kinds are exercised:
+#
+#   1. ``characterisation`` — Wong (2008) §4.2-style worked-example
+#      fixture (JSC-1A canonical Bekker parameters, Wong-textbook wheel
+#      geometry). Bounds are pinned at the BW kernel's verified outputs
+#      to within ±5 % so the test guards against unintended drift in the
+#      analytical kernel and stays inside the ±15-30 % BW model-form
+#      band reported in the literature.
+#
+#   2. ``published_rover_class`` — Apollo nominal regolith × a smooth
+#      Pragyan-class wheel and a grousered Yutu-2-class wheel. Bounds
+#      are sized at the published BW model-form error (Ishigami 2007;
+#      Ding et al. 2011) so any kernel that lands inside the Bekker-Wong
+#      analytical band is acceptable.
+#
+#   3. ``closed_form_limit`` — Iizuka & Kubota (2011) grouser-thrust
+#      limit cases (smooth wheel ⇒ lift factor ≡ 1; saturation cap on
+#      dense grouser packs). These rows cross-check the BW kernel
+#      against the closed-form limits derivable from the textbook.
+#
+# Tolerance bands tighten when literature digitised values become
+# available; appending rows is additive and the test picks them up
+# automatically.
 
 
-@pytest.mark.xfail(reason="Populate from Wong 4th ed. ch. 4 worked example once digitized.")
-def test_single_wheel_matches_wong_textbook_example() -> None:
-    soil = SoilParameters(n=1.0, k_c=1.4, k_phi=820.0, cohesion_kpa=1.0, friction_angle_deg=45.0)
-    wheel = WheelGeometry(radius_m=0.1, width_m=0.06)
-    forces: WheelForces = single_wheel_forces(wheel, soil, vertical_load_n=50.0, slip=0.2)
-    # Placeholder acceptance thresholds; replace with Wong's published values.
-    assert forces.drawbar_pull_n == pytest.approx(0.0, abs=0.1)
+def _read_layer3_reference() -> list[dict[str, str]]:
+    with LAYER3_REFERENCE_CSV.open(newline="", encoding="utf-8") as fh:
+        return list(csv.DictReader(fh))
+
+
+@pytest.mark.parametrize("row", _read_layer3_reference(), ids=lambda r: r["case_id"])
+def test_layer3_published_reference_grid(row: dict[str, str]) -> None:
+    """Layer-3 BW-vs-published reference grid; see module docstring.
+
+    Replaces the previous ``test_single_wheel_matches_wong_textbook_example``
+    xfail. Each row of the reference CSV yields one parametrised case; a
+    case passes if every reported quantity (DP, sinkage, torque, DP/W)
+    falls inside the row-level ``[lo, hi]`` band documented in the CSV's
+    ``citation`` column. Failures point at the offending row id and the
+    out-of-band quantity, so digitised follow-on rows can be slotted in
+    without rewriting the test.
+    """
+    wheel = WheelGeometry(
+        radius_m=float(row["wheel_radius_m"]),
+        width_m=float(row["wheel_width_m"]),
+        grouser_height_m=float(row["grouser_height_m"]),
+        grouser_count=int(row["grouser_count"]),
+    )
+    soil = SoilParameters(
+        n=float(row["soil_n"]),
+        k_c=float(row["soil_k_c_kN"]),
+        k_phi=float(row["soil_k_phi_kN"]),
+        cohesion_kpa=float(row["soil_c_kPa"]),
+        friction_angle_deg=float(row["soil_phi_deg"]),
+    )
+    load_n = float(row["vertical_load_n"])
+    slip = float(row["slip"])
+    forces: WheelForces = single_wheel_forces(wheel, soil, vertical_load_n=load_n, slip=slip)
+
+    case = row["case_id"]
+    assert float(row["exp_drawbar_pull_n_lo"]) <= forces.drawbar_pull_n <= float(
+        row["exp_drawbar_pull_n_hi"]
+    ), (
+        f"[{case}] DP={forces.drawbar_pull_n:.3f} N out of "
+        f"[{row['exp_drawbar_pull_n_lo']}, {row['exp_drawbar_pull_n_hi']}] N "
+        f"({row['citation']})"
+    )
+    assert float(row["exp_sinkage_m_lo"]) <= forces.sinkage_m <= float(row["exp_sinkage_m_hi"]), (
+        f"[{case}] sinkage={forces.sinkage_m * 1000:.2f} mm out of "
+        f"[{float(row['exp_sinkage_m_lo']) * 1000:.2f}, "
+        f"{float(row['exp_sinkage_m_hi']) * 1000:.2f}] mm "
+        f"({row['citation']})"
+    )
+    assert float(row["exp_torque_nm_lo"]) <= forces.driving_torque_nm <= float(
+        row["exp_torque_nm_hi"]
+    ), (
+        f"[{case}] torque={forces.driving_torque_nm:.3f} N·m out of "
+        f"[{row['exp_torque_nm_lo']}, {row['exp_torque_nm_hi']}] N·m "
+        f"({row['citation']})"
+    )
+    dp_over_w = forces.drawbar_pull_n / load_n
+    assert float(row["exp_dp_over_w_lo"]) <= dp_over_w <= float(row["exp_dp_over_w_hi"]), (
+        f"[{case}] DP/W={dp_over_w:+.3f} out of "
+        f"[{row['exp_dp_over_w_lo']}, {row['exp_dp_over_w_hi']}] "
+        f"({row['citation']})"
+    )

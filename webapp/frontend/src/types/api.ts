@@ -26,7 +26,7 @@ export type TerrainClass =
 export type SunGeometry = "continuous" | "diurnal" | "polar_intermittent";
 
 /**
- * Mirror of `roverdevkit.schema.DesignVector` (schema v7, W12 step B
+ * Mirror of `roverdevkit.schema.DesignVector` (schema v7, v6 schema update
  * follow-up).
  *
  * v6 changes: `nominal_speed_mps` removed (cruise speed is derived in
@@ -73,6 +73,16 @@ export interface MissionScenario {
   max_slope_deg: number;
   sun_geometry: SunGeometry;
   operational_duty_cycle: number;
+  /**
+   * Scientific-payload mass (kg) and continuous ops-time power (W),
+   * mission requirements introduced in schema v9. Payload mass is added
+   * to total vehicle mass as a top-level line item *outside* the dry-mass
+   * growth margin; payload power adds to the continuous electrical load.
+   * Each scenario ships a class-typical default; the Mission Inputs panel
+   * lets a user override both for a single round-trip.
+   */
+  payload_mass_kg: number;
+  payload_power_w: number;
 }
 
 export interface SoilParametersOut {
@@ -134,6 +144,15 @@ export interface PredictRequest {
    * calibrated PIs (`mode = "surrogate"`).
    */
   operational_duty_cycle?: number | null;
+  /**
+   * Optional per-query overrides for the schema-v9 payload mission
+   * requirements (`MissionScenario.payload_mass_kg` / `payload_power_w`).
+   * `null`/omitted uses the scenario's class-typical default. Both are
+   * LHS-sampled surrogate inputs over [0, 30], so any in-bounds override
+   * stays on the surrogate path with calibrated PIs.
+   */
+  payload_mass_kg?: number | null;
+  payload_power_w?: number | null;
   repair_crossings?: boolean;
 }
 
@@ -172,6 +191,13 @@ export interface EvaluateRequest {
    * calibrated default.
    */
   operational_duty_cycle?: number | null;
+  /**
+   * Optional per-query overrides for the schema-v9 payload mission
+   * requirements (`MissionScenario.payload_mass_kg` / `payload_power_w`).
+   * `null`/omitted uses the scenario's class-typical default.
+   */
+  payload_mass_kg?: number | null;
+  payload_power_w?: number | null;
 }
 
 export interface EvaluateMetric {
@@ -322,6 +348,13 @@ export interface SweepRequest {
    * sweep tab in sync with the Single design tab's slider.
    */
   operational_duty_cycle?: number | null;
+  /**
+   * Optional per-query overrides for the schema-v9 payload mission
+   * requirements. Held constant across the grid; only design variables
+   * vary on the sweep axes.
+   */
+  payload_mass_kg?: number | null;
+  payload_power_w?: number | null;
 }
 
 export interface SweepResponse {
@@ -388,6 +421,13 @@ export interface OptimizeRequest {
   n_generations?: number;
   seed?: number;
   operational_duty_cycle?: number | null;
+  /**
+   * Optional per-job overrides for the schema-v9 payload mission
+   * requirements. The NSGA-II candidates are all scored carrying this
+   * payload, so the front reflects the mission's real mass/power budget.
+   */
+  payload_mass_kg?: number | null;
+  payload_power_w?: number | null;
 }
 
 export interface OptimizeJobResponse {
@@ -424,37 +464,9 @@ export interface OptimizeCancelResponse {
   status: OptimizeJobStatus;
 }
 
-export interface ParetoFrontSummary {
-  scenario_name: string;
-  pareto_size: number;
-  backend: string;
-  dataset_version: string | null;
-  front_url: string;
-}
-
-export interface ParetoFrontListResponse {
-  fronts: ParetoFrontSummary[];
-}
-
-export interface ParetoFrontResponse {
-  scenario_name: string;
-  source: "canonical";
-  metadata: Record<string, unknown>;
-  pareto_front: OptimizeParetoPoint[];
-}
-
 export interface ShapFeatureScore {
   feature: string;
   value: number;
-}
-
-export interface ShapTargetImportance {
-  target: PrimaryTarget;
-  features: ShapFeatureScore[];
-}
-
-export interface ShapGlobalResponse {
-  targets: ShapTargetImportance[];
 }
 
 export interface ShapExplainRequest {
@@ -462,6 +474,8 @@ export interface ShapExplainRequest {
   scenario_name: string;
   target: PrimaryTarget;
   operational_duty_cycle?: number | null;
+  payload_mass_kg?: number | null;
+  payload_power_w?: number | null;
 }
 
 export interface ShapLocalResponse {
@@ -480,11 +494,68 @@ export interface RegistryEntrySummary {
   thermal_architecture: Record<string, unknown>;
   panel_efficiency: number;
   panel_dust_factor: number;
+  panel_tilt_deg: number;
+  panel_azimuth_deg: number;
   imputation_notes: string;
 }
 
 export interface RegistryListResponse {
   rovers: RegistryEntrySummary[];
+}
+
+/**
+ * Mirror of the FastAPI `RediscoveryBackend` literal. The evaluator
+ * sweep is the source of truth (corrected-evaluator-truth fronts);
+ * the v8 surrogate sweep is offered as a wall-clock benchmark
+ * alongside it. See `reports/rediscovery_loo_comparison.md` for the
+ * 2026-05-28 panel-tilt fix that makes the polar trio's energy
+ * margins physically defensible under the evaluator backend.
+ */
+export type RediscoveryBackend = "evaluator" | "surrogate";
+
+export interface RediscoveryParetoPoint {
+  design: DesignVector;
+  metrics: Record<string, number>;
+}
+
+export interface RediscoverySummary {
+  /** URL-safe identifier matching the per-rover JSON file stem. */
+  slug: string;
+  /** Human-readable name from the registry (e.g. `"CADRE-unit"`). */
+  rover_name: string;
+  /** True for rovers that have actually flown (Pragyan, Yutu-2). */
+  is_flown: boolean;
+  /** Class-generic `*_micro` scenario the rediscovery harness used. */
+  class_generic_scenario: string;
+  backend: RediscoveryBackend;
+  design_space_distance: number;
+  pareto_dominated: boolean;
+  mass_budget_kg: number;
+  pareto_front_size: number;
+}
+
+export interface RediscoveryListResponse {
+  backend: RediscoveryBackend;
+  rovers: RediscoverySummary[];
+}
+
+export interface RediscoveryDetail {
+  slug: string;
+  rover_name: string;
+  is_flown: boolean;
+  class_generic_scenario: string;
+  backend: RediscoveryBackend;
+  rover_design: DesignVector;
+  rover_metrics_under_generic_scenario: Record<string, number>;
+  design_space_distance: number;
+  pareto_dominated: boolean;
+  mass_budget_kg: number;
+  integer_matches: Record<string, boolean>;
+  per_variable_percent_errors: Record<string, number>;
+  nearest_pareto_index: number;
+  nearest_pareto_design: DesignVector;
+  nearest_pareto_metrics: Record<string, number>;
+  pareto_front: RediscoveryParetoPoint[];
 }
 
 /**
@@ -545,13 +616,13 @@ export const DESIGN_BOUNDS: Record<keyof DesignVector, FieldBounds> = {
     description: "N_w, mobility wheel count (4 or 6).",
   },
   chassis_mass_kg: {
-    min: 3,
+    min: 0.5,
     max: 50,
-    step: 0.5,
+    step: 0.1,
     unit: "kg",
     label: "Chassis mass",
     description:
-      "m_c, dry chassis mass (subsystem masses are added by the model).",
+      "m_c, dry chassis mass (subsystem masses are added by the model). Floor lowered to 0.5 kg to admit CADRE / Tenacious-class ultra-micro rovers; designs below 3 kg are outside the v4 surrogate's training support and fall back to the deterministic evaluator (no PIs).",
   },
   wheelbase_m: {
     min: 0.3,
@@ -570,12 +641,13 @@ export const DESIGN_BOUNDS: Record<keyof DesignVector, FieldBounds> = {
     description: "A_s, deployable solar array area.",
   },
   battery_capacity_wh: {
-    min: 20,
+    min: 5,
     max: 500,
-    step: 5,
+    step: 1,
     unit: "Wh",
     label: "Battery capacity",
-    description: "C_b, usable battery capacity.",
+    description:
+      "C_b, usable battery capacity. Floor lowered to 5 Wh to admit CADRE-class flotilla rovers; designs below 20 Wh are outside the v4 surrogate's training support.",
   },
   avionics_power_w: {
     min: 5,
@@ -586,13 +658,43 @@ export const DESIGN_BOUNDS: Record<keyof DesignVector, FieldBounds> = {
     description: "P_a, continuous avionics draw.",
   },
   peak_wheel_torque_nm: {
-    min: 0.3,
+    min: 0.05,
     max: 20.0,
-    step: 0.05,
+    step: 0.01,
     unit: "Nm",
     label: "Peak wheel torque",
     description:
-      "T_hub^peak, peak per-wheel hub torque the drivetrain (motor + gearbox combined) can sustain. Sizes motor mass and gates whether the rover stalls on slope; cruise speed is derived from this and the slip-balance torque demand.",
+      "T_hub^peak, peak per-wheel hub torque the drivetrain (motor + gearbox combined) can sustain. Sizes motor mass and gates whether the rover stalls on slope; cruise speed is derived from this and the slip-balance torque demand. Floor lowered to 0.05 Nm to admit CADRE-class flotilla rovers; designs below 0.3 Nm are outside the v4 surrogate's training support.",
+  },
+};
+
+/**
+ * Bounds for the schema-v9 payload mission-requirement sliders. Kept
+ * aligned with `MissionScenario.payload_mass_kg` / `payload_power_w`
+ * (both `[0, 30]`). The 30 kg ceiling covers the heaviest in-class lunar
+ * micro-rover payload (Yutu-2, ~25 kg of GPR/VNIS/APXS instruments).
+ */
+export const PAYLOAD_BOUNDS: Record<
+  "payload_mass_kg" | "payload_power_w",
+  FieldBounds
+> = {
+  payload_mass_kg: {
+    min: 0,
+    max: 30,
+    step: 0.5,
+    unit: "kg",
+    label: "Payload mass",
+    description:
+      "m_payload, scientific-instrument mass. A mission requirement added to total vehicle mass outside the dry-mass growth margin.",
+  },
+  payload_power_w: {
+    min: 0,
+    max: 30,
+    step: 0.5,
+    unit: "W",
+    label: "Payload power",
+    description:
+      "P_payload, continuous ops-time instrument power. Adds to the electrical load alongside avionics in the traverse budget.",
   },
 };
 

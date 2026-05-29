@@ -1,6 +1,6 @@
 """Unit tests for :mod:`roverdevkit.drivetrain.motor`.
 
-The drivetrain module is the v6 W12-step-B replacement for the
+The drivetrain module is the v6 schema-v7-step-B replacement for the
 implicit torque ceiling that used to live inside the mass model and
 the implicit cruise speed that used to live on the design vector.
 These tests exercise the four pieces independently:

@@ -1,0 +1,70 @@
+# Class-generic polar micro-rover scenario (rediscovery library).
+#
+# Used only by the Layer-5 rediscovery harness
+# (`roverdevkit.validation.rover_rediscovery`). NOT a canonical
+# tradespace scenario (those live in polar_prospecting.yaml etc. and
+# are returned by `list_scenarios()`); this scenario is excluded from
+# `list_scenarios()` and exposed by
+# `list_class_generic_micro_scenarios()` instead.
+#
+# Leakage controls (why this exists as a separate file)
+# -----------------------------------------------------
+# The canonical `polar_prospecting.yaml` pins
+# `operational_duty_cycle: 0.05`, an "Pragyan ~0.008, Yutu-2 ~0.001 in
+# real ops; 0.05 leaves headroom" calibration that quietly references
+# real-rover ops history. For the rediscovery test that history is the
+# label the optimiser is trying to recover, so reusing the canonical
+# scenario would let calibration of one observable (δ_ops) propagate
+# into the search target. The class-generic library pins all four
+# scenarios to δ_ops = 0.10, a flat class-neutral value that is
+# neither Pragyan's nor MoonRanger's nor any other registry rover's
+# operational anchor.
+#
+# Panel-orientation pairing (2026-05-28 panel-tilt fix)
+# -----------------------------------------------------
+# The leakage control above is honest only when the upstream
+# evaluator is running with a physically-realistic panel orientation.
+# At lat=-85, a horizontal panel (the simulator's pre-2026-05-28
+# default) collects only sin(5 deg) ~= 0.087 of the normal-incidence
+# solar irradiance — an ~18x deficit relative to a polar-deployable
+# tilted array. Before the fix, the canonical per-rover YAMLs
+# (chandrayaan3_pragyan, moonranger_polar_demo, cadre_polar_unit)
+# absorbed this deficit by quietly calibrating `δ_ops` low enough
+# to balance the energy budget against a horizontal panel. Once
+# `polar_micro.yaml` lifts `δ_ops` to a class-neutral 0.10 without
+# also fixing the panel pointing, the missing tilted-panel
+# insolation surfaces as a polar-trio energy stall and a
+# spuriously-high "Pareto-dominated" rate that gets misread as
+# operational conservatism. The rediscovery harness therefore
+# installs a fixed-tilt approximation
+# (`tilt_deg = min(80, |latitude|)`, sun-tracking azimuth) on every
+# evaluator call inside the polar_micro scenario, applied uniformly
+# to both the rover's re-evaluation and every NSGA-II Pareto
+# candidate, so the class-neutral δ_ops anchor is paired with a
+# class-typical polar-array pointing strategy. See
+# `roverdevkit.validation.rover_rediscovery` module docstring for
+# the full rationale.
+#
+# Everything else (latitude, traverse-distance non-binding budget,
+# duration, max_slope, sun_geometry, terrain_class, soil_simulant) is
+# inherited from the canonical polar_prospecting scenario because
+# those are *environmental* facts the rover does not get to choose;
+# they are not per-rover calibration.
+name: polar_micro
+latitude_deg: -85.0
+traverse_distance_m: 30000.0
+terrain_class: polar_regolith
+soil_simulant: Apollo_regolith_nominal
+mission_duration_earth_days: 28.0
+max_slope_deg: 20.0
+sun_geometry: polar_intermittent
+operational_duty_cycle: 0.10
+# Schema v9: payload is a per-rover mission requirement and is exactly
+# the kind of real-rover label the rediscovery optimiser must recover,
+# so it is NOT baked into this class-generic scenario. The rediscovery
+# harness forwards each target rover's published payload as a per-call
+# override to BOTH the rover re-evaluation and every NSGA-II candidate,
+# so leaving it at 0 here keeps the scenario class-neutral (same logic
+# as the flat δ_ops anchor above).
+payload_mass_kg: 0.0
+payload_power_w: 0.0

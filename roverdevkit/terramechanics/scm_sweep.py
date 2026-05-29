@@ -1,10 +1,10 @@
-"""Week-7 SCM single-wheel sweep: design generation + per-row worker.
+"""SCM-correction SCM single-wheel sweep: design generation + per-row worker.
 
 Two thin, testable functions consumed by ``scripts/run_scm_sweep.py``:
 
 - :func:`build_design` — stratified-categorical Latin-hypercube design
-  over the 12-d wheel-level feature space defined in the §6 W7/7.5
-  composition sketch (``project_plan.md``). Continuous LHS over the six
+  over the 12-d wheel-level feature space defined in the §6 SCM-correction
+  composition workflow. Continuous LHS over the six
   numeric wheel/operating parameters; balanced categorical assignment of
   ``soil_class`` and ``grouser_count_class`` so every (soil × grouser)
   bucket gets a roughly equal number of rows. No PyChrono required —
@@ -42,7 +42,7 @@ import pandas as pd
 from scipy.stats import qmc
 
 # ---------------------------------------------------------------------------
-# Constants — match the project_plan.md §6 W7/7.5 composition sketch
+# Constants for the wheel-level SCM correction composition workflow
 # ---------------------------------------------------------------------------
 
 # Continuous LHS bounds. Match the v3 design schema where the bound has a
@@ -65,7 +65,7 @@ CONTINUOUS_BOUNDS: dict[str, tuple[float, float]] = {
 # ``data/soil_simulants.csv`` (see ``roverdevkit.terramechanics.soils``).
 # The four chosen here cover the catalogue's range of (n, k_c, k_phi,
 # cohesion, friction) without redundancy; the three "_dense" / "_loose"
-# bound entries are reserved for the Week-9 sensitivity sweep.
+# bound entries are reserved for the error-budget sensitivity sweep.
 SOIL_CLASSES: tuple[str, ...] = (
     "Apollo_regolith_nominal",
     "JSC-1A",

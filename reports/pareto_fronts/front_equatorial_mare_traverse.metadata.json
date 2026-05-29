@@ -1,0 +1,36 @@
+{
+  "scenario_name": "equatorial_mare_traverse",
+  "backend": "evaluator",
+  "correction_path": "data/scm/correction_v1.joblib",
+  "correction_enabled": true,
+  "dataset_version": "v9",
+  "objectives": [
+    {
+      "target": "range_km",
+      "direction": "max"
+    },
+    {
+      "target": "total_mass_kg",
+      "direction": "min"
+    },
+    {
+      "target": "slope_capability_deg",
+      "direction": "max"
+    }
+  ],
+  "constraints": [
+    {
+      "target": "range_km",
+      "sense": "min",
+      "value": 0.1
+    }
+  ],
+  "population_size": 50,
+  "generations": 60,
+  "seed": 13,
+  "panel_tilt_deg": 20.2,
+  "panel_azimuth_deg": 180.0,
+  "elapsed_s": 56.72387441698811,
+  "pareto_size": 50,
+  "front_csv": "reports/pareto_fronts/front_equatorial_mare_traverse.csv"
+}

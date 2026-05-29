@@ -25,6 +25,8 @@ MANIFEST
 
 # Virtual envs
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -71,19 +73,17 @@ data/scm/*
 data/validation/raw/*
 !data/validation/raw/.gitkeep
 
-# Generated reports / model artifacts
-reports/
+# Generated reports / model artifacts.
+# Top-level reports/ subdirectories are ignored by default; specific
+# ship-with-repo artifacts are unignored below. The .joblib/.parquet
+# globals still catch large binaries inside any unignored subtree.
+reports/*
+!reports/pareto_fronts/
 *.joblib
 *.parquet
 
-# Pretrained models — ship only the canonical one once trained.
-pretrained/*.pkl
-pretrained/checkpoints/
-
 # Internal planning notes
-project_plan.md
-project_log.md
-project_brief.md
+/project_*.md
 
 # Logs
 logs/
@@ -92,8 +92,9 @@ logs/
 # Project-specific scratch
 scratch/
 tmp/
+/package-lock.json
 
-# Phase-3 webapp build / install artifacts
+# webapp webapp build / install artifacts
 webapp/frontend/node_modules/
 webapp/frontend/dist/
 webapp/frontend/.vite/

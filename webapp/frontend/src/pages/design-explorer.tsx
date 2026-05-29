@@ -2,15 +2,14 @@ import { useMemo } from "react";
 import { Play } from "lucide-react";
 
 import { DesignForm, type DesignFormTicks } from "@/components/design-form";
+import { MissionInputsPanel } from "@/components/mission-inputs-panel";
 import { NoPiBanner } from "@/components/no-pi-banner";
-import { OperationsPanel } from "@/components/operations-panel";
 import {
   PredictionPanel,
   type PredictionPanelMeta,
 } from "@/components/prediction-panel";
 import type { OverlayPrediction } from "@/components/prediction-chart";
 import { RegistryOverlayPicker } from "@/components/registry-overlay-picker";
-import { ScenarioPicker } from "@/components/scenario-picker";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -47,6 +46,8 @@ export function DesignExplorer() {
   const design = useDesignStore((s) => s.design);
   const scenarioName = useDesignStore((s) => s.scenarioName);
   const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
+  const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
+  const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
   const overlayRovers = useDesignStore((s) => s.overlayRovers);
 
   const evaluate = useEvaluate();
@@ -71,7 +72,13 @@ export function DesignExplorer() {
       }))
     : [];
 
-  const overlayQueries = useRegistryEvaluations(overlayInputs, scenarioName);
+  // Carry the same mission requirements (payload mass/power) onto the
+  // real-rover overlays so candidate-vs-flown comparisons share an
+  // identical mission budget on the chart.
+  const overlayQueries = useRegistryEvaluations(overlayInputs, scenarioName, {
+    payload_mass_kg: payloadMassOverride,
+    payload_power_w: payloadPowerOverride,
+  });
 
   const overlays: OverlayPrediction[] = overlayInputs
     .map((input, idx) => {
@@ -106,7 +113,7 @@ export function DesignExplorer() {
     const evalByTarget = new Map(
       evaluate.data.metrics.map((m) => [m.target, m.value]),
     );
-    // Schema v7_1 (W12 step B follow-on): δ_ops is now an LHS feature,
+    // Schema v7_1 (v7_1 schema follow-on): δ_ops is now an LHS feature,
     // so the surrogate keeps its calibrated PIs across the whole
     // override range. ``mode`` is always ``"surrogate"`` from the
     // live route, but we still gate on it so the band is suppressed
@@ -138,7 +145,7 @@ export function DesignExplorer() {
         used_scm_correction: evaluate.data.used_scm_correction,
         evaluator_ms: evaluate.data.elapsed_ms,
         thermal: evaluate.data.thermal,
-        // Schema v6 (W12 step B): the v5 ``motor_torque`` field was
+        // Schema v6 (v6 schema update): the v5 ``motor_torque`` field was
         // renamed to ``stall`` and now exposes per-wheel torque
         // demand-vs-capacity directly.
         stall: evaluate.data.stall,
@@ -153,16 +160,18 @@ export function DesignExplorer() {
     // surrogate keeps its calibrated PIs across the entire slider
     // range; both /evaluate and /predict honour the override.
     const opsDuty = opsDutyOverride ?? null;
-    evaluate.mutate({
+    // Schema v9: forward the (optional) payload mission-requirement
+    // overrides to both routes so the deterministic median and the
+    // surrogate PI band share the same mass/power budget.
+    const shared = {
       design,
       scenario_name: scenarioName,
       operational_duty_cycle: opsDuty,
-    });
-    predict.mutate({
-      design,
-      scenario_name: scenarioName,
-      operational_duty_cycle: opsDuty,
-    });
+      payload_mass_kg: payloadMassOverride,
+      payload_power_w: payloadPowerOverride,
+    };
+    evaluate.mutate(shared);
+    predict.mutate(shared);
   };
 
   const evaluatorOnlyMode = predict.data?.mode === "evaluator_only";
@@ -186,10 +195,9 @@ export function DesignExplorer() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <ScenarioPicker />
+          <MissionInputsPanel disabled={isPending} />
           <RegistryOverlayPicker />
           <DesignForm disabled={isPending} ticks={formTicks} />
-          <OperationsPanel disabled={isPending} />
           <Button
             type="button"
             onClick={handlePredict}

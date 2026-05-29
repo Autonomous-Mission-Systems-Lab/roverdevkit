@@ -1,12 +1,12 @@
 """Run the mission evaluator on published rovers and score vs ground truth.
 
-This module is the Week-5 analogue of :mod:`roverdevkit.mass.validation`:
+This module is the real-rover validation analogue of :mod:`roverdevkit.mass.validation`:
 it exposes a tidy :class:`RoverComparisonResult` for each rover in the
 :mod:`roverdevkit.validation.rover_registry`, a
 :class:`ComparisonSummary` that aggregates across the set, and a
 CI-enforceable acceptance gate via :func:`acceptance_gate`.
 
-What "validation" means here (project_plan.md §6 W5, §7 Layer 4)
+What "validation" means here
 ---------------------------------------------------------------
 
 The evaluator produces a *design-space upper bound* on range: given
@@ -24,7 +24,7 @@ So the acceptance criteria are explicitly:
    Catches pathological over-prediction (e.g. evaluator ignoring a
    broken motor or a zeroed avionics load).
 3. **Thermal survival match.** Sim's hot+cold steady-state prediction
-   matches the published outcome exactly. Week-5's clearest binary
+   matches the published outcome exactly. real-rover validation's clearest binary
    check.
 4. **No stall / motor overload.** ``stalled`` must be False (schema v6),
    reflecting that the rover *can* move at all in the scenario soil +
@@ -34,7 +34,7 @@ So the acceptance criteria are explicitly:
    low/high band, where the band already accounts for dust,
    temperature derating, and seasonal irradiance.
 
-Aggregate reporting follows the W3 mass-validation pattern: a formatted
+Aggregate reporting follows the mass-validation mass-validation pattern: a formatted
 human-readable report and a tidy structure that a CI test consumes.
 """
 
@@ -130,23 +130,36 @@ def _predicted_peak_solar_power_w(entry: RoverRegistryEntry) -> float:
     Computed independently of the traverse loop so we can compare to
     published peak-power values without having to dig it out of the
     time-history arrays. Uses the same panel-physics model the traverse
-    sim does (:func:`panel_power_w`) at peak sun elevation.
+    sim does (:func:`panel_power_w`) at peak sun elevation, with the
+    panel orientation (``panel_tilt_deg``, ``panel_azimuth_deg``)
+    taken from the registry entry. Flown rovers (Pragyan, Yutu-2)
+    keep ``panel_tilt_deg = 0`` because their published peak-solar
+    bands in ``data/published_traverse_data.csv`` are operational
+    averages calibrated against horizontal-equivalent pointing;
+    polar design-target rovers (MoonRanger, CADRE-unit) carry
+    deployable tilted arrays and have non-zero values in the
+    registry.
 
     Lunar-only since the Mars-gravity Sojourner sentinel was removed
-    (project_log.md 2026-04-25). The 1 AU solar constant is the right
+    The 1 AU solar constant is the right
     value for every current registry entry.
     """
     peak_elev = sun_elevation_deg(entry.scenario.latitude_deg, lunar_hour_angle_deg=0.0)
     if peak_elev <= 0.0:
         return 0.0
 
+    # Sun azimuth at noon: 0 (north) for southern-hemisphere rovers,
+    # 180 (south) for northern. The exact sign convention from
+    # `solar.sun_azimuth_deg` is singular at H=0 so we set it
+    # explicitly here.
+    sun_az_noon = 0.0 if entry.scenario.latitude_deg < 0.0 else 180.0
     return panel_power_w(
         panel_area_m2=entry.design.solar_area_m2,
         panel_efficiency=entry.panel_efficiency,
         sun_elevation_deg=peak_elev,
-        panel_tilt_deg=0.0,
-        panel_azimuth_deg=180.0,
-        sun_azimuth_deg=180.0,
+        panel_tilt_deg=entry.panel_tilt_deg,
+        panel_azimuth_deg=entry.panel_azimuth_deg,
+        sun_azimuth_deg=sun_az_noon,
         dust_degradation_factor=entry.panel_dust_factor,
         solar_constant_w_per_m2=SOLAR_CONSTANT_AU_1_W_PER_M2,
     )
@@ -185,6 +198,8 @@ def compare_one(
         entry.scenario,
         gravity_m_per_s2=entry.gravity_m_per_s2,
         thermal_architecture=entry.thermal_architecture,
+        panel_tilt_deg=entry.panel_tilt_deg,
+        panel_azimuth_deg=entry.panel_azimuth_deg,
     )
     peak_solar_predicted = _predicted_peak_solar_power_w(entry)
     range_m = metrics.range_km * 1000.0
@@ -225,7 +240,7 @@ def compare_all(
     Iterates :func:`flown_registry` rather than :func:`registry` because
     Layer-0 truth comparison only makes sense for rovers with actual
     published flight data; design-target entries (MoonRanger, Rashid-1)
-    are skipped here and only participate in the Week-6 Layer-1
+    are skipped here and only participate in the baseline-surrogate Layer-1
     surrogate sanity check.
 
     Parameters
@@ -292,7 +307,7 @@ def acceptance_gate(summary: ComparisonSummary) -> None:
             failures.append(f"{r.rover_name}: " + "; ".join(reasons))
     if failures:
         raise AssertionError(
-            "Week-5 rover-comparison acceptance gate failed:\n  - " + "\n  - ".join(failures)
+            "real-rover validation gate failed:\n  - " + "\n  - ".join(failures)
         )
 
 
@@ -302,7 +317,7 @@ def acceptance_gate(summary: ComparisonSummary) -> None:
 
 
 def format_report(summary: ComparisonSummary) -> str:
-    """Human-readable table for notebooks and project_log.md."""
+    """Human-readable table for notebooks and reports."""
     lines = [
         "Rover      range_pred   range_pub  range_ratio  peak_solar_pred  peak_solar_pub  thermal  motor  PASS?",
         "-" * 105,

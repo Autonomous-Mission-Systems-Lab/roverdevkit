@@ -1,10 +1,10 @@
 # Scenario 1 — Apollo-17-like equatorial mare traverse, 14-day mission.
-# See project_plan.md §3.2.
+# Canonical Apollo-17-like equatorial mare traverse scenario.
 #
 # `traverse_distance_m` is set as a *non-binding budget* rather than a
 # short mission assignment: 80 km is just above the 14-day theoretical
 # reach at max speed (0.10 m/s) and max duty cycle (0.6), i.e.
-# 14 * 86400 * 0.10 * 0.6 ≈ 72.6 km. This ensures the Phase-2 LHS sweep
+# 14 * 86400 * 0.10 * 0.6 ≈ 72.6 km. This ensures the surrogate-training LHS sweep
 # sees a range signal that responds to speed/duty/energy instead of
 # saturating at an assigned distance cap.
 name: equatorial_mare_traverse
@@ -15,8 +15,15 @@ soil_simulant: Apollo_regolith_nominal
 mission_duration_earth_days: 14.0
 max_slope_deg: 15.0
 sun_geometry: diurnal
-# Schema v6 (W12 step B): per-scenario default ops duty cycle.
+# Schema v6 (v6 schema update): per-scenario default ops duty cycle.
 # Calibrated against Apollo-17 LRV (~0.5 manned EVA duty) and
 # unmanned long-traverse references (~0.30). See
-# reports/week12_design/decision.md "Per-scenario calibration".
+# the per-scenario calibration rationale.
 operational_duty_cycle: 0.30
+# Schema v9: scientific-payload mission requirement. Class-typical
+# default for a mare science traverse (cameras + spectrometer +
+# sample tools, ~5 kg / 5 W); the webapp Mission-Inputs panel and the
+# evaluator use this unless the caller passes an override, and the
+# surrogate LHS samples payload independently of this default.
+payload_mass_kg: 5.0
+payload_power_w: 5.0

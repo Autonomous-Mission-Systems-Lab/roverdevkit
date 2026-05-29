@@ -1,4 +1,4 @@
-"""Unit tests for the Week-7 SCM sweep design generator and worker.
+"""Unit tests for the SCM-correction SCM sweep design generator and worker.
 
 The design generator is pure NumPy / scipy / pandas and runs in the fast
 pytest loop. The worker (:func:`run_one`) is exercised under a chrono+slow

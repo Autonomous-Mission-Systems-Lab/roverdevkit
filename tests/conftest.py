@@ -4,7 +4,7 @@ Session-scoped fixtures cache expensive evaluator runs across modules so
 the integration suites (cross-scenario sensitivity, real-rover
 validation) don't re-run the same physics dozens of times. The
 non-cached version of the suite was ~580 s; with these fixtures it
-drops to under 60 s. See ``project_log.md`` for the audit.
+drops to under 60 s on a typical developer laptop.
 """
 
 from __future__ import annotations

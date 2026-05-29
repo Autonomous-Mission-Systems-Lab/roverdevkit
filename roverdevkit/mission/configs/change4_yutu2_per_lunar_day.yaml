@@ -1,6 +1,6 @@
 # Validation scenario — Chang'e-4 Yutu-2 single-lunar-day drive window.
 # Not a canonical tradespace scenario; used only by
-# roverdevkit/validation/rover_registry.py for the Week 5 real-rover
+# roverdevkit/validation/rover_registry.py for the real-rover validation real-rover
 # cross-check.
 #
 # Source: Di et al. 2020, Icarus; Ding et al. 2022, Acta Astronautica;
@@ -23,8 +23,17 @@ soil_simulant: Apollo_regolith_nominal
 mission_duration_earth_days: 5.0
 max_slope_deg: 5.0                  # typical-ops mean across Yutu-2's Von Karman traverse
 sun_geometry: diurnal
-# Schema v6 (W12 step B): δ_ops calibrated to Yutu-2's
+# Schema v6 (v6 schema update): δ_ops calibrated to Yutu-2's
 # historical-conservative ops (~0.001-0.0014 implied from total
 # ~1.6 km / 60+ lunar days). Used only by the registry-rover
-# validation gate; see reports/week12_design/decision.md.
+# validation gate; see data/analytical/SCHEMA.md.
 operational_duty_cycle: 0.001
+# Schema v9: Yutu-2 science payload = Lunar Penetrating Radar + VNIS +
+# APXS + panoramic/navigation cameras, ~25 kg (Chang'e-4 payload
+# manifest). payload_power_w held at 0 for this validation scenario:
+# the published per-lunar-day drive distance was achieved with science
+# instruments off during the short drive windows, so the
+# mobility-validation gate (and especially the hot-case thermal check)
+# sees payload mass but not instrument power.
+payload_mass_kg: 25.0
+payload_power_w: 0.0

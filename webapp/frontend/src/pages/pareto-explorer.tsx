@@ -67,7 +67,6 @@ export function ParetoExplorer() {
                     {
                       label: activeFront.label,
                       scenario_name: activeFront.scenarioName,
-                      source: activeFront.source,
                       metadata: activeFront.metadata ?? {},
                       pareto_front: activeFront.points,
                     },
@@ -87,7 +86,7 @@ export function ParetoExplorer() {
           <CardDescription>
             {activeFront
               ? `${activeFront.points.length} Pareto points. Click a point or table row to inspect it on the Single design tab.`
-              : "Run Compute Pareto or load a canonical front."}
+              : "Run NSGA-II from the Find optimized designs card to populate this view."}
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -22,6 +22,50 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from roverdevkit.schema import DesignVector, MissionScenario
 
+# ---------------------------------------------------------------------------
+# Shared mission-requirement override fields
+# ---------------------------------------------------------------------------
+#
+# Schema v9: scientific payload is a *mission requirement* carried on
+# ``MissionScenario`` (``payload_mass_kg`` / ``payload_power_w``), not a
+# design-vector trade. Every request that resolves a scenario server-side
+# accepts an optional per-call override so the Mission-Inputs panel (and
+# the rediscovery harness) can substitute a mission's own payload without
+# editing the canonical scenario catalogue. Both are LHS-sampled surrogate
+# inputs over ``[0, 30]`` (mirroring the v7_1 δ_ops promotion), so any
+# in-bounds override stays on the surrogate path with calibrated PIs.
+
+
+def _payload_mass_field() -> Any:
+    return Field(
+        default=None,
+        ge=0.0,
+        le=30.0,
+        description=(
+            "Optional per-query override for "
+            "``MissionScenario.payload_mass_kg`` (scientific-payload mass, "
+            "kg, a mission requirement). ``None`` uses the scenario's "
+            "class-typical default. Schema v9: payload mass is an "
+            "LHS-sampled surrogate input over [0, 30], so any in-bounds "
+            "override stays on the surrogate path with calibrated PIs."
+        ),
+    )
+
+
+def _payload_power_field() -> Any:
+    return Field(
+        default=None,
+        ge=0.0,
+        le=30.0,
+        description=(
+            "Optional per-query override for "
+            "``MissionScenario.payload_power_w`` (scientific-payload "
+            "continuous ops-time power draw, W, a mission requirement). "
+            "``None`` uses the scenario's class-typical default. Schema "
+            "v9: LHS-sampled surrogate input over [0, 30]."
+        ),
+    )
+
 # Re-export the core types unchanged. Pydantic v2 serialises both
 # transparently to JSON; importing here keeps the OpenAPI schema names
 # consistent with the Python core.
@@ -41,22 +85,21 @@ __all__ = [
     "OptimizeParetoPoint",
     "OptimizeRequest",
     "OptimizeResultResponse",
-    "ParetoFrontListResponse",
-    "ParetoFrontResponse",
-    "ParetoFrontSummary",
     "PredictMode",
     "PredictRequest",
     "PredictResponse",
     "PredictTarget",
+    "RediscoveryDetail",
+    "RediscoveryListResponse",
+    "RediscoverySummary",
+    "RediscoveryParetoPoint",
     "RegistryEntrySummary",
     "RegistryListResponse",
     "ScenarioListResponse",
     "ScenarioWithSoil",
     "ShapExplainRequest",
     "ShapFeatureScore",
-    "ShapGlobalResponse",
     "ShapLocalResponse",
-    "ShapTargetImportance",
     "SoilParametersOut",
     "StallDiagnosticOut",
     "SweepAxisIn",
@@ -166,6 +209,8 @@ class RegistryEntrySummary(BaseModel):
     thermal_architecture: dict[str, Any]
     panel_efficiency: float
     panel_dust_factor: float
+    panel_tilt_deg: float
+    panel_azimuth_deg: float
     imputation_notes: str
 
 
@@ -191,7 +236,11 @@ PrimaryTarget = Literal[
 
 
 class FeatureRow(BaseModel):
-    """The 25-D feature vector actually fed to the surrogate.
+    """The 27-D feature vector actually fed to the surrogate.
+
+    Schema v9 added the two payload mission-requirement inputs
+    (``scenario_payload_mass_kg`` / ``scenario_payload_power_w``),
+    taking the surrogate input frame from 25 to 27 columns.
 
     Echoed back so the frontend can show the nominal soil / categorical
     values that were used; useful for "did I really pick the soil I
@@ -227,13 +276,15 @@ class PredictRequest(BaseModel):
         description=(
             "Optional per-query override for "
             "``MissionScenario.operational_duty_cycle``. SCHEMA_VERSION "
-            "v7_1 (W12 step B follow-on): δ_ops is now a per-row LHS "
+            "v7_1 (v7_1 schema follow-on): δ_ops is now a per-row LHS "
             "feature uniform on [0, 0.6], so any in-bounds override "
             "stays on the surrogate path with calibrated PIs. The "
             "pre-v7_1 evaluator-only fallback for off-default values "
             "has been removed."
         ),
     )
+    payload_mass_kg: float | None = _payload_mass_field()
+    payload_power_w: float | None = _payload_power_field()
     repair_crossings: bool = Field(
         default=True,
         description=(
@@ -267,10 +318,10 @@ inputs the surrogate refuses to predict on)."""
 class PredictResponse(BaseModel):
     """Median + 90 % PI for each primary regression target.
 
-    See ``reports/week8_intervals_v4/SUMMARY.md`` for empirical coverage
+    See ``reports/intervals_v4/SUMMARY.md`` for empirical coverage
     on the test split (target ≈ 90 %, achieved 86–92 % per scenario).
 
-    SCHEMA_VERSION v7_1 (W12 step B follow-on): ``operational_duty_cycle``
+    SCHEMA_VERSION v7_1 (v7_1 schema follow-on): ``operational_duty_cycle``
     is a true surrogate input feature, so any in-bounds δ_ops stays on
     the surrogate path. ``mode`` is therefore always ``"surrogate"`` in
     v7_1; the literal still admits ``"evaluator_only"`` for forwards-
@@ -322,6 +373,8 @@ class EvaluateRequest(BaseModel):
             "[0, 1]). ``None`` uses the scenario's calibrated default."
         ),
     )
+    payload_mass_kg: float | None = _payload_mass_field()
+    payload_power_w: float | None = _payload_power_field()
 
 
 class EvaluateMetric(BaseModel):
@@ -342,7 +395,7 @@ class ThermalDiagnosticOut(BaseModel):
     included because it's the most common knob users would reach for
     if they were sizing a real rover; in our design vector it is
     fixed at 0 W by convention -- thermal is a diagnostic, not a
-    design lever, since W6.
+    design lever, since baseline-surrogate.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -364,7 +417,7 @@ class ThermalDiagnosticOut(BaseModel):
 class StallDiagnosticOut(BaseModel):
     """Drivetrain stall status and the torque numbers that drove it.
 
-    SCHEMA_VERSION v6 (W12 step B): replaces ``MotorTorqueDiagnosticOut``.
+    SCHEMA_VERSION v6 (v6 schema update): replaces ``MotorTorqueDiagnosticOut``.
     The pre-v6 diagnostic flagged ``motor_torque_ok`` whenever the
     per-step peak torque stayed below an implicit, mass-derived ceiling
     inside the mass model. v6 makes the ceiling explicit
@@ -470,6 +523,8 @@ class SweepRequest(BaseModel):
             "runs one-shot)."
         ),
     )
+    payload_mass_kg: float | None = _payload_mass_field()
+    payload_power_w: float | None = _payload_power_field()
 
 
 class SweepSensitivityOut(BaseModel):
@@ -557,10 +612,11 @@ class OptimizeRequest(BaseModel):
         description="Canonical scenario key (one of the four returned by /scenarios)."
     )
     backend: Literal["surrogate", "evaluator"] = Field(
-        default="surrogate",
+        default="evaluator",
         description=(
-            "Surrogate fitness by default. Evaluator fitness is accepted for "
-            "small power-user runs and capped server-side at 1000 evaluations."
+            "Corrected physics evaluator by default; capped server-side at "
+            "5000 evaluations so a live job finishes inside ~2 min. The "
+            "surrogate backend is accepted as an opt-in benchmarking option."
         ),
     )
     objectives: list[OptimizeObjectiveIn] = Field(
@@ -582,6 +638,8 @@ class OptimizeRequest(BaseModel):
         le=0.6,
         description="Optional per-job override for MissionScenario.operational_duty_cycle.",
     )
+    payload_mass_kg: float | None = _payload_mass_field()
+    payload_power_w: float | None = _payload_power_field()
 
 
 class OptimizeJobResponse(BaseModel):
@@ -638,61 +696,13 @@ class OptimizeCancelResponse(BaseModel):
     status: Literal["queued", "running", "completed", "cancelled", "failed"]
 
 
-class ParetoFrontSummary(BaseModel):
-    """One persisted canonical Pareto front available to the explorer."""
-
-    model_config = ConfigDict(frozen=True)
-
-    scenario_name: str
-    pareto_size: int
-    backend: str
-    dataset_version: str | None = None
-    front_url: str
-
-
-class ParetoFrontListResponse(BaseModel):
-    """List of persisted canonical Pareto fronts."""
-
-    model_config = ConfigDict(frozen=True)
-
-    fronts: list[ParetoFrontSummary]
-
-
-class ParetoFrontResponse(BaseModel):
-    """Persisted canonical Pareto front loaded from ``reports/phase3_pareto``."""
-
-    model_config = ConfigDict(frozen=True)
-
-    scenario_name: str
-    source: Literal["canonical"] = "canonical"
-    metadata: dict[str, Any]
-    pareto_front: list[OptimizeParetoPoint]
-
-
 class ShapFeatureScore(BaseModel):
-    """Feature attribution or importance score."""
+    """Per-feature contribution to a single-design prediction."""
 
     model_config = ConfigDict(frozen=True)
 
     feature: str
     value: float
-
-
-class ShapTargetImportance(BaseModel):
-    """Global importance scores for one target."""
-
-    model_config = ConfigDict(frozen=True)
-
-    target: PrimaryTarget
-    features: list[ShapFeatureScore]
-
-
-class ShapGlobalResponse(BaseModel):
-    """Global feature importance for all primary targets."""
-
-    model_config = ConfigDict(frozen=True)
-
-    targets: list[ShapTargetImportance]
 
 
 class ShapExplainRequest(BaseModel):
@@ -704,6 +714,8 @@ class ShapExplainRequest(BaseModel):
     scenario_name: str
     target: PrimaryTarget
     operational_duty_cycle: float | None = Field(default=None, ge=0.0, le=0.6)
+    payload_mass_kg: float | None = _payload_mass_field()
+    payload_power_w: float | None = _payload_power_field()
 
 
 class ShapLocalResponse(BaseModel):
@@ -715,3 +727,125 @@ class ShapLocalResponse(BaseModel):
     prediction: float
     base_value: float
     contributions: list[ShapFeatureScore]
+
+
+# ---------------------------------------------------------------------------
+# Rediscovery validation (Layer-5 LOO sweep, paper headline figure)
+# ---------------------------------------------------------------------------
+
+
+RediscoveryBackend = Literal["evaluator", "surrogate"]
+"""Which fitness backend produced the precomputed rediscovery artifacts.
+
+The evaluator-backed sweep
+(``reports/rediscovery_loo_evaluator/``) is the source of truth for
+the paper figure: every front point is corrected-evaluator-truth.
+The surrogate-backed sweep (``reports/rediscovery_loo_surrogate_v8/``)
+is offered as a faster reference alongside it; per the 2026-05-28
+panel-tilt fix in ``reports/rediscovery_loo_comparison.md``, the
+v8 surrogate's polar-front predictions are still horizontal-panel
+based, so it should be read as a wall-clock benchmark, not a
+fidelity check at high latitudes."""
+
+
+class RediscoveryParetoPoint(BaseModel):
+    """One point on the rediscovery Pareto front.
+
+    The metrics block stores the four primary regression targets
+    evaluated for this design under the rover's class-generic
+    scenario (``polar_micro``, ``mare_micro``, etc.). Not every
+    rediscovery JSON carries every target on every point — older
+    artifacts predate the schema-v6 stall flag — so the metrics
+    dict is left open-shape rather than a fixed PrimaryTarget map.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    design: DesignVector
+    metrics: dict[str, float]
+
+
+class RediscoverySummary(BaseModel):
+    """One rover's rediscovery result, summary view.
+
+    Mirrors the per-rover row of the published Layer-5 report
+    (``reports/rediscovery_loo_evaluator/rediscovery_loo_report.md``)
+    plus the registry's ``is_flown`` tier so the frontend can label
+    flown rovers (Pragyan, Yutu-2) separately from design-target
+    registry cases (MoonRanger, Rashid-1, CADRE-unit, Tenacious).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    slug: str
+    """URL-safe identifier matching the per-rover JSON file stem
+    in ``reports/rediscovery_loo_evaluator/``. Use as the path
+    component on the detail endpoint."""
+
+    rover_name: str
+    """Human-readable name from the registry (e.g. ``"CADRE-unit"``)."""
+
+    is_flown: bool
+    """``True`` for rovers that have actually flown a lunar
+    mission (Pragyan, Yutu-2). Other registry rovers are
+    well-spec'd design-target lunar micro-rovers added for
+    Layer-5 OOD coverage."""
+
+    class_generic_scenario: str
+    """Class-generic ``*_micro`` scenario the rediscovery harness
+    placed this rover under (e.g. ``"polar_micro"``)."""
+
+    backend: RediscoveryBackend
+    design_space_distance: float
+    pareto_dominated: bool
+    mass_budget_kg: float
+    pareto_front_size: int
+
+
+class RediscoveryListResponse(BaseModel):
+    """All rovers' rediscovery summaries for a single backend."""
+
+    model_config = ConfigDict(frozen=True)
+
+    backend: RediscoveryBackend
+    rovers: list[RediscoverySummary]
+
+
+class RediscoveryDetail(BaseModel):
+    """Full rediscovery result for one rover under one backend.
+
+    Includes the summary fields plus the Pareto front itself, the
+    rover's own metrics under the class-generic scenario, the
+    per-variable percent error against the nearest Pareto point,
+    and the integer-match flags for ``grouser_count`` /
+    ``n_wheels``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    slug: str
+    rover_name: str
+    is_flown: bool
+    class_generic_scenario: str
+    backend: RediscoveryBackend
+
+    rover_design: DesignVector
+    """The real rover's published design vector. Plotted as the
+    overlay marker on the Pareto-front figure."""
+
+    rover_metrics_under_generic_scenario: dict[str, float]
+    """Metrics from re-evaluating ``rover_design`` under the
+    class-generic scenario (with the 2026-05-28 panel-tilt fix
+    applied — see ``reports/rediscovery_loo_comparison.md``)."""
+
+    design_space_distance: float
+    pareto_dominated: bool
+    mass_budget_kg: float
+    integer_matches: dict[str, bool]
+    per_variable_percent_errors: dict[str, float]
+
+    nearest_pareto_index: int
+    nearest_pareto_design: DesignVector
+    nearest_pareto_metrics: dict[str, float]
+
+    pareto_front: list[RediscoveryParetoPoint]

@@ -1,10 +1,10 @@
-"""FastAPI backend for the Phase-3 tradespace exploration tool.
+"""FastAPI backend for the webapp tradespace exploration tool.
 
 The package is intentionally thin: every route delegates to the
 existing :mod:`roverdevkit` core (mission evaluator, surrogate,
 validation registry) so the web app cannot drift from the methodology
-paper's reported numbers. See ``project_plan.md`` §6 / Phase 3 and
-``project_log.md`` 2026-04-26 entry for the architectural rationale.
+paper's reported numbers. The backend is intentionally thin so scripts,
+notebooks, and the browser use the same evaluator and surrogate artifacts.
 """
 
 from __future__ import annotations

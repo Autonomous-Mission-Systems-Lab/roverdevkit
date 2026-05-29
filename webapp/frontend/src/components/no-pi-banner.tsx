@@ -4,7 +4,7 @@ import { AlertCircle } from "lucide-react";
  * Inline banner shown on the prediction panel whenever the `/predict`
  * route returns `mode = "evaluator_only"`.
  *
- * SCHEMA_VERSION v7_1 (W12 step B follow-on): `operational_duty_cycle`
+ * SCHEMA_VERSION v7_1 (v7_1 schema follow-on): `operational_duty_cycle`
  * is now a per-row LHS feature, so the live route always returns
  * `"surrogate"` — this banner is dormant in the v7_1 deployment. It
  * is retained as a safety net for any future evaluator-only fallback

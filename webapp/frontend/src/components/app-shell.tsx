@@ -10,6 +10,7 @@ const TABS: Array<{ id: AppView; label: string }> = [
   { id: "sweep", label: "Parametric Sweep" },
   { id: "pareto", label: "Optimize Design" },
   { id: "shap", label: "Explain Design" },
+  { id: "validate", label: "Rediscovery Validation" },
 ];
 
 /** Top-level layout: header with status badge + body slot. */
@@ -35,7 +36,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               size="sm"
               className="h-7 px-2.5 text-xs font-normal"
             >
-              About this model
+              About the tool
             </Button>
           </AboutModelDialog>
         </div>
@@ -60,7 +61,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
       <main className="mx-auto max-w-6xl px-6 py-6">{children}</main>
       <footer className="mx-auto max-w-6xl px-6 py-6 text-xs text-[var(--color-muted-foreground)]">
-        Space Systems Autonomy Lab · Duke University
+        Autonomous Mission Systems Lab · Duke University
       </footer>
     </div>
   );

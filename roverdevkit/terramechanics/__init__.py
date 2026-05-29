@@ -11,11 +11,11 @@
   use the explicit import path.
 - :mod:`.soils` — name -> :class:`SoilParameters` lookup backed by
   :file:`data/soil_simulants.csv`.
-- :mod:`.correction_model` — Week-7.5 ML correction layer that predicts
+- :mod:`.correction_model` — SCM-correction gate ML correction layer that predicts
   the per-wheel delta between SCM and Bekker-Wong over the wheel-level
-  feature space (see ``project_plan.md`` §6 W7/7.5 sketch).
+  feature space used by the correction-model pipeline.
 
-The Week-7 batch orchestration (parallel SCM sweep, resumable queue,
+The SCM-correction batch orchestration (parallel SCM sweep, resumable queue,
 parquet I/O) lives in ``scripts/`` rather than the importable package
 to keep the package light for analytical-only consumers.
 """

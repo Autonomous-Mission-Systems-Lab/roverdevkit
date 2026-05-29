@@ -1,11 +1,11 @@
-"""Fit the Week-7 wheel-level SCM correction model on a gate-sweep parquet.
+"""Fit the SCM-correction wheel-level SCM correction model on a gate-sweep parquet.
 
 Reads ``data/scm/runs_v1.parquet`` (paired Bekker-Wong + SCM single-wheel
 runs produced by ``scripts/run_scm_sweep.py``), fits Ridge / Random
 Forest / XGBoost per delta target, picks the best-by-test-RMSE
 algorithm per target, and writes both the joblib-saved
 :class:`roverdevkit.terramechanics.correction_model.WheelLevelCorrection`
-artifact and a tidy fit-summary CSV used by the Week-7.5 gate report.
+artifact and a tidy fit-summary CSV used by the SCM-correction gate gate report.
 
 Usage
 -----
@@ -14,7 +14,7 @@ Usage
     python scripts/train_correction_model.py \\
         --parquet data/scm/runs_v1.parquet \\
         --out data/scm/correction_v1.joblib \\
-        --fit-summary reports/week7_5_gate/correction_fit.csv \\
+        --fit-summary reports/scm_correction_gate/correction_fit.csv \\
         --seed 42
 """
 
@@ -64,7 +64,7 @@ def _print_summary(fit_summary: pd.DataFrame, model) -> None:
     chosen = model.metadata["chosen_per_target"]
     print()
     print("=" * 78)
-    print("Week-7 wheel-level correction model — fit summary")
+    print("SCM-correction wheel-level correction model — fit summary")
     print("=" * 78)
     print(
         f"Train / val / test rows: "
@@ -106,7 +106,7 @@ def _print_summary(fit_summary: pd.DataFrame, model) -> None:
     if failing:
         print(
             f"NOTE: {len(failing)} target(s) below the informative R² floor of "
-            f"{ACCEPTANCE_R2:.2f}: {failing}. The Week-7.5 gate is decided on "
+            f"{ACCEPTANCE_R2:.2f}: {failing}. The SCM-correction gate gate is decided on "
             f"mission-level rank correlation, not wheel-level R²."
         )
     else:

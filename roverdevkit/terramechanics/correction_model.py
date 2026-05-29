@@ -35,7 +35,7 @@ combinations: the DP residual is dominated by slip and grouser_height,
 the torque residual by load and wheel_radius, the sinkage residual by
 load and soil compressibility. A joint MultiOutputRegressor with
 shared hyperparameters would underfit the harder target. The
-Week-6 surrogate found the same thing for its primary targets.
+baseline-surrogate surrogate found the same thing for its primary targets.
 
 Why no MLP
 ----------
@@ -43,7 +43,7 @@ With ~500 rows and three smooth, low-dimensional residuals, the data
 budget is too small for an MLP to beat a tuned tree without
 overfitting, and the main consumer of this artifact is a binary gate
 decision (fire / don't fire) rather than a precision regression. The
-Week-7.5 gate sweep can be re-run with an MLP variant if the gate
+SCM-correction gate gate sweep can be re-run with an MLP variant if the gate
 requires sub-percent residual error.
 """
 
@@ -118,12 +118,12 @@ DEFAULT_CORRECTION_PATH: Path = _REPO_ROOT / "data" / "scm" / "correction_v1.job
 """Canonical artifact path. Used by the analytical traverse loop when
 ``use_scm_correction=True`` and no explicit correction object is passed."""
 
-# Acceptance threshold for the gate-sweep correction layer. The Week-7
+# Acceptance threshold for the gate-sweep correction layer. The SCM-correction
 # correction model's job is to be calibrated, not to be perfect — its
 # predictions are added to the BW baseline, so a residual R² of 0.6 on
 # all three targets is enough to absorb most of the systematic bias
 # while the random component is washed out by the per-step integration.
-# The Week-7.5 gate criterion is mission-level rank correlation, not
+# The SCM-correction gate gate criterion is mission-level rank correlation, not
 # wheel-level R².
 ACCEPTANCE_R2: float = 0.5
 
@@ -261,7 +261,7 @@ class WheelLevelCorrection:
 # ---------------------------------------------------------------------------
 
 
-# Pre-Week-7 callers imported a ``CorrectionModel`` Protocol that
+# Pre-SCM-correction callers imported a ``CorrectionModel`` Protocol that
 # expected ``fit / predict / save`` on a numpy array. The real artifact
 # (:class:`WheelLevelCorrection`) is the new public interface; this
 # alias keeps any external import path that still says

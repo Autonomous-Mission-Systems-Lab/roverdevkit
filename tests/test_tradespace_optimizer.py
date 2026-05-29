@@ -44,6 +44,7 @@ def test_nsga2_runner_surrogate_emits_checkpoints_and_front() -> None:
         scenario,
         soil,
         bundles=bundles,  # type: ignore[arg-type]
+        backend="surrogate",
         population_size=8,
         n_generations=2,
         seed=1,

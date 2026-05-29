@@ -23,6 +23,8 @@ export function ShapRules() {
   const design = useDesignStore((s) => s.design);
   const scenarioName = useDesignStore((s) => s.scenarioName);
   const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
+  const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
+  const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
   const [target, setTarget] = useState<PrimaryTarget>("range_km");
   const {
     mutate: explainDesign,
@@ -38,8 +40,18 @@ export function ShapRules() {
       scenario_name: scenarioName,
       target,
       operational_duty_cycle: opsDutyOverride ?? null,
+      payload_mass_kg: payloadMassOverride,
+      payload_power_w: payloadPowerOverride,
     });
-  }, [design, explainDesign, opsDutyOverride, scenarioName, target]);
+  }, [
+    design,
+    explainDesign,
+    opsDutyOverride,
+    payloadMassOverride,
+    payloadPowerOverride,
+    scenarioName,
+    target,
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl">

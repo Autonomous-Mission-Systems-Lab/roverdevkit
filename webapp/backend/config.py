@@ -1,7 +1,7 @@
 """Backend configuration: artifact paths, CORS origins, dataset version.
 
-All paths default to the in-repo Phase-2 artifacts so the backend works
-out of the box from a fresh clone after running the Phase-2 pipeline.
+All paths default to the in-repo surrogate-training artifacts so the backend works
+out of the box from a fresh clone after running the surrogate-training pipeline.
 Each value can be overridden via environment variable so the same
 container image can be repointed at a remote object store / mounted
 volume in deployment without code changes.
@@ -10,24 +10,24 @@ Environment variables
 ---------------------
 ``ROVERDEVKIT_QUANTILE_BUNDLES``
     Path to ``quantile_bundles.joblib`` (calibrated quantile XGB heads).
-    Default: ``reports/week12_intervals_v7_1/quantile_bundles.joblib`` —
-    the W12 Step B follow-on recalibration on lhs_v7_1.parquet after
-    ``operational_duty_cycle`` was promoted from a per-family
-    constant to a per-row LHS feature uniform on [0, 0.6]. With the
-    v7_1 calibration, the frontend's δ_ops slider stays on the
-    surrogate path with calibrated 90 % PIs across the full
+    Default: ``reports/surrogate_v9/quantile_bundles.joblib`` — the v9
+    recalibration on lhs_v9.parquet after scientific payload was
+    promoted from a per-rover ``chassis_mass_kg`` convention to two
+    explicit mission-requirement inputs (``payload_mass_kg`` /
+    ``payload_power_w``), each an LHS feature uniform on [0, 30]. With
+    the v9 calibration, the Mission-Inputs panel's payload sliders stay
+    on the surrogate path with calibrated 90 % PIs across the full
     override range.
 ``ROVERDEVKIT_TUNED_PARAMS``
     Path to ``tuned_best_params.json`` (tuned XGB hyperparameters).
     Currently informational only; reserved for later steps that may
     need to refit. Default:
-    ``reports/week12_tuned_v7/tuned_best_params.json`` (50-trial Optuna
-    sweep on the v7 dataset for the four primary regressors and the
-    ``stalled`` classifier; reused unchanged for v7_1 because the
-    column schema is byte-identical and Optuna would re-converge to
-    near-identical parameters).
+    ``reports/tuned_v9/tuned_best_params.json`` (50-trial Optuna
+    sweep on the v9 dataset for the four primary regressors and the
+    ``stalled`` classifier; re-run for v9 because the input
+    dimensionality changed from 25 to 27 columns).
 ``ROVERDEVKIT_DATASET_VERSION``
-    Dataset version label echoed in ``/version``. Default ``v7_1``.
+    Dataset version label echoed in ``/version``. Default ``v9``.
 ``ROVERDEVKIT_CORS_ORIGINS``
     Comma-separated allow-list. Defaults to the Vite dev server.
 """
@@ -78,13 +78,13 @@ def get_settings() -> Settings:
     return Settings(
         quantile_bundles_path=_env_path(
             "ROVERDEVKIT_QUANTILE_BUNDLES",
-            REPO_ROOT / "reports" / "week12_intervals_v7_1" / "quantile_bundles.joblib",
+            REPO_ROOT / "reports" / "surrogate_v9" / "quantile_bundles.joblib",
         ),
         tuned_params_path=_env_path(
             "ROVERDEVKIT_TUNED_PARAMS",
-            REPO_ROOT / "reports" / "week12_tuned_v7" / "tuned_best_params.json",
+            REPO_ROOT / "reports" / "tuned_v9" / "tuned_best_params.json",
         ),
-        dataset_version=os.environ.get("ROVERDEVKIT_DATASET_VERSION", "v7_1"),
+        dataset_version=os.environ.get("ROVERDEVKIT_DATASET_VERSION", "v9"),
         cors_origins=_env_csv(
             "ROVERDEVKIT_CORS_ORIGINS",
             ("http://localhost:5173", "http://127.0.0.1:5173"),

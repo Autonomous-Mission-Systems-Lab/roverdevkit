@@ -1,4 +1,4 @@
-"""Calibrated prediction intervals via quantile XGBoost (project_plan.md §6 / W8 step-4).
+"""Calibrated prediction intervals via quantile XGBoost.
 
 Scope
 -----
@@ -7,7 +7,7 @@ regression target at ``τ ∈ {0.05, 0.50, 0.95}`` to produce point
 predictions plus 90 % prediction intervals on top of the corrected
 mission evaluator (``data/analytical/lhs_v4.parquet``).
 
-The post-W7.7 reframe (``project_log.md`` 2026-04-26) demoted the
+A later pipeline review demoted the
 mission-level surrogate from "the headline ML deliverable" to "an
 optional acceleration and uncertainty layer." That demotion is the
 reason this module exists at all: NSGA-II inner-loop fitness needs a
@@ -17,25 +17,25 @@ that the methodology paper would not actually use.
 
 Hyperparameter strategy
 -----------------------
-Each quantile head reuses the W8 step-3 tuned median hyperparameters
-(``reports/week8_tuned_v4/tuned_best_params.json``) — same
+Each quantile head reuses the tuned-median tuned median hyperparameters
+(``reports/tuned_v4/tuned_best_params.json``) — same
 ``max_depth`` / ``learning_rate`` / regularisation, only the loss
 function changes. This is a deliberate choice:
 
-- The W8 step-3 search already moved the median's HP frontier; ξ-tail
+- The tuned-median search already moved the median's HP frontier; ξ-tail
   refits at the same setting are good enough for prediction-interval
   *width* on a smooth, well-sampled corpus like ``lhs_v4``.
 - It keeps the writeup honest: the only thing varying across the three
   heads is ``quantile_alpha``, so the empirical coverage delta is
   attributable to the loss, not to per-head HP tuning.
 - Re-tuning per quantile would multiply tuning cost by 3 and bias the
-  ``τ=0.5`` head away from its W8 step-3 setting, making the median
+  ``τ=0.5`` head away from its tuned-median setting, making the median
   sanity guardrail (``§6 step-4``) less informative.
 
 A future revision can per-tune the tail heads if the empirical 90 %
 coverage misses the target in a way that suggests systematic
 under/over-confidence. For the v4 dataset that is not currently the
-case (see ``reports/week8_intervals_v4/SUMMARY.md``).
+case (see ``reports/intervals_v4/SUMMARY.md``).
 
 Quantile crossings
 ------------------
@@ -96,7 +96,7 @@ class QuantileHeads:
     base_params
         Hyperparameters shared across the three heads (everything
         except ``objective`` / ``quantile_alpha``). Persisted so the
-        writeup and the saved artifact know exactly which W8 step-3
+        writeup and the saved artifact know exactly which tuned-median
         configuration produced the bundle.
     fit_seconds
         Total wall-clock to fit all three heads (refit on train+val).
@@ -186,14 +186,14 @@ def fit_quantile_heads(
     Parameters
     ----------
     X_train / y_train / X_val / y_val
-        Same train / val split used by W8 step-3. Validation drives
+        Same train / val split used by tuned-median. Validation drives
         early stopping; the final refit happens on ``train ∪ val``
         with the early-stopping-best ``n_estimators`` per head.
     target
         Target name (used only for downstream artifact naming).
     base_params
         Output of :func:`json.load` on
-        ``reports/week8_tuned_v4/tuned_best_params.json[target]`` — a
+        ``reports/tuned_v4/tuned_best_params.json[target]`` — a
         dict containing ``n_estimators``, ``max_depth``,
         ``learning_rate``, ``subsample``, ``colsample_bytree``,
         ``min_child_weight``, ``reg_alpha``, ``reg_lambda``,
@@ -203,7 +203,7 @@ def fit_quantile_heads(
     quantiles
         Triple of τ values. Default ``(0.05, 0.5, 0.95)``.
     early_stopping_rounds
-        Patience on the val pinball loss. Mirrors W8 step-3 tuning.
+        Patience on the val pinball loss. Mirrors tuned-median tuning.
     n_jobs
         Plumbed through to XGBoost.
 

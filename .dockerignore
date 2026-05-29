@@ -1,0 +1,75 @@
+# Keep the Docker build context small. The build context is the
+# repo root (see `webapp/Dockerfile`), so anything not needed at
+# image-build time should be excluded here.
+
+# VCS / IDE
+.git
+.gitignore
+.github
+.cursor
+.vscode
+.idea
+
+# Python build / cache artifacts
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.tox
+htmlcov
+build
+dist
+
+# Conda / venv
+.conda
+.venv
+venv
+env
+
+# Notebook outputs (notebooks themselves stay; outputs are large)
+.ipynb_checkpoints
+
+# Frontend build outputs (re-built inside the Dockerfile from source).
+webapp/frontend/node_modules
+webapp/frontend/dist
+webapp/frontend/.cache
+
+# Docker scaffolding (don't recurse the Dockerfile into itself).
+**/Dockerfile
+**/docker-compose*.yml
+.dockerignore
+
+# Local-only logs and reports
+*.log
+reports/**/*.log
+
+# Datasets / artifacts that aren't needed at runtime. The runtime
+# image only needs:
+#   - data/ (soils, scenarios, validation set, scm correction blob)
+#   - reports/surrogate_v9/quantile_bundles.joblib
+#   - reports/pareto_fronts/
+#   - reports/rediscovery_loo_evaluator/
+#   - reports/rediscovery_loo_surrogate_v9/
+# Heavy training-time parquets and superseded surrogate versions stay
+# out so the image fits inside typical free-tier hosting limits.
+data/analytical/
+data/scm/runs_*.parquet
+reports/baselines_*
+reports/surrogate_v7_1/
+reports/surrogate_v8/
+reports/tuned_v7/
+reports/tuned_v8/
+reports/tuned_v9/
+reports/rediscovery_loo_surrogate_v8/
+reports/validation_*/
+reports/concept_study_comparison*
+reports/week*/
+reports/intervals_*/
+
+# OS noise
+.DS_Store
+Thumbs.db

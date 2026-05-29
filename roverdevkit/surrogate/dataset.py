@@ -1,4 +1,4 @@
-"""Parallel Phase-2 dataset builder.
+"""Parallel surrogate-training dataset builder.
 
 Takes a list of :class:`LHSSample` from :mod:`.sampling`, runs
 :func:`roverdevkit.mission.evaluator.evaluate_verbose` on each
@@ -17,7 +17,7 @@ Column schema (documented in ``data/analytical/SCHEMA.md``):
   / ``sinkage_max_m`` / ``motor_torque_ok`` — :class:`MissionMetrics`
   targets the surrogate predicts.
 - ``stat_*`` — aggregate statistics (mean / p95 / max / final) from the
-  :class:`TraverseLog` time series for the Week-7.5 SCM-correction
+  :class:`TraverseLog` time series for the SCM-correction
   gate and surrogate diagnostics.
 
 Thermal scope (v2)
@@ -28,7 +28,7 @@ Rationale: the current mass model treats RHU power and MLI quality as
 free, so thermal_survival reduces to a near-trivial gate ("did you add
 an RHU?") with no design trade-off. Including it as a target would
 add a degenerate column and dilute the headline R²/AUC. The Pragyan
-vs. Yutu-2 thermal distinction is preserved in the Week-5 validation
+vs. Yutu-2 thermal distinction is preserved in the real-rover validation
 harness (``roverdevkit.validation.rover_registry``); a future mass-model
 upgrade that charges RHU/MLI mass will let thermal re-enter the
 surrogate as a real Pareto trade.
@@ -66,19 +66,19 @@ from roverdevkit.surrogate.sampling import LHSSample
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = "v7_1"
+SCHEMA_VERSION = "v9"
 """Bump when the column schema or training distribution changes so
 downstream code can detect stale Parquet files. Written into Parquet
 file-level metadata.
 
 History
 -------
-- v1 (Week 6 step 1, retired): included ``thermal_survival`` as a
+- v1 (initial baseline-surrogate schema, retired): included ``thermal_survival`` as a
   feasibility target.
-- v2 (Week 6 step 2): drop ``thermal_survival`` from the schema; the
+- v2 (second baseline-surrogate schema): drop ``thermal_survival`` from the schema; the
   evaluator still computes it but the surrogate does not consume it.
   See module docstring for the scoping rationale.
-- v3 (Week 6 step 4 follow-up, 2026-04-25): widened LHS bounds on
+- v3 (expanded-support baseline-surrogate schema, 2026-04-25): widened LHS bounds on
   ``wheel_width_m`` (0.15 -> 0.20), ``grouser_height_m`` (0.012 ->
   0.020), and ``chassis_mass_kg`` (35 -> 50) so the flown / design-
   target lunar micro-rovers in
@@ -87,14 +87,14 @@ History
   at corner points. Column schema is byte-identical to v2; the bump
   signals the changed training distribution so a v2-trained surrogate
   isn't silently reused on a v3 dataset.
-- v4 (Week 8 step 1, 2026-04-26): rebuild with the trained wheel-level
+- v4 (SCM-corrected surrogate schema, 2026-04-26): rebuild with the trained wheel-level
   SCM correction (``use_scm_correction=True``) composed into the
   analytical evaluator. Column schema is byte-identical to v3; the
   bump signals the corrected mobility physics so a v3-trained
   surrogate isn't silently reused on v4 data. Promotion was gated
-  by the Week-7.5 sign-flip gate (``reports/week7_5_gate``) and the
-  Week-7.7 BW-vs-SCM-direct bake-off (``reports/week7_7_bakeoff``).
-- v5 (Week 11 step 2, 2026-04-27): rebuild after the Bekker-Wong kernel
+  by the SCM-correction sign-flip gate (``reports/scm_correction_gate``) and the
+  BW-vs-SCM-direct bake-off (``reports/bw_scm_bakeoff``).
+- v5 (grouser-aware surrogate schema, 2026-04-27): rebuild after the Bekker-Wong kernel
   gained the Iizuka & Kubota 2011 grouser shear-thrust term (see
   ``_grouser_shear_lift`` in ``roverdevkit/terramechanics/bekker_wong.py``).
   Column schema is byte-identical to v4; the bump signals the
@@ -104,13 +104,13 @@ History
   on the LHS marginal: slope_capability_deg +33 % relative
   (~+2.6 deg), peak_motor_torque_nm ~+14 %, energy_margin_raw_pct
   ~-15 % (more torque demand at the same forward force). Triggered
-  by the Week-11 sweep-tool finding that grouser_height_m and
+  by the Pareto-front sweep-tool finding that grouser_height_m and
   grouser_count had no effect on slope capability.
-- v5_1 (Week 12 step A, 2026-04-27): rebuild after the traverse simulator
+- v5_1 (energy-feasible range schema, 2026-04-27): rebuild after the traverse simulator
   gained an energy-feasibility throttle that drops effective duty when
   the battery hits its DoD floor (see ``run_traverse`` in
   ``roverdevkit/mission/traverse_sim.py`` and
-  ``reports/week12_design/decision.md``). Column schema is byte-
+  the version history in ``data/analytical/SCHEMA.md``). Column schema is byte-
   identical to v5; the bump signals the achievable-range semantics —
   a v5-trained range_km head is a capability-envelope predictor and
   is no longer aligned with the v5_1 evaluator's range labels (range
@@ -118,9 +118,9 @@ History
   drive past floor unphysically). Other label columns (energy_margin,
   slope_capability, mass) shift only slightly because the throttle
   reduces consumption when it engages, leaving the steady-state
-  behavior unchanged everywhere else. Step B (W12 main) will rebuild
+  behavior unchanged everywhere else. The next schema revision rebuilds
   again as v6 with the drivetrain-aware design vector.
-- v6 (Week 12 step B, 2026-04-28): drivetrain-aware design vector. Drops
+- v6 (drivetrain-aware schema, 2026-04-28): drivetrain-aware design vector. Drops
   ``design_nominal_speed_mps`` (cruise speed is now derived inside the
   evaluator from per-wheel torque demand + slip-balance + energy
   balance + a kinematic envelope cap; see
@@ -139,9 +139,9 @@ History
   whether δ_des or δ_ops is binding; total_mass_kg ±1 kg drift from
   the mass-model touch-up (motor mass now keyed off
   ``design_peak_wheel_torque_nm`` directly, removing the v5 fixed-point
-  iteration). See ``reports/week12_design/decision.md`` for full
+  iteration). See the version history in ``data/analytical/SCHEMA.md`` for full
   rationale and validation gates.
-- v7 (Week 12 step B follow-up, 2026-04-28): drops
+- v7 (single-duty-knob schema, 2026-04-28): drops
   ``design_designed_duty_cycle`` from the feature schema after that
   field turned out to do no engineering work in the v6 mass model
   (no mass term scales with δ_des; the only role of δ_des in v6 was
@@ -153,8 +153,8 @@ History
   reflect the changed feature-vector dimensionality (11 design dims
   instead of 12) and to invalidate v6 surrogate artifacts that
   expect the dropped column. See
-  ``reports/week12_design/decision.md`` for full rationale.
-- v7_1 (Week 12 step B follow-on, 2026-04-28): rebuild after
+  the version history in ``data/analytical/SCHEMA.md`` for full rationale.
+- v7_1 (duty-cycle sampled schema, 2026-04-28): rebuild after
   ``operational_duty_cycle`` was promoted from a per-family constant
   (mare 0.30, polar 0.05, highland 0.15, crater 0.20) to a per-row
   LHS feature drawn uniformly over [0.0, 0.6] independently of the
@@ -166,7 +166,28 @@ History
   frontend δ_ops slider range. Pre-v7_1 surrogates are still
   feasible to use deterministically but their PIs are only
   calibrated at the four per-family δ_ops anchors and break the
-  webapp's δ_ops override path."""
+  webapp's δ_ops override path.
+- v8 (ultra-micro widening, 2026-05-27): rebuild after the LHS
+  design floors were lowered to match the A2 schema widening
+  (``chassis_mass_kg`` 3.0 → 0.5, ``peak_wheel_torque_nm`` 0.3 →
+  0.05, ``battery_capacity_wh`` 20.0 → 5.0). Brings ultra-micro
+  registry rovers (NASA JPL CADRE-unit at chassis ~0.8 kg,
+  iSpace Tenacious at chassis ~2 kg) inside the surrogate's
+  training support, closing the OOD gap that prevented surrogate-
+  backed rediscovery from converging on those rovers in B1.5.
+  Column schema is byte-identical to v7_1; the bump signals the
+  changed input distribution (wider design support) so v7_1
+  surrogates aren't silently reused on v8 data. Scenario-side
+  bounds (mission duration, max slope, traverse distance) are
+  unchanged — the four ``*_micro`` rediscovery scenarios already
+  sit inside the v7_1 LHS per-family scenario ranges, and the
+  user-stated B2 goal (registry rovers inside training support)
+  is fully satisfied by widening the design floors alone. The
+  v8 LHS marginal will look like v7_1 with a heavier tail toward
+  light, low-torque, low-battery designs; we expect the
+  feasibility (non-stalled) rate to drop modestly because some
+  ultra-micro draws (e.g. low-torque rovers on the highland
+  slope-range) will exceed the torque ceiling and stall."""
 
 DEFAULT_FIDELITY = "analytical"
 
@@ -242,6 +263,8 @@ def _flatten_scenario(scenario: MissionScenario, sample: LHSSample) -> dict[str,
         "scenario_soil_cohesion_kpa": sample.soil.cohesion_kpa,
         "scenario_soil_friction_angle_deg": sample.soil.friction_angle_deg,
         "scenario_soil_shear_modulus_k_m": sample.soil.shear_modulus_k_m,
+        "scenario_payload_mass_kg": scenario.payload_mass_kg,
+        "scenario_payload_power_w": scenario.payload_power_w,
     }
 
 

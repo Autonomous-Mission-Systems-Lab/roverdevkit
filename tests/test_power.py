@@ -1,7 +1,7 @@
 """Tests for the power sub-package.
 
 Solar: physics-first-principles assertions plus a Yutu-2 noon-power
-cross-check (project_plan.md §6, Week 2 deliverable).
+cross-check.
 
 Battery: round-trip efficiency, SOC clamping, temperature derating, and
 the SMAD-style usable-capacity validation gate ("100 Wh nominal pack
@@ -395,7 +395,7 @@ class TestTemperatureDerating:
 class TestUsableCapacity:
     def test_validation_gate_100wh_pack_at_room_temp(self) -> None:
         """SMAD-style sizing rule of thumb: 100 Wh nominal -> ~85 Wh usable
-        at 20 C with the default 15 % DoD floor (project_plan.md §4)."""
+        at 20 C with the default 15 % DoD floor."""
         s = BatteryState(capacity_wh=100.0, state_of_charge=1.0)
         assert usable_capacity_wh(s) == pytest.approx(85.0, abs=1.0)
 

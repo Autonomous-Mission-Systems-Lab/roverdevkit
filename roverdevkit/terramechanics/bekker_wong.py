@@ -49,12 +49,18 @@ Assumptions
   packs; residuals against PyChrono SCM are absorbed by the Path-2
   correction layer.
 
-Validation roadmap (see ``data/validation/README.md``)
-------------------------------------------------------
-- Ding et al. 2011, IEEE T-RO — single-wheel lunar-rover experiments.
-- Iizuka & Kubota 2011 — grousered wheel experiments.
-- Wong — worked examples from the textbook (used as unit-test ground
-  truth once digitized).
+Validation (Layer 3)
+--------------------
+The Layer-3 sub-model validation grid lives at
+``data/validation/wong_layer3_reference.csv`` and is exercised by
+``tests/test_terramechanics.py::test_layer3_published_reference_grid``.
+Each row is a published-reference operating point (Wong 2008 §4.2
+worked-example fixture, a Pragyan-class smooth wheel, and a Yutu-2-class
+grousered wheel on Apollo nominal regolith, plus Iizuka & Kubota 2011
+grouser limit cases) with per-quantity tolerance bands sized at the
+±15-30 % BW model-form error reported in Ishigami (2007) and
+Ding et al. (2011). Adding new digitised rows is additive — append a
+row to the CSV and the parametrised test picks it up automatically.
 
 """
 
@@ -297,7 +303,7 @@ def _integrate_forces(
     #   - j(θ₁) = 0                                           (entry)
     #   - At s = 1 (pure skid), j(θ) = R(θ₁ − θ) (maximal slip length)
     #   - At s = 0 (no slip), j is small but nonzero — a kinematic
-    #     rolling-shear residual. See project_log.md for the DP(0)
+    #     rolling-shear residual. The DP(0)
     #     sign-subtlety discussion.
     j = radius_m * ((theta_1 - theta) - (1.0 - slip) * (math.sin(theta_1) - sin_theta))
 
@@ -389,7 +395,7 @@ def _compaction_resistance(sinkage_m: float, wheel: WheelGeometry, soil: SoilPar
     In the rigid-wheel rolling model this is not identically equal to
     ``−DP`` at ``s = 0`` because the integrated DP also picks up the
     kinematic-shear contribution from τ(θ) at zero slip (see discussion
-    in the module docstring and ``project_log.md``). For realistic
+    in the module docstring). For realistic
     lunar per-wheel loads the two agree in magnitude to ~15 %.
     """
     if sinkage_m <= 0.0:

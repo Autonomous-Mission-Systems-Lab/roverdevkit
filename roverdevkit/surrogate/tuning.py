@@ -1,14 +1,14 @@
 """Optuna-based hyperparameter tuning for XGBoost surrogate baselines.
 
-Scope (project_plan.md §6.2 / Week-8 step-3)
+Scope
 --------------------------------------------
 Tunes only **XGBoost** — for both the per-target regressors and the
 ``stalled`` feasibility classifier (schema v6 flipped polarity from
-``motor_torque_ok``). The Week-8 step-2 baselines
-report (`reports/week8_baselines_v4/SUMMARY.md`) shows XGBoost is within
+``motor_torque_ok``). The baseline surrogate baselines
+report (`reports/baselines_v4/SUMMARY.md`) shows XGBoost is within
 0.005 R² of the joint MLP on every primary target while being ~7×
 faster to fit, which makes it the production candidate for the
-Phase 3 NSGA-II constraint loop. Tuning Ridge / RF / LogReg / MLP would
+webapp NSGA-II constraint loop. Tuning Ridge / RF / LogReg / MLP would
 not move the production frontier:
 
 - Ridge is the linear-baseline floor (intentional reference, not a
@@ -40,7 +40,7 @@ study summary frame, and timing — enough for downstream code to
 serialise the model and report tuned vs untuned in the metrics frame.
 
 This module intentionally does **not** modify ``baselines.py``: the
-default-hyperparameter pipeline stays intact so the Week-6 / Week-8
+default-hyperparameter pipeline stays intact so the baseline and calibrated-surrogate
 step-2 acceptance numbers remain reproducible.
 """
 
@@ -66,7 +66,7 @@ optuna.logging.set_verbosity(optuna.logging.WARNING)
 
 
 def _suggest_xgb_regressor_params(trial: optuna.Trial, *, random_state: int) -> dict[str, Any]:
-    """Search space mirrors the Week-6 default config but lets every knob move.
+    """Search space mirrors the baseline-surrogate default config but lets every knob move.
 
     ``n_estimators`` is allowed up to 1500 with early stopping on the
     val set; the actual count is recovered from ``best_iteration`` when

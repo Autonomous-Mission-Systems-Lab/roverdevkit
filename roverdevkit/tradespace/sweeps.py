@@ -26,7 +26,7 @@ Why 1-D / 2-D only
 ------------------
 The tradespace UI uses Plotly line charts (1-D) and heatmaps (2-D);
 3-D sweeps are unwieldy to render and are better expressed as
-NSGA-II Pareto fronts (Week 11 step-3). If a future step needs N-D
+NSGA-II Pareto fronts (Pareto-front workflow). If a future step needs N-D
 sweeps for offline batch generation, ``itertools.product`` over a
 list of :class:`SweepAxis` would be a one-line extension.
 """
@@ -58,11 +58,11 @@ SWEEPABLE_VARIABLES: tuple[str, ...] = (
 )
 """Design-vector fields the UI lets the user sweep on a grid axis.
 
-SCHEMA_VERSION v6 (W12 step B): ``nominal_speed_mps`` is gone (cruise
+SCHEMA_VERSION v6 (v6 schema update): ``nominal_speed_mps`` is gone (cruise
 speed is now derived inside the evaluator; sweeping it is no longer
 meaningful) and ``drive_duty_cycle`` was renamed ``designed_duty_cycle``.
 ``peak_wheel_torque_nm`` is the new drivetrain-capability sweep axis.
-SCHEMA_VERSION v7 (W12 step B follow-up) drops
+SCHEMA_VERSION v7 (v7 schema follow-up) drops
 ``designed_duty_cycle`` from the design vector entirely; drive duty
 cycle is now a per-scenario quantity (``operational_duty_cycle``) and
 sweeping it lives on the scenario side of the ``/sweep`` route.
@@ -318,7 +318,7 @@ def expand_grid(spec: SweepSpec, base_design: DesignVector) -> list[DesignVector
 
 
 # Cell-count thresholds. Tuned for ~40 ms / cell on the corrected
-# evaluator (W7.7) and effectively zero per cell on the vectorised
+# evaluator (BW/SCM bake-off) and effectively zero per cell on the vectorised
 # surrogate. The auto threshold targets a sub-10 s response for
 # interactive UX; the hard limits keep a malicious or sloppy request
 # from melting the server.

@@ -1,4 +1,4 @@
-"""Unit tests for the stratified LHS sampler (Week 6 step 1)."""
+"""Unit tests for the stratified LHS sampler (initial baseline-surrogate schema)."""
 
 from __future__ import annotations
 

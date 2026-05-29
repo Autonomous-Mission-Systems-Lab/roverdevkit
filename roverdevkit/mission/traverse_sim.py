@@ -9,7 +9,7 @@ solar panel, and logs everything.
 The simulator **always runs to the end of the mission duration**; it
 does not short-circuit when the battery hits its DoD floor or the
 rover stalls. Early termination would throw away information the
-surrogate layer (project_plan.md §4) needs to learn failure modes. The
+surrogate layer needs to learn failure modes. The
 end-of-run constraint flags and ``terminated_reason`` field capture
 whatever failures occurred during the run.
 
@@ -23,20 +23,20 @@ Integration notes
 - We apply the *effective* duty cycle ``δ_eff = min(designed,
   operational)`` as a mission-average scaling on mobility power and
   forward progress. This is the standard tradespace approximation
-  (project_plan.md §4); pinning down a drive schedule is deferred to
-  v2. **W12 Step A (2026-04-27) addendum:** when the battery hits its
+  for the first release; pinning down a drive schedule is deferred to
+  v2. **schema-v7 Step A (2026-04-27) addendum:** when the battery hits its
   DoD floor and the unthrottled power balance goes negative, the
   per-step mobility duty is locally throttled to whatever fraction of
   ``δ_eff`` the instantaneous solar input can sustain
   (``min(δ_eff, (p_solar - p_avionics) / p_drive)``). This makes
   ``range_km`` an *energy-feasible* metric rather than a capability
-  envelope; details in ``reports/week12_design/decision.md``.
-- **W12 Step B (2026-04-28) addendum:** cruise speed is now *derived*
+  envelope; details in the version history in ``data/analytical/SCHEMA.md``.
+- **v6 schema update (2026-04-28) addendum:** cruise speed is now *derived*
   inside :func:`run_traverse` from the slip-balance torque demand,
   the mission-average solar power budget, the kinematic envelope, and
   the design's ``peak_wheel_torque_nm`` — see
   :mod:`roverdevkit.drivetrain.motor`. ``DesignVector.nominal_speed_mps``
-  is gone. Schema v7 (W12 step B follow-up) further removed
+  is gone. Schema v7 (v7 schema follow-up) further removed
   ``designed_duty_cycle`` from the design vector after that field
   turned out to do no engineering work in the v6 mass model; the
   per-scenario / override ``operational_duty_cycle`` is now used
@@ -45,7 +45,7 @@ Integration notes
   (:mod:`roverdevkit.power.thermal`) rather than a per-step check --
   the lumped-parameter model is steady-state.
 
-Performance (post-W7.7 lift-out, project_log.md 2026-04-26 entry)
+Performance note
 -----------
 Default ``dt_s = 3600`` (1 hour) gives ~340 steps for a 14-day mission
 and ~720 steps for a 30-day mission. The Bekker-Wong slip solve and the
@@ -62,7 +62,7 @@ End-to-end mission cost on Apple Silicon (single core):
 * SCM-direct (PyChrono in the wheel-force solve, available via the
   ``force_backend="scm"`` switch for validation only):  ~4 s / mission
 
-The 100× gap between BW + correction and SCM-direct, with W7.7 showing
+The 100× gap between BW + correction and SCM-direct, with BW/SCM bake-off showing
 ≥99 % feasibility-flip agreement, is the cost-vs-fidelity result that
 makes the wheel-level correction architecture the production choice.
 
@@ -166,7 +166,7 @@ physical limits at which the Bekker-Wong model is credible."""
 class TraverseLog:
     """Per-step traverse-sim history arrays plus termination metadata.
 
-    Schema v6 (W12 step B): three new top-level fields make the
+    Schema v6 (v6 schema update): three new top-level fields make the
     derived-cruise-speed pipeline observable to callers:
 
     - ``cruise_speed_mps`` — the rover speed the time loop actually
@@ -317,7 +317,7 @@ def _solve_step_wheel_forces(
     With ``correction is None`` this is pure Bekker-Wong; with a
     correction, the slip-balance equilibrium is solved against
     ``DP_BW(s) + ΔDP(s) − DP_required = 0`` so the resulting slip
-    reflects corrected mobility (the §6 W7 plan calls this "injection
+    reflects corrected mobility (the §6 SCM-correction plan calls this "injection
     point 1"; the corrected torque it returns is "injection point 2"
     once it propagates into ``_mobility_power_w``).
 
@@ -372,7 +372,7 @@ def _scm_solve_step_wheel_forces(
 
     Solves the same slip-balance equation, but evaluates drawbar pull
     via the PyChrono SCM single-wheel driver instead of Bekker-Wong.
-    Used by the Week-7.7 bake-off (BW vs BW+correction vs SCM-direct)
+    Used by the BW/SCM bake-off bake-off (BW vs BW+correction vs SCM-direct)
     and by the SCM-direct backend in :func:`run_traverse`.
 
     The PyChrono import is deferred so the analytical path never pays
@@ -419,7 +419,7 @@ def _mobility_power_w(
     motor still draws torque * omega at the no-forward-progress slip --
     the wheels are still spinning, just not pulling the rover forward.
 
-    Schema v6 (W12 step B): ``cruise_speed_mps`` is now the *derived*
+    Schema v6 (v6 schema update): ``cruise_speed_mps`` is now the *derived*
     rover speed from :func:`roverdevkit.drivetrain.motor.cruise_speed`,
     not the pre-v6 design input ``nominal_speed_mps``.
     """
@@ -448,7 +448,7 @@ def _average_solar_power_w(
 ) -> float:
     """Mean solar input over the mission window, in W.
 
-    Schema v6 (W12 step B). Used by the energy-balance cruise-speed
+    Schema v6 (v6 schema update). Used by the energy-balance cruise-speed
     solve in :func:`roverdevkit.drivetrain.motor.energy_balance_v_cruise`.
     Sampled (not integrated analytically) because the existing
     :func:`panel_power_w` already encodes the diurnal / polar
@@ -512,6 +512,7 @@ def run_traverse(
     correction: WheelLevelCorrection | None = None,
     force_backend: str = "bw",
     operational_duty_cycle_override: float | None = None,
+    payload_power_w: float = 0.0,
 ) -> TraverseLog:
     """March the rover through the scenario and return a full traverse log.
 
@@ -549,7 +550,7 @@ def run_traverse(
         ``correction.predict_array(...)`` at the slip-balance solve.
         ``None`` (default) preserves the analytical BW-only path.
     force_backend
-        Wheel-level force backend selector for the Week-7.7 bake-off:
+        Wheel-level force backend selector for the BW/SCM bake-off bake-off:
         ``"bw"`` (default) uses Bekker-Wong, optionally augmented by
         ``correction``; ``"scm"`` calls the PyChrono SCM single-wheel
         driver directly inside the slip solve. ``"scm"`` ignores
@@ -558,12 +559,18 @@ def run_traverse(
         the SCM-direct path costs ~1-3 s/mission rather than the
         ~10 minutes a per-step solve would take.
     operational_duty_cycle_override
-        Schema v6 (W12 step B): per-call override of the scenario's
+        Schema v6 (v6 schema update): per-call override of the scenario's
         ``operational_duty_cycle``. ``None`` (default) uses the value
-        on the scenario YAML. Schema v7 (W12 step B follow-up): this
+        on the scenario YAML. Schema v7 (v7 schema follow-up): this
         value is used directly as ``δ_eff`` (clamped to ``[0, 1]``);
         the v6 ``min(δ_des, δ_ops)`` cap collapsed when
         ``designed_duty_cycle`` was removed from the design vector.
+    payload_power_w
+        Schema v9: scientific-payload continuous ops-time power draw,
+        W. Added to the continuous (non-mobility) electrical load
+        alongside ``design.avionics_power_w`` everywhere the base load
+        enters the power budget. Defaults to 0.0 so pre-v9 callers are
+        unaffected.
     """
     if force_backend not in {"bw", "scm"}:
         raise ValueError(f"force_backend must be 'bw' or 'scm', got {force_backend!r}")
@@ -622,7 +629,7 @@ def run_traverse(
             wheel, soil, load_per_wheel, required_dp_per_wheel, correction=correction
         )
 
-    # Schema v6/v7 (W12 step B): derive δ_eff and v_cruise here,
+    # Schema v6/v7 (v6 schema update): derive δ_eff and v_cruise here,
     # replacing the pre-v6 ``design.nominal_speed_mps`` and
     # ``design.drive_duty_cycle`` design inputs. The torque demand
     # from the slip-balance solve plus the mission-average solar budget
@@ -633,6 +640,11 @@ def run_traverse(
     # rule into a single per-scenario ``operational_duty_cycle`` after
     # that field turned out to do no engineering work in the v6 mass
     # model.
+    # Schema v9: the continuous (non-mobility) electrical load is
+    # avionics plus scientific payload. Both draw whenever the rover is
+    # powered, competing with mobility for the solar / battery budget.
+    base_load_w = design.avionics_power_w + payload_power_w
+
     ops_duty_used = (
         scenario.operational_duty_cycle
         if operational_duty_cycle_override is None
@@ -655,7 +667,7 @@ def run_traverse(
         slip_eq=float(forces.slip),
         slip_solver_failed=slip_solver_failed,
         p_solar_avg_w=p_solar_avg_w,
-        p_avionics_w=design.avionics_power_w,
+        p_avionics_w=base_load_w,
         wheel_radius_m=design.wheel_radius_m,
         motor_efficiency=motor_efficiency,
         delta_eff=delta_eff,
@@ -700,7 +712,7 @@ def run_traverse(
             dust_degradation_factor=panel_dust_factor,
         )
 
-        # Energy-feasibility throttle (W12 Step A, 2026-04-27).
+        # Energy-feasibility throttle (schema-v7 Step A, 2026-04-27).
         # When entering this step the battery is already at its floor
         # and the *unthrottled* power balance would be negative, the
         # rover physically cannot sustain commanded duty: it must drop
@@ -709,22 +721,22 @@ def run_traverse(
         # report full forward progress while quietly violating the
         # battery floor for the rest of the mission, which made
         # range_km a capability envelope rather than an achievable
-        # distance. See reports/week12_design/decision.md and the
+        # distance. See the version history in ``data/analytical/SCHEMA.md`` and
         # 2026-04-27 project_log entry.
-        p_load_full = design.avionics_power_w + effective_mobility_w
+        p_load_full = base_load_w + effective_mobility_w
         p_net_full = p_solar - p_load_full
         floored_at_step_start = (
             battery.state_of_charge <= battery.min_state_of_charge + 1e-9
             and p_net_full < 0.0
         )
         if floored_at_step_start:
-            p_mob_avail_w = max(0.0, p_solar - design.avionics_power_w)
+            p_mob_avail_w = max(0.0, p_solar - base_load_w)
             duty_throttled = min(
                 delta_eff,
                 p_mob_avail_w / max(p_drive, 1e-9),
             )
             dx = 0.0 if stalled else v_cruise * dt_s * duty_throttled
-            p_load = design.avionics_power_w + duty_throttled * p_drive
+            p_load = base_load_w + duty_throttled * p_drive
             battery_floored_once = True
         else:
             dx = dx_per_step
@@ -749,8 +761,9 @@ def run_traverse(
         power_out_arr[k] = p_load
         # Log the actual mobility draw (post-throttle), not the
         # hypothetical full-duty draw, so downstream diagnostics see
-        # the real per-step power profile.
-        mobility_arr[k] = max(0.0, p_load - design.avionics_power_w)
+        # the real per-step power profile. Subtract the full base load
+        # (avionics + payload) so mobility stays isolated (schema v9).
+        mobility_arr[k] = max(0.0, p_load - base_load_w)
         slip_arr[k] = forces.slip
         sinkage_arr[k] = forces.sinkage_m
         torque_arr[k] = forces.driving_torque_nm

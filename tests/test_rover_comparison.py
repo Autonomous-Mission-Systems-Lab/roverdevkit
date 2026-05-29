@@ -1,6 +1,6 @@
-"""Week-5 real-rover validation gate (project_plan.md §6 W5).
+"""Real-rover validation gate.
 
-This is **the** Week-5 CI gate. The plan calls out Week 5 as the critical
+This is **the** real-rover validation CI gate. The plan calls out real-rover validation as the critical
 pre-ML check: if the evaluator can't reproduce real rover behaviour, we
 fix the evaluator before touching the surrogate layer. The tests here
 encode the acceptance criteria that let that gate fail loudly in CI.
@@ -43,7 +43,7 @@ from roverdevkit.validation.rover_registry import (
 # Layer-0 truth comparison uses the *flown* subset of the registry —
 # design-target rovers (MoonRanger, Rashid-1) have no published flight
 # data and only participate in the Layer-1 surrogate sanity check
-# (Week 6).
+# (baseline-surrogate).
 REGISTERED_ROVERS = [e.rover_name for e in flown_registry()]
 
 
@@ -55,7 +55,7 @@ REGISTERED_ROVERS = [e.rover_name for e in flown_registry()]
 def test_acceptance_gate_passes_for_full_registry(
     rover_compare_summary: ComparisonSummary,
 ) -> None:
-    """The Week-5 gate: every registered rover passes every criterion."""
+    """The real-rover validation gate: every registered rover passes every criterion."""
     acceptance_gate(rover_compare_summary)
     assert rover_compare_summary.all_pass
     assert rover_compare_summary.n_pass == len(REGISTERED_ROVERS)
@@ -164,7 +164,7 @@ def test_peak_solar_power_in_published_band(
 
 
 # ---------------------------------------------------------------------------
-# Sensitivity: "right direction when parameters change" (plan §6 W5)
+# Sensitivity: "right direction when parameters change" (plan §6 real-rover validation)
 # ---------------------------------------------------------------------------
 
 

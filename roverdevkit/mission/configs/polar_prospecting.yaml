@@ -1,5 +1,5 @@
 # Scenario 2 — high-latitude prospecting, long shadows, intermittent sun.
-# See project_plan.md §3.2.
+# Canonical high-latitude prospecting scenario.
 #
 # `traverse_distance_m` is non-binding (see equatorial_mare_traverse).
 # 30 km is well below the 30-day theoretical reach (~150 km) but above
@@ -14,8 +14,14 @@ soil_simulant: Apollo_regolith_nominal
 mission_duration_earth_days: 30.0
 max_slope_deg: 20.0
 sun_geometry: polar_intermittent
-# Schema v6 (W12 step B): per-scenario default ops duty cycle.
+# Schema v6 (v6 schema update): per-scenario default ops duty cycle.
 # Polar missions are systematically commanded slowly (Pragyan ~0.008,
 # Yutu-2 ~0.001 in real ops). 0.05 leaves headroom for less
-# conservative polar concepts; see reports/week12_design/decision.md.
+# conservative polar concepts; see data/analytical/SCHEMA.md.
 operational_duty_cycle: 0.05
+# Schema v9: scientific-payload mission requirement. Polar prospecting
+# carries a heavier instrument suite (neutron spectrometer + volatiles
+# drill/analyzer, ~6 kg / 8 W class-typical). Surrogate LHS samples
+# payload independently; this is the webapp / evaluator default.
+payload_mass_kg: 6.0
+payload_power_w: 8.0

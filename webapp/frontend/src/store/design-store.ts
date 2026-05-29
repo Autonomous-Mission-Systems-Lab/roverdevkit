@@ -41,7 +41,7 @@ interface DesignState {
    *
    * `null` means "use the scenario's calibrated default"; setting an
    * explicit number passes that value through to both `/evaluate` and
-   * `/predict`. SCHEMA_VERSION v7_1 (W12 step B follow-on): δ_ops is
+   * `/predict`. SCHEMA_VERSION v7_1 (v7_1 schema follow-on): δ_ops is
    * an LHS feature so the surrogate keeps calibrated PIs across the
    * entire slider range; pre-v7_1 any override forced an evaluator-
    * only fallback that suppressed the PI band. Reset to `null`
@@ -53,6 +53,19 @@ interface DesignState {
    * the v6 mass model.
    */
   opsDutyOverride: number | null;
+  /**
+   * Optional per-query overrides for the schema-v9 payload mission
+   * requirements (`MissionScenario.payload_mass_kg` / `payload_power_w`).
+   *
+   * `null` means "use the scenario's class-typical default"; an explicit
+   * number is passed through to `/evaluate`, `/predict`, `/sweep`, and
+   * `/optimize`. Reset to `null` automatically when the user switches
+   * scenario so a heavy-payload override doesn't silently carry onto a
+   * different mission class. Both are LHS-sampled surrogate inputs over
+   * [0, 30] so the surrogate keeps calibrated PIs across the whole range.
+   */
+  payloadMassOverride: number | null;
+  payloadPowerOverride: number | null;
   /** Names of registry rovers whose predictions should be overlaid on the chart. */
   overlayRovers: string[];
   setDesignField: <K extends keyof DesignVector>(
@@ -63,6 +76,9 @@ interface DesignState {
   setScenario: (name: ScenarioName) => void;
   setOpsDutyOverride: (value: number | null) => void;
   clearOpsDutyOverride: () => void;
+  setPayloadMassOverride: (value: number | null) => void;
+  setPayloadPowerOverride: (value: number | null) => void;
+  clearPayloadOverrides: () => void;
   resetDesign: () => void;
   toggleOverlayRover: (name: string) => void;
   clearOverlayRovers: () => void;
@@ -72,14 +88,32 @@ export const useDesignStore = create<DesignState>()((set) => ({
   design: DEFAULT_DESIGN,
   scenarioName: "equatorial_mare_traverse",
   opsDutyOverride: null,
+  payloadMassOverride: null,
+  payloadPowerOverride: null,
   overlayRovers: [],
   setDesignField: (key, value) =>
     set((state) => ({ design: { ...state.design, [key]: value } })),
   setDesign: (design) => set({ design }),
-  setScenario: (name) => set({ scenarioName: name, opsDutyOverride: null }),
+  setScenario: (name) =>
+    set({
+      scenarioName: name,
+      opsDutyOverride: null,
+      payloadMassOverride: null,
+      payloadPowerOverride: null,
+    }),
   setOpsDutyOverride: (value) => set({ opsDutyOverride: value }),
   clearOpsDutyOverride: () => set({ opsDutyOverride: null }),
-  resetDesign: () => set({ design: DEFAULT_DESIGN, opsDutyOverride: null }),
+  setPayloadMassOverride: (value) => set({ payloadMassOverride: value }),
+  setPayloadPowerOverride: (value) => set({ payloadPowerOverride: value }),
+  clearPayloadOverrides: () =>
+    set({ payloadMassOverride: null, payloadPowerOverride: null }),
+  resetDesign: () =>
+    set({
+      design: DEFAULT_DESIGN,
+      opsDutyOverride: null,
+      payloadMassOverride: null,
+      payloadPowerOverride: null,
+    }),
   toggleOverlayRover: (name) =>
     set((state) => ({
       overlayRovers: state.overlayRovers.includes(name)

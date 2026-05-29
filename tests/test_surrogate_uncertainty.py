@@ -5,7 +5,7 @@ These tests verify the contract — :class:`QuantileHeads` shape,
 round-trip, the coverage-table schema — without making any claim
 about empirical 90 % coverage. The full coverage numbers are measured
 offline against the 40k LHS dataset and live in
-``reports/week8_intervals_v4/SUMMARY.md``.
+``reports/intervals_v4/SUMMARY.md``.
 
 The fixture is identical to ``test_surrogate_tuning.py`` (and so is
 the (X, y) split helper) so the suite runtime stays well under 10 s.
@@ -48,7 +48,7 @@ def small_df() -> pd.DataFrame:
 
 def _split_xy(df: pd.DataFrame, target: str) -> tuple[pd.DataFrame, np.ndarray]:
     df_clean = valid_rows(df)
-    # Schema v6 (W12 step B): ``FEASIBILITY_COLUMN`` is now ``stalled``
+    # Schema v6 (v6 schema update): ``FEASIBILITY_COLUMN`` is now ``stalled``
     # with positive class = infeasible (the failure mode), so we negate
     # before masking to keep only the *feasible* (non-stalled) rows the
     # quantile heads need.
@@ -68,7 +68,7 @@ def _split_train_val(
 
 
 def _tiny_base_params() -> dict:
-    """Mirror W8 step-3 schema with cheap values so the smoke runs fast."""
+    """Mirror tuned-median schema with cheap values so the smoke runs fast."""
     return {
         "n_estimators": 60,
         "max_depth": 3,

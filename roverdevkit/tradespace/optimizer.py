@@ -1,11 +1,15 @@
 """NSGA-II multi-objective optimization via pymoo.
 
 The optimizer is deliberately small and webapp-agnostic: callers provide
-the canonical scenario, soil parameters, loaded quantile bundles, and
-optionally the evaluator's wheel-level SCM correction artifact. The
-default backend is the surrogate because NSGA-II calls the fitness
-function hundreds to thousands of times; the evaluator backend is kept
-for power users and CI smoke tests with a hard evaluation cap.
+the canonical scenario, soil parameters, optionally a set of loaded
+quantile bundles, and optionally the evaluator's wheel-level SCM
+correction artifact. The default backend is the corrected physics
+evaluator: at ~20 ms per design it can finish a 1,500-evaluation
+NSGA-II search in well under a minute, and using evaluator-truth as the
+fitness function avoids any surrogate-approximation error on the
+optimization frontier. The surrogate backend is retained as an opt-in
+benchmarking option for callers that need sub-millisecond fitness
+evaluations (e.g., large offline experiments).
 """
 
 from __future__ import annotations
@@ -57,13 +61,21 @@ DESIGN_BOUNDS: dict[str, tuple[float, float]] = {
     "grouser_height_m": (0.0, 0.020),
     "grouser_count": (0.0, 24.0),
     "n_wheels": (4.0, 6.0),
-    "chassis_mass_kg": (3.0, 50.0),
+    "chassis_mass_kg": (0.5, 50.0),
     "wheelbase_m": (0.3, 1.2),
     "solar_area_m2": (0.1, 1.5),
-    "battery_capacity_wh": (20.0, 500.0),
+    "battery_capacity_wh": (5.0, 500.0),
     "avionics_power_w": (5.0, 40.0),
-    "peak_wheel_torque_nm": (0.3, 20.0),
+    "peak_wheel_torque_nm": (0.05, 20.0),
 }
+"""NSGA-II search bounds. Mirror :class:`DesignVector` schema bounds so
+the optimiser can reach every constructable design. The three
+ultra-micro floors (``chassis_mass_kg``, ``battery_capacity_wh``,
+``peak_wheel_torque_nm``) were lowered 2026-05-27 to admit CADRE and
+Tenacious. The v4 LHS surrogate was trained on the narrower
+``(3.0, 20.0, 0.3)`` floors; running NSGA-II with ``backend='surrogate'``
+on designs below those points extrapolates outside training support
+until the v5 regeneration."""
 
 
 @dataclass(frozen=True)
@@ -145,14 +157,35 @@ class NSGA2Runner:
         *,
         bundles: dict[str, QuantileHeads] | None = None,
         correction: WheelLevelCorrection | None = None,
-        backend: OptimizationBackend = "surrogate",
+        backend: OptimizationBackend = "evaluator",
         objectives: tuple[OptimizationObjective, ...] = DEFAULT_OBJECTIVES,
         constraints: tuple[OptimizationConstraint, ...] = (),
         population_size: int = 100,
         n_generations: int = 200,
         seed: int = 0,
         evaluator_eval_cap: int = 1000,
+        panel_tilt_deg: float = 0.0,
+        panel_azimuth_deg: float = 180.0,
     ) -> None:
+        """Construct a runner.
+
+        Parameters
+        ----------
+        panel_tilt_deg, panel_azimuth_deg
+            Solar-array orientation forwarded to every evaluator call
+            (and so to :func:`roverdevkit.mission.traverse_sim.run_traverse`).
+            Defaults match the simulator's historical horizontal /
+            south-facing panel. The rediscovery harness sets these to
+            a scenario-driven ``tilt = min(80, |latitude|)`` /
+            sun-tracking azimuth at high latitudes so the optimiser's
+            Pareto front is evaluated under the same panel-pointing
+            assumption as the real polar rovers it is being compared
+            against. Note: only the evaluator backend honours these
+            overrides; the surrogate backend is trained on
+            horizontal-panel evaluator outputs and ignores tilt /
+            azimuth (a v9 LHS regen would be required to restore
+            symmetry at high latitudes).
+        """
         if backend == "surrogate" and bundles is None:
             raise ValueError("surrogate backend requires quantile bundles.")
         if backend == "evaluator" and population_size * n_generations > evaluator_eval_cap:
@@ -170,6 +203,8 @@ class NSGA2Runner:
         self.population_size = population_size
         self.n_generations = n_generations
         self.seed = seed
+        self.panel_tilt_deg = panel_tilt_deg
+        self.panel_azimuth_deg = panel_azimuth_deg
 
     def run(
         self,
@@ -225,7 +260,13 @@ class NSGA2Runner:
             if self.bundles is None:  # pragma: no cover - constructor guards this
                 raise AssertionError("missing bundles")
             return _surrogate_metrics(designs, self.scenario, self.soil, self.bundles)
-        return _evaluator_metrics(designs, self.scenario, correction=self.correction)
+        return _evaluator_metrics(
+            designs,
+            self.scenario,
+            correction=self.correction,
+            panel_tilt_deg=self.panel_tilt_deg,
+            panel_azimuth_deg=self.panel_azimuth_deg,
+        )
 
 
 class _RoverProblem(Problem):
@@ -337,6 +378,8 @@ def _feature_frame(
                 "scenario_soil_cohesion_kpa": soil.cohesion_kpa,
                 "scenario_soil_friction_angle_deg": soil.friction_angle_deg,
                 "scenario_soil_shear_modulus_k_m": soil.shear_modulus_k_m,
+                "scenario_payload_mass_kg": scenario.payload_mass_kg,
+                "scenario_payload_power_w": scenario.payload_power_w,
                 "scenario_family": scenario.name,
                 "scenario_terrain_class": scenario.terrain_class,
                 "scenario_soil_simulant": scenario.soil_simulant,
@@ -374,24 +417,51 @@ def _evaluator_metrics(
     scenario: MissionScenario,
     *,
     correction: WheelLevelCorrection | None,
+    panel_tilt_deg: float = 0.0,
+    panel_azimuth_deg: float = 180.0,
 ) -> list[dict[str, float]]:
+    """Evaluate a batch of designs under the corrected evaluator.
+
+    A single evaluator failure (e.g. the Bekker-Wong slip solver
+    cannot find an entry angle for a fully-buried wheel) must not
+    crash the entire NSGA-II run. We catch the exception here and
+    emit a sentinel "deeply infeasible" metrics dict that the
+    objective/constraint pipeline will translate into a large
+    constraint-violation magnitude, letting the GA continue.
+    """
     out: list[dict[str, float]] = []
     use_corr = correction is not None
     for design in designs:
-        metrics = evaluator_evaluate(
-            design,
-            scenario,
-            use_scm_correction=use_corr,
-            correction=correction,
-        )
-        out.append(
-            {
-                "range_km": float(metrics.range_km),
-                "energy_margin_raw_pct": float(metrics.energy_margin_raw_pct),
-                "slope_capability_deg": float(metrics.slope_capability_deg),
-                "total_mass_kg": float(metrics.total_mass_kg),
-            }
-        )
+        try:
+            metrics = evaluator_evaluate(
+                design,
+                scenario,
+                use_scm_correction=use_corr,
+                correction=correction,
+                panel_tilt_deg=panel_tilt_deg,
+                panel_azimuth_deg=panel_azimuth_deg,
+            )
+            out.append(
+                {
+                    "range_km": float(metrics.range_km),
+                    "energy_margin_raw_pct": float(metrics.energy_margin_raw_pct),
+                    "slope_capability_deg": float(metrics.slope_capability_deg),
+                    "total_mass_kg": float(metrics.total_mass_kg),
+                }
+            )
+        except Exception:  # noqa: BLE001 -- broad-except is intentional
+            # Sentinel: zero range/slope, large mass so any constraint
+            # using total_mass_kg as a ceiling treats this as
+            # infeasible, and the GA's tournament selection prefers
+            # any successfully-evaluated individual.
+            out.append(
+                {
+                    "range_km": 0.0,
+                    "energy_margin_raw_pct": -100.0,
+                    "slope_capability_deg": 0.0,
+                    "total_mass_kg": 1e6,
+                }
+            )
     return out
 
 
@@ -451,6 +521,8 @@ def run_nsga2(
     population_size: int = 100,
     n_generations: int = 200,
     seed: int = 0,
+    panel_tilt_deg: float = 0.0,
+    panel_azimuth_deg: float = 180.0,
 ) -> pd.DataFrame:
     """Run NSGA-II and return the Pareto-front design-and-metric dataframe."""
     runner = NSGA2Runner(
@@ -464,6 +536,8 @@ def run_nsga2(
         population_size=population_size,
         n_generations=n_generations,
         seed=seed,
+        panel_tilt_deg=panel_tilt_deg,
+        panel_azimuth_deg=panel_azimuth_deg,
     )
     return runner.run().to_frame()
 

@@ -1,7 +1,7 @@
 """Smoke tests for ``POST /sweep``.
 
 The evaluator backend has no artifact dependency beyond the SCM
-correction (already optional); the surrogate backend needs the W8
+correction (already optional); the surrogate backend needs the surrogate-calibration
 step-4 quantile bundle. Tests that require the bundle skip when it
 is missing so a contributor without the artifact can still run the
 evaluator path locally.

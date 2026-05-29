@@ -1,6 +1,6 @@
-"""Train and score the Week-6 baseline surrogate matrix on a Parquet dataset.
+"""Train and score the baseline-surrogate baseline surrogate matrix on a Parquet dataset.
 
-Single canonical entry point for the Week-6 §6 step-4 acceptance run:
+Single canonical entry point for the baseline-surrogate §6 step-4 acceptance run:
 fit Ridge / RF / XGBoost per target, the joint MLP across all primary
 targets, and LogReg / XGBoost feasibility classifiers; then score them
 on the held-out test split (with a per-scenario-family breakdown) and
@@ -32,12 +32,12 @@ Examples
     # Full 40k v4 acceptance run (current canonical dataset, BW + SCM correction)
     python scripts/run_baselines.py \\
         --dataset data/analytical/lhs_v4.parquet \\
-        --out-dir reports/week8_baselines_v4
+        --out-dir reports/baselines_v4
 
     # Fast pilot smoke (skip MLP, smaller forest)
     python scripts/run_baselines.py \\
         --dataset data/analytical/lhs_pilot.parquet \\
-        --out-dir reports/week6_baselines_pilot \\
+        --out-dir reports/baselines_pilot \\
         --no-mlp
 """
 

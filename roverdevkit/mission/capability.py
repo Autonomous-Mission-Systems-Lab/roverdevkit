@@ -3,7 +3,7 @@
 Right now this contains one thing: the **maximum climbable slope** for a
 rover design on a given soil. This is separate from the traverse sim
 because it's a static capability metric (not time-resolved) and it
-populates ``MissionMetrics.slope_capability_deg`` (project_plan.md §2, §3.2
+populates ``MissionMetrics.slope_capability_deg`` for the canonical mission scenarios
 scenario 3).
 
 Approach

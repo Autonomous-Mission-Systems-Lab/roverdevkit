@@ -9,8 +9,8 @@ import { useDesignStore } from "@/store/design-store";
 /**
  * Per-scenario operations override.
  *
- * Schema v6 (W12 step B) introduced a v5 ``drive_duty_cycle`` -> two-
- * field split (designed vs. operational duty). Schema v7 (W12 step B
+ * Schema v6 (v6 schema update) introduced a v5 ``drive_duty_cycle`` -> two-
+ * field split (designed vs. operational duty). Schema v7 (v6 schema update
  * follow-up) collapsed that split back into a single per-scenario
  * ``operational_duty_cycle`` after ``designed_duty_cycle`` turned out
  * to do no engineering work in the v6 mass model. Drive duty cycle
@@ -22,7 +22,7 @@ import { useDesignStore } from "@/store/design-store";
  * user override δ_ops for a single `/evaluate` + `/predict`
  * round-trip without editing the scenario YAML.
  *
- * SCHEMA_VERSION v7_1 (W12 step B follow-on): δ_ops is now an LHS
+ * SCHEMA_VERSION v7_1 (v7_1 schema follow-on): δ_ops is now an LHS
  * feature in the surrogate dataset (uniform [0, 0.6] independent of
  * scenario family), so the override stays on the surrogate path and
  * keeps its calibrated PIs across the entire slider range. Pre-v7_1

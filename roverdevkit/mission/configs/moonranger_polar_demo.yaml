@@ -18,8 +18,14 @@ soil_simulant: Apollo_regolith_loose  # matches Pragyan's polar choice
 mission_duration_earth_days: 8.0      # Kumar et al. 2020: "eight Earth days"
 max_slope_deg: 6.0                    # typical-ops; ride PSR-margin terrain like Pragyan
 sun_geometry: polar_intermittent
-# Schema v6 (W12 step B): δ_ops calibrated to MoonRanger's
+# Schema v6 (v6 schema update): δ_ops calibrated to MoonRanger's
 # aspirational design target of 1 km / Earth-day. With nominal
 # v_cruise ~0.05 m/s implied 0.012/0.05 = 0.23. We use 0.20 as the
 # aspirational anchor referenced in the design doc.
 operational_duty_cycle: 0.20
+# Schema v9: MoonRanger science payload = Neutron Spectrometer System
+# (NSS) for hydrogen/ice prospecting, ~1.0 kg class-typical.
+# payload_power_w held at 0 for this validation scenario (instrument
+# off during the kilometre-per-day drive windows).
+payload_mass_kg: 1.0
+payload_power_w: 0.0

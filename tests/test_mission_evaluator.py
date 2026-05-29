@@ -1,12 +1,12 @@
 """End-to-end mission-evaluator integration tests.
 
-Smoke tests in Week 4: the pipeline runs end-to-end on every canonical
+Smoke tests in mission-evaluator: the pipeline runs end-to-end on every canonical
 scenario for a Rashid-like design and returns finite, in-range metrics.
 
-The Week 5 acceptance test -- "loaded with Yutu-2 / Pragyan / Rashid
+The real-rover validation acceptance test -- "loaded with Yutu-2 / Pragyan / Rashid
 parameters, does the evaluator predict daily traverse distance and
 power profile in the right order of magnitude?" -- lives in a separate
-notebook per project_plan.md §6 W5.
+notebook.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def test_mass_in_micro_rover_class(
 ) -> None:
     metrics = evaluate(rashid_like_design, equatorial_scenario)
     # Rashid was ~10 kg; the design vector yields a bottom-up estimate
-    # in the 5-50 kg micro-rover class (project_plan.md §1).
+    # in the 5-50 kg lunar micro-rover class.
     assert 5.0 <= metrics.total_mass_kg <= 50.0
 
 
@@ -53,6 +53,44 @@ def test_all_metrics_are_finite(
     ):
         assert math.isfinite(value)
         assert value >= 0.0
+
+
+@pytest.mark.integration
+def test_payload_mass_increases_total_mass(
+    rashid_like_design: DesignVector, equatorial_scenario: MissionScenario
+) -> None:
+    """Schema v9: a scenario payload mass adds one-for-one to total mass."""
+    base = evaluate(rashid_like_design, equatorial_scenario)
+    loaded = evaluate(
+        rashid_like_design,
+        equatorial_scenario.model_copy(update={"payload_mass_kg": 8.0}),
+    )
+    assert loaded.total_mass_kg - base.total_mass_kg == pytest.approx(8.0, abs=1e-6)
+
+
+@pytest.mark.integration
+def test_payload_override_beats_scenario_default(
+    rashid_like_design: DesignVector, equatorial_scenario: MissionScenario
+) -> None:
+    """The per-call ``payload_mass_kg`` override supersedes the YAML value."""
+    scenario = equatorial_scenario.model_copy(update={"payload_mass_kg": 5.0})
+    base = evaluate(rashid_like_design, equatorial_scenario)
+    overridden = evaluate(rashid_like_design, scenario, payload_mass_kg=0.0)
+    assert overridden.total_mass_kg == pytest.approx(base.total_mass_kg, abs=1e-6)
+
+
+@pytest.mark.integration
+def test_payload_power_reduces_range(
+    rashid_like_design: DesignVector, equatorial_scenario: MissionScenario
+) -> None:
+    """Schema v9: payload draws continuous power, so a heavy payload load
+    cannot *increase* achievable range (it competes with mobility)."""
+    base = evaluate(rashid_like_design, equatorial_scenario)
+    loaded = evaluate(
+        rashid_like_design,
+        equatorial_scenario.model_copy(update={"payload_power_w": 25.0}),
+    )
+    assert loaded.range_km <= base.range_km + 1e-9
 
 
 @pytest.mark.integration
@@ -117,10 +155,10 @@ def test_denser_soil_boosts_slope_capability(
 def test_scm_correction_loads_when_artifact_present(
     rashid_like_design: DesignVector, equatorial_scenario: MissionScenario
 ) -> None:
-    """Week-7 step-5: ``use_scm_correction=True`` must successfully run and
+    """SCM-correction: ``use_scm_correction=True`` must successfully run and
     must produce metrics that **differ** from the BW-only baseline when
     the canonical artifact is on disk. If it is absent (e.g. a fresh
-    clone before the Week-7 build), the call still succeeds (graceful
+    clone before the SCM-correction build), the call still succeeds (graceful
     fallback with a warning) but returns BW-identical metrics — which
     is captured here by allowing equality in that case.
     """
@@ -157,7 +195,7 @@ def test_scm_correction_loads_when_artifact_present(
 
 
 # ---------------------------------------------------------------------------
-# Schema v6/v7 (W12 step B): operational_duty_cycle override
+# Schema v6/v7 (v6 schema update): operational_duty_cycle override
 # ---------------------------------------------------------------------------
 #
 # The pre-v6 ``range_at_utilisation`` post-hoc rescaler is gone. Schema

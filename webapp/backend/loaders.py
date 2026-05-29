@@ -6,6 +6,13 @@ roverdevkit core so the cache invalidation story is "restart the
 process" — there is no in-process model reloading endpoint by design
 (simple, and matches the methodology paper's "frozen artifacts" story).
 
+Rediscovery artifacts live as committed JSON under
+``reports/rediscovery_loo_evaluator/`` and
+``reports/rediscovery_loo_surrogate_v9/`` (one file per rover, plus
+a manifest). The :func:`get_rediscovery_loo` loader reads them
+lazily from disk so the server boots fast and degrades gracefully
+when a fresh clone is missing the surrogate-backed sweep.
+
 Cache strategy
 --------------
 Each loader uses :func:`functools.lru_cache(maxsize=1)`. That gives:
@@ -22,9 +29,11 @@ call (or by calling :func:`reset_caches` after the env change).
 
 from __future__ import annotations
 
+import json
 import logging
 from functools import lru_cache
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 import joblib
 
@@ -46,9 +55,38 @@ from webapp.backend.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+RediscoveryBackend = Literal["evaluator", "surrogate"]
+"""See :data:`webapp.backend.schemas.RediscoveryBackend` for details."""
+
+_REDISCOVERY_SUBDIRS: dict[RediscoveryBackend, str] = {
+    "evaluator": "rediscovery_loo_evaluator",
+    "surrogate": "rediscovery_loo_surrogate_v9",
+}
+"""Subdirectory under ``reports/`` for each backend's per-rover JSONs.
+
+Pinned to the v9 surrogate sweep: schema v9 promoted scientific
+payload to two explicit mission-requirement inputs, so the
+rediscovery harness now injects each rover's published payload onto
+both the rover's re-evaluation and the NSGA-II candidates. Bumping
+the surrogate dataset version requires a deliberate edit here so the
+API never silently mixes calibration regimes."""
+
+# Per-rover JSON files inside each backend directory have these stems.
+# Hard-coded rather than glob-discovered so adding a new rover is an
+# explicit registry change (and the route stays apples-to-apples
+# across backends).
+_REDISCOVERY_SLUGS: tuple[str, ...] = (
+    "pragyan",
+    "yutu_2",
+    "moonranger",
+    "rashid_1",
+    "cadre_unit",
+    "tenacious",
+)
+
 
 # ---------------------------------------------------------------------------
-# Surrogate (W8 step-4 quantile-XGBoost bundles)
+# Surrogate (quantile-calibration quantile-XGBoost bundles)
 # ---------------------------------------------------------------------------
 
 
@@ -128,6 +166,62 @@ def get_registry() -> tuple[RoverRegistryEntry, ...]:
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Rediscovery LOO artifacts (Layer-5 paper figure)
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=2)
+def get_rediscovery_loo(backend: RediscoveryBackend) -> dict[str, dict[str, Any]]:
+    """Return ``{slug -> rediscovery JSON dict}`` for the given backend.
+
+    Reads the committed per-rover JSONs from
+    ``reports/rediscovery_loo_<backend>/`` once per process per
+    backend. Slugs not present on disk are silently skipped (a
+    fresh clone may not yet have re-run the surrogate-backed sweep,
+    and the route surfaces "no data" rather than 500-ing).
+
+    Raises
+    ------
+    FileNotFoundError
+        If the entire backend directory is missing -- in that case
+        the route should return an empty list with the right backend
+        echoed back, not a half-populated payload.
+    """
+    cfg = get_settings()
+    sub = _REDISCOVERY_SUBDIRS[backend]
+    base: Path = cfg.repo_root / "reports" / sub
+    if not base.is_dir():
+        raise FileNotFoundError(
+            f"rediscovery LOO artifacts not found at {base}. "
+            "Re-run scripts/run_rediscovery_loo.py for this backend."
+        )
+    out: dict[str, dict[str, Any]] = {}
+    for slug in _REDISCOVERY_SLUGS:
+        path = base / f"{slug}.json"
+        if not path.exists():
+            logger.warning(
+                "rediscovery artifact %s missing for backend=%s; skipping",
+                path,
+                backend,
+            )
+            continue
+        with path.open("r", encoding="utf-8") as fp:
+            out[slug] = json.load(fp)
+    if not out:
+        raise FileNotFoundError(
+            f"no per-rover rediscovery JSONs under {base}; "
+            "expected one or more of "
+            + ", ".join(f"{slug}.json" for slug in _REDISCOVERY_SLUGS)
+        )
+    logger.info(
+        "loaded %d rediscovery LOO entries for backend=%s",
+        len(out),
+        backend,
+    )
+    return out
+
+
 @lru_cache(maxsize=1)
 def get_correction() -> WheelLevelCorrection | None:
     """Return the production wheel-level SCM correction artifact, if available.
@@ -154,3 +248,4 @@ def reset_caches() -> None:
     get_soil_for_simulant.cache_clear()
     get_registry.cache_clear()
     get_correction.cache_clear()
+    get_rediscovery_loo.cache_clear()

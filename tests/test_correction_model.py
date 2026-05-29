@@ -1,4 +1,4 @@
-"""Unit tests for the Week-7 wheel-level SCM correction layer.
+"""Unit tests for the SCM-correction wheel-level SCM correction layer.
 
 Uses a small synthetic gate-sweep parquet built from the real
 :func:`roverdevkit.terramechanics.scm_sweep.build_design` plus mocked

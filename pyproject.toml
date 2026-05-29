@@ -10,7 +10,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.11"
 authors = [
-  { name = "Space Systems Autonomy Lab, Duke University" },
+  { name = "Autonomous Mission Systems Lab, Duke University" },
 ]
 keywords = [
   "lunar",
@@ -41,7 +41,6 @@ dependencies = [
   "optuna>=3.5",
   "matplotlib>=3.8",
   "plotly>=5.18",
-  "ipywidgets>=8.1",
   "pydantic>=2.5",
   "pyyaml>=6.0",
   "tqdm>=4.66",
@@ -52,7 +51,7 @@ dependencies = [
 torch = ["torch>=2.2"]
 chrono = []  # PyChrono is installed via conda, not pip
 webapp = [
-  # Phase-3 browser-based tradespace tool backend (see project_plan.md §6 Phase 3).
+  # Browser-based tradespace tool backend.
   # Frontend toolchain (Node 20 LTS + npm) is managed separately under webapp/frontend/.
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
@@ -70,7 +69,7 @@ dev = [
 ]
 
 [project.urls]
-Repository = "https://github.com/Space-Systems-Autonomy-Lab/roverdevkit"
+Repository = "https://github.com/Autonomous-Mission-Systems-Lab/roverdevkit"
 
 [tool.setuptools.packages.find]
 include = ["roverdevkit*"]

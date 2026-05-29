@@ -22,9 +22,19 @@ Subsystem accounting (SMAD Ch. 11, Table 11-43 convention)::
     m_thermal    = f_thermal * (m_subsystems + m_harness)
     m_dry        = m_subsystems + m_harness + m_thermal
     m_margin     = f_margin * m_dry
-    m_total      = m_dry + m_margin
+    m_total      = m_dry + m_margin + m_payload
 
-Motor mass (schema v6, W12 step B). The motor subsystem mass is now
+Payload mass (schema v9). Scientific payload is a *mission
+requirement* carried on :class:`roverdevkit.schema.MissionScenario`,
+not a design variable. It enters the total as a top-level line item
+**after** the AIAA S-120A dry-mass growth margin (``m_payload`` is a
+known, specified mass, so the bus growth allowance does not apply to
+it). This matches standard aerospace mass-budget practice (payload is
+tracked separately from bus dry mass) and lets the bottom-up model
+reproduce full-up published rover mass — e.g. Yutu-2's ~25 kg science
+payload no longer has to be hidden inside ``chassis_mass_kg``.
+
+Motor mass (schema v6, v6 schema update). The motor subsystem mass is now
 computed directly from the design's
 :attr:`roverdevkit.schema.DesignVector.peak_wheel_torque_nm` (a true
 input), so the pre-v6 fixed-point loop over total mass is gone — this
@@ -192,10 +202,18 @@ class MassBreakdown:
     harness_kg: float
     thermal_kg: float
     margin_kg: float
+    payload_kg: float = 0.0
+    """Scientific-payload mass, kg (schema v9).
+
+    A mission requirement carried on
+    :class:`roverdevkit.schema.MissionScenario`, added to the total
+    *outside* the dry-mass growth margin. Defaults to 0.0 so pre-v9
+    callers (and the mass model's own subsystem-only sweeps) are
+    unaffected."""
     n_iterations: int = field(default=0, compare=False)
     """Number of fixed-point iterations taken to converge motor mass.
 
-    Schema v6 (W12 step B): always 1 — motor mass is a direct function
+    Schema v6 (v6 schema update): always 1 — motor mass is a direct function
     of :attr:`roverdevkit.schema.DesignVector.peak_wheel_torque_nm` so
     the model converges in one pass. Field retained for back-compat
     with pre-v6 fixtures and the validation harness."""
@@ -212,12 +230,13 @@ class MassBreakdown:
             + self.harness_kg
             + self.thermal_kg
             + self.margin_kg
+            + self.payload_kg
         )
 
     @property
     def dry_kg(self) -> float:
-        """Mass excluding margin."""
-        return self.total_kg - self.margin_kg
+        """Bus dry mass: excludes both the growth margin and the payload."""
+        return self.total_kg - self.margin_kg - self.payload_kg
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +286,7 @@ def _motors_mass(
 ) -> float:
     """Drive-motor + gearbox mass sized from the peak-wheel torque.
 
-    Schema v6 (W12 step B): ``peak_wheel_torque_nm`` is now a direct
+    Schema v6 (v6 schema update): ``peak_wheel_torque_nm`` is now a direct
     design input rather than something derived from the vehicle's
     lunar weight inside the mass model. Per-motor mass remains
     ``m_0 + k_tau * tau_peak``; total summed over ``n_wheels``. The
@@ -322,11 +341,12 @@ def estimate_mass(
     peak_wheel_torque_nm: float,
     grouser_height_m: float = 0.0,
     grouser_count: int = 0,
+    payload_mass_kg: float = 0.0,
     params: MassModelParams | None = None,
 ) -> MassBreakdown:
     """Assemble a bottom-up subsystem mass breakdown for a rover design.
 
-    Schema v6 (W12 step B). All subsystems are load-independent now
+    Schema v6 (v6 schema update). All subsystems are load-independent now
     that ``peak_wheel_torque_nm`` is a true design input — the pre-v6
     fixed-point iteration over total mass is gone, and this function
     converges in a single pass. The ``n_iterations`` field on the
@@ -352,6 +372,11 @@ def estimate_mass(
         motor mass directly via ``m_0 + k_tau * tau_peak``.
     grouser_height_m, grouser_count
         Grouser geometry, m and count. Defaults to 0.
+    payload_mass_kg
+        Scientific-payload mass, kg (schema v9). A mission requirement
+        from :attr:`roverdevkit.schema.MissionScenario.payload_mass_kg`.
+        Added to the total *after* the dry-mass growth margin (payload
+        is a known mass, not grown). Defaults to 0.0.
     params
         :class:`MassModelParams` override; defaults to the module defaults.
 
@@ -367,6 +392,9 @@ def estimate_mass(
         geometry).
     """
     params = params or MassModelParams()
+
+    if payload_mass_kg < 0.0:
+        raise ValueError("payload_mass_kg must be non-negative.")
 
     m_chassis = chassis_mass_kg
     if m_chassis <= 0.0:
@@ -395,6 +423,7 @@ def estimate_mass(
         harness_kg=m_harness,
         thermal_kg=m_thermal,
         margin_kg=m_margin,
+        payload_kg=payload_mass_kg,
         n_iterations=1,
     )
 
@@ -402,8 +431,16 @@ def estimate_mass(
 def estimate_mass_from_design(
     design: DesignVector,
     params: MassModelParams | None = None,
+    *,
+    payload_mass_kg: float = 0.0,
 ) -> MassBreakdown:
-    """Convenience wrapper that unpacks a :class:`DesignVector`."""
+    """Convenience wrapper that unpacks a :class:`DesignVector`.
+
+    ``payload_mass_kg`` (schema v9) is a mission requirement that lives
+    on :class:`roverdevkit.schema.MissionScenario`, not on the design
+    vector, so it is passed in explicitly by the evaluator. Defaults to
+    0.0 for callers that only need the bus mass.
+    """
     return estimate_mass(
         wheel_radius_m=design.wheel_radius_m,
         wheel_width_m=design.wheel_width_m,
@@ -415,5 +452,6 @@ def estimate_mass_from_design(
         peak_wheel_torque_nm=design.peak_wheel_torque_nm,
         grouser_height_m=design.grouser_height_m,
         grouser_count=design.grouser_count,
+        payload_mass_kg=payload_mass_kg,
         params=params,
     )

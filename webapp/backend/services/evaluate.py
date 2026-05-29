@@ -16,7 +16,7 @@ identical -- the underlying physics call is the same -- and the extra
 fields are dropped on the floor for callers that only want
 ``MissionMetrics``.
 
-Schema v6 (W12 step B): the previous ``MotorTorqueDiagnostic`` was
+Schema v6 (v6 schema update): the previous ``MotorTorqueDiagnostic`` was
 replaced by :class:`StallDiagnostic`. The pre-v6 diagnostic compared the
 peak observed torque to a closed-form per-wheel ceiling derived from
 ``mass × g / N × R × sf × μ`` inside the mass model; v6 makes the
@@ -102,9 +102,9 @@ def evaluate_design(
         ``None`` to fall back to the BW-only evaluator; the route
         decides whether that fallback is acceptable.
     operational_duty_cycle
-        Schema v6 (W12 step B): per-call override of
+        Schema v6 (v6 schema update): per-call override of
         ``MissionScenario.operational_duty_cycle``. ``None`` (default)
-        uses the scenario's calibrated value. Schema v7 (W12 step B
+        uses the scenario's calibrated value. Schema v7 (v6 schema update
         follow-up): used directly as ``δ_eff`` (clamped to ``[0, 1]``).
 
     Returns

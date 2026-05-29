@@ -1,7 +1,7 @@
 """Drivetrain torque-speed envelope and cruise-speed derivation.
 
-W12 step B (2026-04-28) overhaul. Background and design rationale:
-``reports/week12_design/decision.md``. Schema v7 (W12 step B
+v6 schema update (2026-04-28) overhaul. Background and design rationale:
+the version history in ``data/analytical/SCHEMA.md``. Schema v7 (v6 schema update
 follow-up) consolidated the v6 designed/operational duty-cycle split
 back into a single per-scenario ``operational_duty_cycle``: the v6
 ``designed_duty_cycle`` field carried no engineering content (the v6
@@ -9,7 +9,7 @@ mass model never actually scaled with it) so the only role of
 ``δ_des`` was to upper-bound ``δ_eff``, which a user can equivalently
 express by lowering ``operational_duty_cycle``.
 
-The pre-W12 design vector exposed ``nominal_speed_mps`` and
+The pre-schema-v7 design vector exposed ``nominal_speed_mps`` and
 ``drive_duty_cycle`` as free design *inputs* and gated mobility on an
 implicit, mass-derived torque ceiling inside the mass model. That made
 ``range_km`` close to a tautology of two design knobs and let the

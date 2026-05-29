@@ -17,10 +17,18 @@ mission_duration_earth_days: 14.0   # one lunar day, hot case
 max_slope_deg: 5.0                  # typical-ops mean; Pragyan stayed on near-flat terrain
 
 sun_geometry: polar_intermittent
-# Schema v6 (W12 step B): δ_ops calibrated to Pragyan's published
+# Schema v6 (v6 schema update): δ_ops calibrated to Pragyan's published
 # 101 m / ~10 active Earth days at ~6.6 cm/s nominal v_cruise.
 # Implied δ_ops = (101/(10*86400)) / 0.066 ≈ 0.0018; we use 0.008
 # (the design-doc historical-conservative anchor) which sits
 # between Pragyan's own ops (~0.002) and a more aspirational
 # polar concept. Used only by the registry-rover validation gate.
 operational_duty_cycle: 0.008
+# Schema v9: Pragyan science payload = APXS + LIBS spectrometers,
+# ~3.5 kg (Chandrayaan-3 instrument suite). payload_power_w held at 0
+# for this validation scenario: the published traverse / peak-solar /
+# thermal truth was measured during mobility windows with the
+# instruments powered down, so the mobility-validation gate sees mass
+# (always carried) but not instrument standby draw.
+payload_mass_kg: 3.5
+payload_power_w: 0.0

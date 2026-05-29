@@ -1,4 +1,4 @@
-"""Week-2 PyChrono SCM single-wheel driver tests.
+"""PyChrono integration PyChrono SCM single-wheel driver tests.
 
 Purpose: validate that ``pychrono_scm.single_wheel_forces_scm`` is
 *wired correctly* — i.e., that the rig produces forces that satisfy
@@ -8,12 +8,12 @@ magnitude as the analytical Bekker-Wong model.
 
 This is **not** a validation-against-truth test — SCM and analytical
 Bekker-Wong are both models, not ground truth, and the gap between
-them is exactly what the Week-5 correction layer is meant to learn.
+them is exactly what the real-rover validation correction layer is meant to learn.
 
 The tests are marked ``chrono`` (requires PyChrono) and ``slow``
 (simulation wall-clock is seconds, not milliseconds), so they are
 skipped by default in the fast ``pytest`` loop and run explicitly
-via ``pytest -m 'chrono and slow'`` during Week-2 go/no-go review
+via ``pytest -m 'chrono and slow'`` during PyChrono integration smoke review
 and any subsequent SCM-related refactor.
 """
 
@@ -188,7 +188,7 @@ def test_scm_and_analytical_agree_in_order_of_magnitude(
 
     The two models will disagree quantitatively — that's expected and
     is precisely the systematic delta that the Path-2 correction layer
-    (Week 5) will learn to predict. Here we only assert:
+    (real-rover validation) will learn to predict. Here we only assert:
 
       * same sign of DP (both produce traction at driving slip),
       * DP within a factor of 5 (rules out wiring errors of several
@@ -196,7 +196,7 @@ def test_scm_and_analytical_agree_in_order_of_magnitude(
       * driving torque within a factor of 3,
       * sinkage within a factor of 3.
 
-    Bounds are deliberately loose; the real calibration happens in Week 5.
+    Bounds are deliberately loose; the real calibration happens in real-rover validation.
     """
     load = 30.0
     slip = 0.2
@@ -236,8 +236,8 @@ def test_scm_wall_clock_under_path2_budget(
     apollo_nominal: SoilParameters,
     fast_config: ScmConfig,
 ) -> None:
-    """Formal Week-2 go/no-go gate: wall-clock per simulated-wheel-second
-    must stay under the 10 s / wheel-second budget from project_plan.md §5.
+    """Formal PyChrono integration smoke gate: wall-clock per simulated-wheel-second
+    must stay under the 10 s / wheel-second runtime budget.
 
     Measured on an Apple M-series laptop at the default (δ=15 mm) mesh,
     this is typically ~0.08 s/wheel-s — two orders of magnitude of headroom.

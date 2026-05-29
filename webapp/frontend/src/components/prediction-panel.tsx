@@ -31,7 +31,7 @@ export interface PredictionPanelMeta {
    * Used by the footer chips to show pass/fail and to back the
    * click-for-details dialog explaining *why* a flag fired.
    *
-   * Schema v6 (W12 step B): the v5 ``motor_torque`` field was renamed
+   * Schema v6 (v6 schema update): the v5 ``motor_torque`` field was renamed
    * to ``stall`` and now exposes the explicit per-wheel torque
    * demand-vs-capacity comparison from the run-traverse stall gate.
    */

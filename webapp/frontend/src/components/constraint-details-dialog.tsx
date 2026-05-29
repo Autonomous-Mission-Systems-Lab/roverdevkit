@@ -19,7 +19,7 @@ import type { StallDiagnostic, ThermalDiagnostic } from "@/types/api";
  * so the numbers shown here are deterministic ground truth (not
  * surrogate predictions).
  *
- * Schema v6 (W12 step B): the v5 `motor_torque` variant was renamed
+ * Schema v6 (v6 schema update): the v5 `motor_torque` variant was renamed
  * to `stall` and now exposes the explicit per-wheel torque
  * demand-vs-capacity comparison the run-traverse stall gate uses,
  * rather than the v5 BW-sizing peak-vs-ceiling check.
@@ -231,7 +231,7 @@ function StallBody({
           Compares the peak per-wheel torque the slip-balance solver asks of the
           drivetrain on the scenario&rsquo;s worst-case slope to the
           design&rsquo;s explicit <code>peak_wheel_torque_nm</code> capacity.
-          Schema v6 (W12 step B) made this a true drivetrain capability check
+          Schema v6 (v6 schema update) made this a true drivetrain capability check
           alongside the run-traverse stall gate; in v5 the comparable ceiling
           was implicit in the BW-sizing model.
         </DialogDescription>

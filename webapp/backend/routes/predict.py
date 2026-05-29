@@ -18,6 +18,7 @@ from webapp.backend.schemas import (
     PredictResponse,
     PredictTarget,
 )
+from webapp.backend.services import apply_scenario_overrides
 from webapp.backend.services.predict import build_feature_row, predict_quantiles
 
 logger = logging.getLogger(__name__)
@@ -34,21 +35,21 @@ def predict(req: PredictRequest) -> PredictResponse:
     1. Resolve the scenario from the canonical four (404 if unknown).
     2. Look up nominal Bekker-Wong soil parameters for the scenario's
        simulant.
-    3. Assemble the 25-D feature row in the surrogate's training-time
-       column order, applying any per-call
-       ``operational_duty_cycle`` override before flattening so the
-       surrogate sees the same δ_ops the deterministic evaluator
-       would.
+    3. Assemble the 27-D feature row in the surrogate's training-time
+       column order, applying any per-call ``operational_duty_cycle``
+       and schema-v9 payload (``payload_mass_kg`` / ``payload_power_w``)
+       mission-requirement overrides before flattening so the surrogate
+       sees the same scenario inputs the deterministic evaluator would.
     4. Dispatch to every primary target's ``QuantileHeads`` head and
        collect ``(q05, q50, q95)`` triples.
 
-    The surrogate is the W8 step-4 ``quantile_bundles.joblib``;
-    ``q50`` is within R² 0.005 of the W8 step-3 tuned median (see
-    ``reports/week8_intervals_v4/SUMMARY.md`` for the median sanity
+    The surrogate is the quantile-calibration ``quantile_bundles.joblib``;
+    ``q50`` is within R² 0.005 of the tuned-median tuned median (see
+    ``reports/intervals_v4/SUMMARY.md`` for the median sanity
     guardrail), so this single artifact powers both point estimates
     and PI envelopes.
 
-    Schema v7_1 (W12 step B follow-on): ``operational_duty_cycle`` is
+    Schema v7_1 (v7_1 schema follow-on): ``operational_duty_cycle`` is
     a true surrogate input feature (LHS-sampled per row over [0, 0.6]),
     so any in-bounds δ_ops is in-distribution and the calibrated PIs
     apply across the full frontend slider range. The pre-v7_1
@@ -63,13 +64,13 @@ def predict(req: PredictRequest) -> PredictResponse:
                 f"unknown scenario {req.scenario_name!r}. Pick one of {sorted(scenarios.keys())}."
             ),
         )
-    scenario = scenarios[req.scenario_name]
+    scenario = apply_scenario_overrides(
+        scenarios[req.scenario_name],
+        operational_duty_cycle=req.operational_duty_cycle,
+        payload_mass_kg=req.payload_mass_kg,
+        payload_power_w=req.payload_power_w,
+    )
     soil = get_soil_for_simulant(scenario.soil_simulant)
-
-    if req.operational_duty_cycle is not None:
-        scenario = scenario.model_copy(
-            update={"operational_duty_cycle": req.operational_duty_cycle}
-        )
 
     X = build_feature_row(req.design, scenario, soil)
 

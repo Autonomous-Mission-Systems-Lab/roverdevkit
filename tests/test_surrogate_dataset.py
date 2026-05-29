@@ -1,4 +1,4 @@
-"""Unit tests for the parallel dataset builder (Week 6 step 1).
+"""Unit tests for the parallel dataset builder (initial baseline-surrogate schema).
 
 These tests use :func:`build_dataset` with ``n_workers=1`` for
 reproducibility and to avoid multiprocessing fork/spawn overhead in CI.
@@ -79,6 +79,8 @@ _EXPECTED_SCENARIO_COLS = {
     "scenario_soil_cohesion_kpa",
     "scenario_soil_friction_angle_deg",
     "scenario_soil_shear_modulus_k_m",
+    "scenario_payload_mass_kg",
+    "scenario_payload_power_w",
 }
 
 _EXPECTED_METRIC_COLS = {

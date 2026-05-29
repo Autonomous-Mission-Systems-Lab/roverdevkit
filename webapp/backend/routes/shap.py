@@ -1,11 +1,17 @@
-"""SHAP/design-rule explanation routes."""
+"""Per-design SHAP explanation route.
+
+Returns TreeSHAP-style feature contributions for the current design and the
+selected primary target. There is intentionally no global-importance
+endpoint: the design-explain experience in the webapp is scoped to the
+single design the user is editing, and any global feature-importance
+analysis lives in the offline design-rules report under ``reports/``.
+"""
 
 from __future__ import annotations
 
 import numpy as np
 from fastapi import APIRouter, HTTPException
 
-from roverdevkit.surrogate.features import PRIMARY_REGRESSION_TARGETS
 from roverdevkit.surrogate.uncertainty import QuantileHeads
 from webapp.backend.loaders import (
     get_canonical_scenarios,
@@ -15,38 +21,12 @@ from webapp.backend.loaders import (
 from webapp.backend.schemas import (
     ShapExplainRequest,
     ShapFeatureScore,
-    ShapGlobalResponse,
     ShapLocalResponse,
-    ShapTargetImportance,
 )
+from webapp.backend.services import apply_scenario_overrides
 from webapp.backend.services.predict import build_feature_row
 
 router = APIRouter(tags=["shap"])
-
-
-@router.get("/shap/global", response_model=ShapGlobalResponse)
-def shap_global() -> ShapGlobalResponse:
-    """Return global feature importances from the median quantile heads."""
-    bundles = _load_bundles_or_503()
-    rows: list[ShapTargetImportance] = []
-    for target in PRIMARY_REGRESSION_TARGETS:
-        head = bundles[target]
-        model = _median_model(head)
-        values = np.asarray(getattr(model, "feature_importances_", []), dtype=float)
-        if values.size != len(head.feature_columns):
-            values = np.zeros(len(head.feature_columns), dtype=float)
-        denom = float(np.sum(np.abs(values))) or 1.0
-        scores = [
-            ShapFeatureScore(feature=feature, value=float(value / denom))
-            for feature, value in zip(head.feature_columns, values, strict=True)
-        ]
-        rows.append(
-            ShapTargetImportance(
-                target=target,  # type: ignore[arg-type]
-                features=sorted(scores, key=lambda item: abs(item.value), reverse=True)[:12],
-            )
-        )
-    return ShapGlobalResponse(targets=rows)
 
 
 @router.post("/shap/explain", response_model=ShapLocalResponse)
@@ -61,11 +41,12 @@ def shap_explain(req: ShapExplainRequest) -> ShapLocalResponse:
                 f"unknown scenario {req.scenario_name!r}. Pick one of {sorted(scenarios.keys())}."
             ),
         )
-    scenario = scenarios[req.scenario_name]
-    if req.operational_duty_cycle is not None:
-        scenario = scenario.model_copy(
-            update={"operational_duty_cycle": req.operational_duty_cycle}
-        )
+    scenario = apply_scenario_overrides(
+        scenarios[req.scenario_name],
+        operational_duty_cycle=req.operational_duty_cycle,
+        payload_mass_kg=req.payload_mass_kg,
+        payload_power_w=req.payload_power_w,
+    )
     soil = get_soil_for_simulant(scenario.soil_simulant)
     X = build_feature_row(req.design, scenario, soil)
     head = bundles[req.target]
@@ -84,8 +65,8 @@ def shap_explain(req: ShapExplainRequest) -> ShapLocalResponse:
         base_value = float(contribs[-1])
     except Exception:
         # Keep the UI usable even if a future model backend cannot emit
-        # exact TreeSHAP contributions. The global panel still carries
-        # the explanatory signal and the response shape remains stable.
+        # exact TreeSHAP contributions. The response shape stays stable
+        # and the chart simply falls back to a flat zero-contribution row.
         base_value = prediction
 
     scores = [

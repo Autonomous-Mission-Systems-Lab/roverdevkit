@@ -7,7 +7,7 @@ Scope and fidelity
 ------------------
 This is a *tradespace-level* model. We deliberately use closed-form
 spherical-astronomy expressions and a constant solar irradiance instead of
-SPICE/JPL ephemeris look-ups (project_plan.md §4): for the design-variable
+SPICE/JPL ephemeris look-ups: for the design-variable
 sweeps and surrogate-training runs in this project, a few-percent error in
 mean daily insolation is well below the uncertainty introduced by the
 mass-model and terramechanics fits.
@@ -307,9 +307,9 @@ def solar_power_timeseries(
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Generate a power-vs-time profile over one or more lunar diurnal cycles.
 
-    Useful for plotting (notebooks/02_terramechanics_validation.ipynb and
-    later validation notebooks) and as a reference implementation against
-    which the traverse simulator can be sanity-checked.
+    Useful for plotting (see notebooks/paper_figures.ipynb) and as a
+    reference implementation against which the traverse simulator can be
+    sanity-checked.
 
     The default ``noon_hour`` places sunrise at t=0, so the first quarter of
     the synodic day climbs from horizon to zenith. Override it to align with

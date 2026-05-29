@@ -1,6 +1,6 @@
 """Cross-scenario ranking + one-at-a-time sensitivity checks.
 
-Two light-weight Week-5 checks layered on top of the evaluator:
+Two light-weight real-rover validation checks layered on top of the evaluator:
 
 1. :func:`rank_archetypes` runs three hand-crafted design archetypes
    (``large_traverser``, ``polar_survivor``, ``slope_climber``) across
@@ -16,7 +16,7 @@ Two light-weight Week-5 checks layered on top of the evaluator:
 
 Both are a direct response to the "is the evaluator right in the
 right *direction* when parameters change?" question from the project
-plan §6 W5.
+plan §6 real-rover validation.
 """
 
 from __future__ import annotations

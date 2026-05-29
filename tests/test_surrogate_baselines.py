@@ -1,4 +1,4 @@
-"""Unit tests for the Week-6 baseline surrogate models.
+"""Unit tests for the baseline-surrogate baseline surrogate models.
 
 These tests focus on **shape and contract**, not on accuracy:
 
@@ -18,7 +18,7 @@ These tests focus on **shape and contract**, not on accuracy:
 
 A single small in-memory dataset (``n_per_scenario=8`` -> 32 rows) is
 shared across all tests via a module-scoped fixture so the evaluator
-is only invoked once. This dataset is too small to hit the Week-6 R²
+is only invoked once. This dataset is too small to hit the baseline-surrogate R²
 gates, which is intentional: accuracy is measured offline against the
 40k LHS dataset, not in unit tests.
 """

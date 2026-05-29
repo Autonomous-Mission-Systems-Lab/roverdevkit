@@ -1,5 +1,5 @@
 # Scenario 4 — crater rim survey, short traverse, lots of slope changes.
-# See project_plan.md §3.2. Optimizer objective is energy-optimal traverse.
+# Canonical crater-rim traverse scenario; optimizer objective is energy-optimal traverse.
 #
 # `traverse_distance_m` is non-binding (see equatorial_mare_traverse).
 # 25 km is just below the 5-day theoretical reach at max speed / duty
@@ -12,7 +12,13 @@ soil_simulant: Apollo_regolith_nominal
 mission_duration_earth_days: 5.0
 max_slope_deg: 18.0
 sun_geometry: diurnal
-# Schema v6 (W12 step B): per-scenario default ops duty cycle.
+# Schema v6 (v6 schema update): per-scenario default ops duty cycle.
 # Anchored on MER-A/B daily averages (~0.15-0.20 in typical drive
-# sols on uneven terrain). See reports/week12_design/decision.md.
+# sols on uneven terrain). See data/analytical/SCHEMA.md.
 operational_duty_cycle: 0.20
+# Schema v9: scientific-payload mission requirement. Crater-rim survey
+# carries a mid-weight imaging + spectroscopy suite (~4 kg / 5 W).
+# Surrogate LHS samples payload independently; webapp / evaluator
+# default.
+payload_mass_kg: 4.0
+payload_power_w: 5.0

@@ -1,0 +1,46 @@
+# Class-generic mare micro-rover scenario (rediscovery library).
+#
+# Used only by the Layer-5 rediscovery harness
+# (`roverdevkit.validation.rover_rediscovery`). NOT a canonical
+# tradespace scenario (the canonical mare scenario lives in
+# `equatorial_mare_traverse.yaml` and is returned by
+# `list_scenarios()`); this scenario is excluded from
+# `list_scenarios()` and exposed by
+# `list_class_generic_micro_scenarios()` instead.
+#
+# Leakage controls (why this exists as a separate file)
+# -----------------------------------------------------
+# The canonical `equatorial_mare_traverse.yaml` pins
+# `operational_duty_cycle: 0.30`, calibrated against Apollo-17 LRV
+# manned-EVA duty and unmanned long-traverse references. For
+# rediscovery on Yutu-2 / Rashid-1 / Tenacious that calibration is the
+# label the optimiser is trying to recover, so reusing the canonical
+# scenario would let one observable's anchor propagate into the search
+# target. The class-generic library pins all four scenarios to
+# δ_ops = 0.10, a flat class-neutral value that is neither Yutu-2's
+# (~0.001 in real ops) nor Rashid-1's design-target (~0.013) nor
+# Tenacious's design-target.
+#
+# Latitude is shifted to +30 deg — between Yutu-2 (+45 deg Von Karman)
+# and Rashid-1 (+47 deg Atlas) and Tenacious (+60 deg Mare Frigoris)
+# without matching any of them. This is a class-neutral mid-latitude
+# mare position, not a per-rover landing site. Other fields (terrain
+# class, soil, sun_geometry, traverse-distance non-binding budget,
+# duration, max_slope) inherit from the canonical scenario because
+# they are environmental facts rather than per-rover calibration.
+name: mare_micro
+latitude_deg: 30.0
+traverse_distance_m: 80000.0
+terrain_class: mare_nominal
+soil_simulant: Apollo_regolith_nominal
+mission_duration_earth_days: 14.0
+max_slope_deg: 15.0
+sun_geometry: diurnal
+operational_duty_cycle: 0.10
+# Schema v9: payload left at 0 (class-neutral). The rediscovery harness
+# forwards each target rover's published payload as a per-call override
+# to both the rover re-evaluation and every NSGA-II candidate, so the
+# scenario itself carries no per-rover payload label (same leakage
+# logic as the flat δ_ops anchor above).
+payload_mass_kg: 0.0
+payload_power_w: 0.0

@@ -4,7 +4,7 @@ See :mod:`.parametric_mers` for the :func:`estimate_mass` top-level
 function and the :class:`MassModelParams` constants bag. See
 :mod:`.validation` for the published-rover cross-check. The design choice
 to go bottom-up (instead of fitting per-subsystem MERs on n~8 published
-rovers) is recorded in the Week-3 entry of ``project_log.md``.
+rovers) is documented inline in the validation helpers.
 """
 
 from roverdevkit.mass.parametric_mers import (

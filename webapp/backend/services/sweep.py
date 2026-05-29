@@ -9,7 +9,7 @@ soil parameters), runs the chosen backend, and returns a
 Two backends, two performance profiles
 --------------------------------------
 - **Evaluator**: corrected analytical pipeline + wheel-level SCM
-  correction. ~40 ms / cell after the W7.7 lift-out. Ground truth.
+  correction. ~40 ms / cell after the BW/SCM bake-off lift-out. Ground truth.
   Used for ≤ ``EVALUATOR_AUTO_THRESHOLD`` cells in auto mode.
 - **Surrogate**: τ=0.5 head from the quantile bundles. Vectorised --
   one batch ``predict`` over the whole grid. ~5 ms total for any
@@ -165,7 +165,7 @@ def _run_surrogate(
     preds = bundles[spec.target].predict(X, repair_crossings=True)
     # The "0.50" key is added by QuantileHeads.predict for whichever
     # quantile equals 0.5 in the configured triple. Default triple is
-    # (0.05, 0.5, 0.95), so this lookup matches the W8 step-4 contract.
+    # (0.05, 0.5, 0.95), so this lookup matches the quantile-calibration contract.
     if "q50" in preds:
         return np.asarray(preds["q50"], dtype=float)
     # Fallback: pick the entry whose label is closest to 0.5. Defensive

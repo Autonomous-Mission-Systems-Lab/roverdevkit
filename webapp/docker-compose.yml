@@ -1,0 +1,49 @@
+# Docker Compose — RoverDevKit webapp
+#
+# One-command boot for the dockerized tradespace tool. Build context
+# is the repo root so the multi-stage Dockerfile under
+# `webapp/Dockerfile` can reach the package source plus the
+# `data/` and `reports/` artifacts that get baked into the image.
+#
+# Usage from the repo root:
+#
+#     docker compose -f webapp/docker-compose.yml up --build
+#
+# Then open http://localhost:8000.
+#
+# This is the single-process production-style topology: one uvicorn
+# container serves both the FastAPI API and the React SPA off
+# `ROVERDEVKIT_STATIC_DIR=/app/static`. The Vite dev server is
+# **not** part of the compose file — for live frontend reload use
+# `make webapp-dev`, which boots backend on :8000 and the Vite dev
+# server on :5173 with proxying.
+
+services:
+  webapp:
+    build:
+      # Repo root, so COPY can reach `pyproject.toml`, `roverdevkit/`,
+      # `data/`, `reports/`, and `webapp/` in a single context.
+      context: ..
+      dockerfile: webapp/Dockerfile
+    image: roverdevkit/webapp:dev
+    container_name: roverdevkit-webapp
+    ports:
+      - "8000:8000"
+    environment:
+      # CORS: open to the local docker host. Override at deploy time
+      # (HF Spaces / Fly.io) by passing your hosted origin via
+      # ROVERDEVKIT_CORS_ORIGINS.
+      ROVERDEVKIT_CORS_ORIGINS: "http://localhost:8000,http://127.0.0.1:8000"
+      # Static frontend mount (set inside the Dockerfile by default
+      # but echoed here so it's discoverable from `docker inspect`).
+      ROVERDEVKIT_STATIC_DIR: "/app/static"
+    healthcheck:
+      # The /healthz route returns 200 once the artifact loaders have
+      # had a chance to touch the disk. 30s of startup grace covers
+      # the first-ever surrogate bundle load on a slow filesystem.
+      test: ["CMD-SHELL", "python -c \"import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz', timeout=2).status == 200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

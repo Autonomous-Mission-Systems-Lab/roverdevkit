@@ -7,7 +7,7 @@ underlying TPE study is run with a small ``n_trials`` so the suite
 stays well under 30 s on a developer laptop.
 
 Acceptance numbers are measured offline against the 40k LHS dataset
-(see ``reports/week8_tuned_v4/SUMMARY.md``); the unit tests here just
+(see ``reports/tuned_v4/SUMMARY.md``); the unit tests here just
 guard the API contract.
 """
 
@@ -45,7 +45,7 @@ def _split_xy(
 ) -> tuple[pd.DataFrame, np.ndarray]:
     df_clean = valid_rows(df)
     if feasible_only:
-        # Schema v6 (W12 step B): ``FEASIBILITY_COLUMN`` is now ``stalled``
+        # Schema v6 (v6 schema update): ``FEASIBILITY_COLUMN`` is now ``stalled``
         # with positive class = infeasible, so we negate before masking
         # to keep only the feasible (non-stalled) regression rows.
         mask = (~df_clean[FEASIBILITY_COLUMN].astype(bool)).to_numpy()

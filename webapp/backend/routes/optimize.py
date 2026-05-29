@@ -34,6 +34,7 @@ from webapp.backend.loaders import (
     get_quantile_bundles,
     get_soil_for_simulant,
 )
+from webapp.backend.services import apply_scenario_overrides
 from webapp.backend.schemas import (
     OptimizeCancelResponse,
     OptimizeCheckpointOut,
@@ -111,11 +112,12 @@ def optimize(req: OptimizeRequest) -> OptimizeJobResponse:
                 f"Pick one of {sorted(scenarios.keys())}."
             ),
         )
-    scenario = scenarios[req.scenario_name]
-    if req.operational_duty_cycle is not None:
-        scenario = scenario.model_copy(
-            update={"operational_duty_cycle": req.operational_duty_cycle}
-        )
+    scenario = apply_scenario_overrides(
+        scenarios[req.scenario_name],
+        operational_duty_cycle=req.operational_duty_cycle,
+        payload_mass_kg=req.payload_mass_kg,
+        payload_power_w=req.payload_power_w,
+    )
 
     soil = get_soil_for_simulant(scenario.soil_simulant)
     correction = get_correction()
@@ -149,6 +151,12 @@ def optimize(req: OptimizeRequest) -> OptimizeJobResponse:
             population_size=req.population_size,
             n_generations=req.n_generations,
             seed=req.seed,
+            # Live evaluator-backed jobs are interactive: cap chosen so a
+            # worst-case run finishes inside ~2 min wall clock at the
+            # corrected evaluator's ~22 ms/call. Surrogate-backed jobs
+            # are not bound by this cap (the optimizer's own check is
+            # gated on backend == "evaluator").
+            evaluator_eval_cap=5000,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

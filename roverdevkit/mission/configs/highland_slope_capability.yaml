@@ -1,11 +1,16 @@
 # Scenario 3 — highland slope capability, up to 25° slopes.
-# See project_plan.md §3.2. Optimizer objective is usually min-mass
+# Canonical highland slope-capability scenario; optimizer objective is usually min-mass
 # subject to slope-capability ≥ max_slope_deg.
 #
-# `traverse_distance_m` is non-binding (see equatorial_mare_traverse).
-# 20 km is well above the 7-day theoretical reach (~36 km) for most
-# designs once the 25° slope + loose soil combination bites. Range
-# stays dominated by slope physics, not the distance cap.
+# `traverse_distance_m` is binding under v7 + SCM correction: every
+# feasible (non-stalling) design reaches the 20 km cap inside the 7-day
+# mission, so ``range_km`` is essentially a constant on this scenario.
+# Treat range here as a feasibility floor (range > 0 means the rover
+# can move) rather than an optimization objective. The earlier
+# calibration claimed 20 km was non-binding because the pre-correction
+# Bekker-Wong slip estimates over-predicted forward speed on 25° loose
+# regolith, depressing reach below the cap — the SCM correction
+# restored realistic mobility and the cap now binds.
 name: highland_slope_capability
 latitude_deg: 10.0
 traverse_distance_m: 20000.0
@@ -14,8 +19,14 @@ soil_simulant: Apollo_regolith_loose    # worst-case soil for slope climbing
 mission_duration_earth_days: 7.0
 max_slope_deg: 25.0
 sun_geometry: diurnal
-# Schema v6 (W12 step B): per-scenario default ops duty cycle.
+# Schema v6 (v6 schema update): per-scenario default ops duty cycle.
 # Slope-focused missions are systematically slower than nominal
 # terrain missions (more careful traverse planning). See
-# reports/week12_design/decision.md "Per-scenario calibration".
+# the per-scenario calibration rationale.
 operational_duty_cycle: 0.15
+# Schema v9: scientific-payload mission requirement. A slope-capability
+# demonstrator carries a lighter payload (stereo cameras + IMU science,
+# ~3 kg / 3 W) so mobility margin goes to the climb. Surrogate LHS
+# samples payload independently; this is the webapp / evaluator default.
+payload_mass_kg: 3.0
+payload_power_w: 3.0

@@ -1,7 +1,7 @@
-"""Stratified Latin-Hypercube sampler for the Phase-2 analytical dataset.
+"""Stratified Latin-Hypercube sampler for the surrogate-training analytical dataset.
 
 Produces ``(DesignVector, MissionScenario, SoilParameters)`` triples for
-the surrogate training set (``project_plan.md`` §6). The sampler is
+the surrogate training set. The sampler is
 deterministic given its seed; re-running with the same ``seed`` reproduces
 the exact same set of ``(design, scenario)`` pairs and their train/val/
 test split assignment.
@@ -29,7 +29,7 @@ single (10 + 10)-D LHS across each stratum, then unscaled to their
 physical ranges. ``grouser_count`` is drawn from a continuous LHS
 column and rounded to an integer in ``[0, 24]``.
 
-Schema-version note (v7_1, W12 step B follow-on): the
+Schema-version note (v7_1, v7_1 schema follow-on): the
 ``operational_duty_cycle`` column is now drawn from the LHS over
 [0, 0.6] independently of the scenario family, instead of being
 pinned to the family default. The per-family default is retained on
@@ -78,10 +78,10 @@ SplitName = Literal["train", "val", "test"]
 # `grouser_height_m`, and `chassis_mass_kg` so the flown / design-target
 # lunar micro-rovers in `roverdevkit.validation.rover_registry` sit
 # inside the surrogate's training support rather than at corner points
-# of the cube. See project_log.md for the rationale and the registry
+# of the cube. The registry-driven bounds keep flown/design-target rovers
 # entries (Yutu-2 mass ~35 kg ex-payload, Rashid-1 grouser 15 mm,
 # Lunokhod-class wheel widths 20 cm) that motivated the widening.
-# SCHEMA_VERSION v6 (2026-04-28, W12 step B): ``nominal_speed_mps`` is
+# SCHEMA_VERSION v6 (2026-04-28, v6 schema update): ``nominal_speed_mps`` is
 # no longer a free design variable (cruise speed is now derived inside
 # the evaluator from drivetrain torque + slip-balance + energy
 # balance + kinematic envelope) and ``drive_duty_cycle`` is renamed
@@ -95,22 +95,34 @@ SplitName = Literal["train", "val", "test"]
 # entry — the schema bounds here are the floor / ceiling clips, not
 # the prior shape.
 #
-# SCHEMA_VERSION v7 (2026-04-28, W12 step B follow-up): drops
+# SCHEMA_VERSION v7 (2026-04-28, v7 schema follow-up): drops
 # ``designed_duty_cycle`` from the LHS bounds tuple after that field
 # turned out to do no engineering work in the v6 mass model. The
 # only role of δ_des in v6 was to upper-bound δ_eff = min(δ_des,
 # δ_ops); a user can equivalently express that by lowering δ_ops.
 # Drive duty cycle now lives entirely on the scenario.
+#
+# SCHEMA_VERSION v8 (2026-05-27, ultra-micro widening): drops the
+# ``chassis_mass_kg`` / ``peak_wheel_torque_nm`` / ``battery_capacity_wh``
+# LHS floors to match the schema floors lowered in A2 (CADRE/Tenacious
+# registry expansion). The v4-v7_1 surrogate was trained on the
+# narrower (3.0, 0.3, 20.0) floors, which left ultra-micro rovers
+# OOD for the Layer-1 sanity gate and for surrogate-backed
+# rediscovery. The v8 LHS samples chassis ∈ [0.5, 50.0],
+# peak_wheel_torque ∈ [0.05, 20.0] (post-clip; see log-uniform
+# anchor sampling below), battery ∈ [5.0, 500.0]. All other LHS
+# bounds (scenario perturbation ranges, soil envelopes, grouser
+# count etc.) are unchanged from v7_1.
 _CONTINUOUS_DESIGN_BOUNDS: tuple[tuple[str, float, float], ...] = (
     ("wheel_radius_m", 0.05, 0.20),
     ("wheel_width_m", 0.03, 0.20),
     ("grouser_height_m", 0.0, 0.020),
-    ("chassis_mass_kg", 3.0, 50.0),
+    ("chassis_mass_kg", 0.5, 50.0),
     ("wheelbase_m", 0.3, 1.2),
     ("solar_area_m2", 0.1, 1.5),
-    ("battery_capacity_wh", 20.0, 500.0),
+    ("battery_capacity_wh", 5.0, 500.0),
     ("avionics_power_w", 5.0, 40.0),
-    ("peak_wheel_torque_nm", 0.3, 20.0),
+    ("peak_wheel_torque_nm", 0.05, 20.0),
 )
 
 # grouser_count is an integer LHS column
@@ -118,7 +130,7 @@ _GROUSER_COUNT_BOUNDS: tuple[int, int] = (0, 24)
 
 # Scenario-level perturbation columns (per-family base values live in FAMILIES).
 #
-# SCHEMA_VERSION v7_1 (W12 step B follow-on, 2026-04-28): added
+# SCHEMA_VERSION v7_1 (v7_1 schema follow-on, 2026-04-28): added
 # ``operational_duty_cycle`` so the surrogate sees δ_ops as a true LHS
 # feature instead of a per-family constant. The pre-v7_1 dataset
 # pinned δ_ops to the family's published default (mare 0.30, polar
@@ -130,6 +142,15 @@ _GROUSER_COUNT_BOUNDS: tuple[int, int] = (0, 24)
 # the calibrated quantile heads still apply. The per-family default
 # is retained on :class:`ScenarioFamily` because the canonical
 # scenario YAMLs / UI initial slider position still reference it.
+# SCHEMA_VERSION v9 (payload as a mission requirement): added
+# ``payload_mass_kg`` and ``payload_power_w`` so the surrogate sees
+# scientific payload as true LHS features rather than a per-scenario
+# constant. They are appended *after* the soil block so the existing
+# positional indices (latitude 0, duration 1, max_slope 2, δ_ops 3,
+# soil 4-9) are unchanged; payload occupies indices 10-11. Both are
+# sampled family-agnostic uniform on [0, 30] so the entire webapp
+# Mission-Inputs payload slider range is in-distribution (mirrors the
+# v7_1 δ_ops promotion).
 _SCENARIO_PERTURB_COLS: tuple[str, ...] = (
     "latitude_deg",
     "mission_duration_earth_days",
@@ -141,6 +162,8 @@ _SCENARIO_PERTURB_COLS: tuple[str, ...] = (
     "soil_cohesion_kpa",
     "soil_friction_angle_deg",
     "soil_shear_modulus_k_m",
+    "payload_mass_kg",
+    "payload_power_w",
 )
 
 # Per-row δ_ops bounds for the LHS draw. Matches
@@ -148,10 +171,17 @@ _SCENARIO_PERTURB_COLS: tuple[str, ...] = (
 # so the entire frontend slider range is in-distribution.
 _OPERATIONAL_DUTY_CYCLE_BOUNDS: tuple[float, float] = (0.0, 0.6)
 
+# Per-row payload bounds for the LHS draw (schema v9). Match
+# :attr:`MissionScenario.payload_mass_kg` / ``payload_power_w`` schema
+# bounds so the entire frontend Mission-Inputs slider range is
+# in-distribution.
+_PAYLOAD_MASS_KG_BOUNDS: tuple[float, float] = (0.0, 30.0)
+_PAYLOAD_POWER_W_BOUNDS: tuple[float, float] = (0.0, 30.0)
+
 # Unified soil parameter bounds, covering the envelope of the seven
 # simulants in data/soil_simulants.csv. The LHS draws jittered Bekker
 # parameters in these ranges so the surrogate learns a continuous
-# soil-property -> metric mapping (project_plan.md §6). The
+# soil-property -> metric mapping. The
 # scenario-family labels retain physical realism because the terrain
 # class / soil-simulant *name* is still attached to each sample, but
 # the actual Bekker numbers the evaluator sees are the LHS draw.
@@ -188,7 +218,7 @@ class ScenarioFamily:
     mission_duration_range_days: tuple[float, float]
     max_slope_range_deg: tuple[float, float]
     operational_duty_cycle: float
-    """Per-family default ground-ops duty cycle. Schema v6 (W12 step B):
+    """Per-family default ground-ops duty cycle. Schema v6 (v6 schema update):
     each generated :class:`MissionScenario` carries the calibrated δ_ops
     for its family so the LHS dataset sees the same operational anchor
     the canonical YAMLs expose at runtime (mare 0.30, polar 0.05,
@@ -304,8 +334,12 @@ def _assign_splits(n: int, seed: int, val_frac: float, test_frac: float) -> np.n
 # Schema bounds for ``peak_wheel_torque_nm``; the LHS column is mapped
 # log-uniform around a per-row anchor (see ``_build_design_from_lhs_row``)
 # rather than uniform on these bounds, so we keep them as a separate
-# clip rather than driving the unscale.
-_PEAK_TORQUE_NM_FLOOR: float = 0.3
+# clip rather than driving the unscale. The v8 floor (2026-05-27)
+# matches the schema floor lowered in A2 so ultra-micro draws
+# (chassis < 3 kg with the v5-implicit torque anchor ~ 0.04 N·m × the
+# LogUniform(0.5, 3.0) factor) land in the realisable region without
+# being slammed against a hard 0.3 N·m clip.
+_PEAK_TORQUE_NM_FLOOR: float = 0.05
 _PEAK_TORQUE_NM_CEILING: float = 20.0
 # Log-uniform range applied to the v5-implicit anchor (decision.md
 # §"LHS prior on peak_wheel_torque_nm"): a row's anchor is multiplied
@@ -417,6 +451,13 @@ def _build_scenario_and_soil_from_lhs_row(
         lo, hi = _SOIL_BOUNDS[col]
         soil_values[col] = float(_unscale(u_scenario[i : i + 1], lo, hi)[0])
 
+    # Schema v9: payload columns occupy indices 10-11 (after the soil
+    # block), sampled family-agnostic uniform on their schema bounds.
+    pm_lo, pm_hi = _PAYLOAD_MASS_KG_BOUNDS
+    pp_lo, pp_hi = _PAYLOAD_POWER_W_BOUNDS
+    payload_mass = float(_unscale(u_scenario[10:11], pm_lo, pm_hi)[0])
+    payload_power = float(_unscale(u_scenario[11:12], pp_lo, pp_hi)[0])
+
     scenario = MissionScenario(
         name=family.name,
         latitude_deg=latitude,
@@ -427,6 +468,8 @@ def _build_scenario_and_soil_from_lhs_row(
         max_slope_deg=max_slope,
         sun_geometry=family.sun_geometry,
         operational_duty_cycle=ops_duty,
+        payload_mass_kg=payload_mass,
+        payload_power_w=payload_power,
     )
     soil = SoilParameters(
         n=soil_values["soil_n"],
@@ -452,7 +495,7 @@ def generate_samples(
     val_frac: float = 0.1,
     test_frac: float = 0.1,
 ) -> list[LHSSample]:
-    """Generate a stratified LHS over the Phase-2 design space.
+    """Generate a stratified LHS over the surrogate-training design space.
 
     Parameters
     ----------

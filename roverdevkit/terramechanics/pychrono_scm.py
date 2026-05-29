@@ -29,10 +29,10 @@ Signed forces on the wheel are pulled from ``SCMTerrain.GetContactForceBody``
 at every step and averaged over the steady-state window to build the returned
 ``WheelForces``.
 
-Path 2 of the three-path data generation strategy (see project_plan.md §5).
+Optional high-fidelity path for wheel-soil data generation.
 Heavier than the analytical path by 2-4 orders of magnitude, so used for
-(a) Week-2 wiring validation, (b) Week-5 calibration data for the
-correction layer, (c) Week-9 targeted validation runs.
+(a) PyChrono integration wiring validation, (b) real-rover validation calibration data for the
+correction layer, (c) error-budget targeted validation runs.
 
 Known environment quirk
 -----------------------
@@ -283,7 +283,7 @@ def single_wheel_forces_scm(
     # Chrono convention: ChLinkMotorLinearSpeed, ChLinkLockPrismatic, and
     # ChLinkMotorRotationSpeed all use the joint frame's **Z-axis** as
     # their primary axis. Verified empirically with the identity-frame test
-    # (see project_log.md Week-2 entry).
+    # as a smoke test for the optional PyChrono integration.
     #
     # x_motor: drive along world +X → rotate local Z to world X via
     #          QuatFromAngleY(+π/2), since R_y(π/2)·ẑ = x̂.

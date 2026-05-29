@@ -1,22 +1,22 @@
 """Top-level mission evaluator.
 
-This is the **primary artifact** of the project (project_plan.md §2). After
-the W7.7 traverse-loop lift-out it runs in ~40 ms / mission with the
+This is the **primary artifact** of the package. After
+the BW/SCM bake-off traverse-loop lift-out it runs in ~40 ms / mission with the
 wheel-level SCM correction enabled (~30 ms BW-only); the
 :mod:`roverdevkit.surrogate` layer is an *optional* acceleration and
 uncertainty layer used for NSGA-II inner loops, batch sensitivity studies,
-and prediction-interval calibration. Most Phase-3 workflows can run against
+and prediction-interval calibration. Most webapp workflows can run against
 this evaluator directly. Every ML claim in the paper is grounded in what
 this function computes.
 
 Capability envelope vs operational utilisation
 ----------------------------------------------
-Schema v6 (W12 step B) introduced an explicit
+Schema v6 (v6 schema update) introduced an explicit
 engineering-vs-operations duty-cycle split (``designed_duty_cycle``
 on the design vector vs ``operational_duty_cycle`` on the scenario,
 with the evaluator running the loop at ``δ_eff = min(δ_des, δ_ops)``)
 to match the same distinction JPL Team X and ESA CDF studies use.
-Schema v7 (W12 step B follow-up) collapsed that split back into a
+Schema v7 (v7 schema follow-up) collapsed that split back into a
 single per-scenario ``operational_duty_cycle`` after
 ``designed_duty_cycle`` turned out to do no engineering work in the
 v6 mass model — the only role of ``δ_des`` was to upper-bound
@@ -55,9 +55,9 @@ Design notes
   does not short-circuit on design failures. Constraint flags
   (``thermal_survival``, ``stalled``) and continuous metrics
   (``energy_margin_pct``, ``range_km``) encode the failure modes instead.
-  This is critical for training the Phase-2 surrogate over the full
+  This is critical for training the surrogate-training surrogate over the full
   design space including infeasible regions.
-- Schema v6 (W12 step B): ``stalled`` replaces the v5 ``motor_torque_ok``
+- Schema v6 (v6 schema update): ``stalled`` replaces the v5 ``motor_torque_ok``
   field. The stall gate is now an explicit comparison against
   :attr:`roverdevkit.schema.DesignVector.peak_wheel_torque_nm` — the
   drivetrain stalls when the slip-balance torque demand exceeds that
@@ -100,13 +100,13 @@ from roverdevkit.terramechanics.soils import get_soil_parameters
 class DetailedEvaluation:
     """Full evaluator output: headline metrics plus supporting artefacts.
 
-    Returned by :func:`evaluate_verbose`. Phase-2 dataset generation needs
+    Returned by :func:`evaluate_verbose`. surrogate-training dataset generation needs
     the :class:`TraverseLog` so it can compute aggregate sub-model stats
     (peak/mean/p95 of drawbar pull, sinkage, motor torque, solar power,
     battery SOC) that the single-scalar :class:`MissionMetrics` does not
     expose. The :class:`MassBreakdown` is kept alongside so per-subsystem
     mass is recoverable without re-running the mass model. The full
-    :class:`ThermalResult` is also surfaced (Phase-3 web app reads
+    :class:`ThermalResult` is also surfaced (webapp web app reads
     peak / cold temperatures so the constraint chip can explain *why*
     a survival flag fired).
     """
@@ -141,7 +141,7 @@ def _energy_margin_raw_pct(log: TraverseLog) -> float:
 
     Defined as ``(E_generated - E_consumed) / E_consumed * 100``,
     unbounded on both sides. Negative ⇒ net energy deficit; >0 ⇒ surplus
-    generation. Used by the Phase-2 surrogate because it does not
+    generation. Used by the surrogate-training surrogate because it does not
     saturate when SOC sits at 1.0 (benign scenarios) or at the DoD floor
     (polar night), unlike :func:`_energy_margin_pct`.
 
@@ -171,11 +171,15 @@ def evaluate_verbose(
     correction: WheelLevelCorrection | None = None,
     force_backend: str = "bw",
     operational_duty_cycle: float | None = None,
+    payload_mass_kg: float | None = None,
+    payload_power_w: float | None = None,
+    panel_tilt_deg: float = 0.0,
+    panel_azimuth_deg: float = 180.0,
 ) -> DetailedEvaluation:
     """Full evaluator: headline metrics plus traverse log and mass breakdown.
 
     Same physics pipeline as :func:`evaluate`, but returns the supporting
-    artefacts needed by the Phase-2 dataset builder (aggregate sub-model
+    artefacts needed by the surrogate-training dataset builder (aggregate sub-model
     statistics from the :class:`TraverseLog`) and per-subsystem mass
     introspection for validation.
 
@@ -197,11 +201,11 @@ def evaluate_verbose(
         Mars-gravity Sojourner sentinel was removed (2026-04-25).
     soil_override
         Optional :class:`SoilParameters` to use instead of the
-        catalogue lookup on ``scenario.soil_simulant``. The Phase-2
+        catalogue lookup on ``scenario.soil_simulant``. The surrogate-training
         LHS sweep uses this to inject per-sample jittered Bekker
         parameters so the surrogate learns a continuous soil → metric
         mapping instead of a four-category one
-        (``project_plan.md`` §6).
+        used by the surrogate-training workflow.
     use_scm_correction
         When ``True`` and ``correction`` is ``None``, loads the
         production wheel-level correction artifact from
@@ -219,17 +223,40 @@ def evaluate_verbose(
         joblib-loading on every evaluate.
     force_backend
         Wheel-level force backend (``"bw"`` default or ``"scm"`` for
-        the Week-7.7 bake-off — runs PyChrono SCM directly inside the
+        the BW/SCM bake-off bake-off — runs PyChrono SCM directly inside the
         slip solve). ``"scm"`` ignores ``correction`` /
         ``use_scm_correction`` since SCM-direct is the ground truth
         the correction tries to approximate.
     operational_duty_cycle
-        Schema v6 (W12 step B): per-call override of
+        Schema v6 (v6 schema update): per-call override of
         ``scenario.operational_duty_cycle``. ``None`` (default) uses
-        the scenario YAML's calibrated value. Schema v7 (W12 step B
+        the scenario YAML's calibrated value. Schema v7 (v6 schema update
         follow-up) uses this value directly as ``δ_eff`` (clamped to
         ``[0, 1]``); the v6 ``min(δ_des, δ_ops)`` cap collapsed when
         ``designed_duty_cycle`` was removed from the design vector.
+    payload_mass_kg, payload_power_w
+        Schema v9: per-call override of the scenario's
+        ``payload_mass_kg`` / ``payload_power_w`` mission-requirement
+        fields. ``None`` (default) uses the scenario YAML values.
+        ``payload_mass_kg`` is added to total vehicle mass as a
+        top-level line item outside the dry-mass growth margin;
+        ``payload_power_w`` is added to the continuous ops-time
+        electrical load (alongside avionics) and to the hot-case
+        thermal dissipation. The rediscovery harness forwards a
+        rover's published payload to both the rover re-evaluation and
+        every NSGA-II individual so the comparison stays
+        apples-to-apples.
+    panel_tilt_deg, panel_azimuth_deg
+        Solar-array orientation forwarded to
+        :func:`roverdevkit.mission.traverse_sim.run_traverse`.
+        Defaults match the simulator's historical horizontal /
+        south-facing panel; pass non-zero values to model
+        polar-deployable arrays whose surface normals track the
+        low-elevation sun (see
+        :class:`roverdevkit.validation.rover_registry.RoverRegistryEntry`
+        for per-rover values, and the rediscovery harness for the
+        scenario-driven ``tilt = min(80, |latitude|)`` override
+        used at high latitudes).
     """
     if correction is None and use_scm_correction and force_backend != "scm":
         correction = load_correction_or_none(DEFAULT_CORRECTION_PATH, on_missing="warn")
@@ -241,7 +268,18 @@ def evaluate_verbose(
         mass_params = dataclasses.replace(mass_params, gravity_moon_m_per_s2=gravity_m_per_s2)
     active_g = mass_params.gravity_moon_m_per_s2
 
-    breakdown: MassBreakdown = estimate_mass_from_design(design, params=mass_params)
+    # Schema v9: resolve payload mission requirements (per-call override
+    # falls back to the scenario default).
+    payload_mass = (
+        scenario.payload_mass_kg if payload_mass_kg is None else payload_mass_kg
+    )
+    payload_power = (
+        scenario.payload_power_w if payload_power_w is None else payload_power_w
+    )
+
+    breakdown: MassBreakdown = estimate_mass_from_design(
+        design, params=mass_params, payload_mass_kg=payload_mass
+    )
     total_mass_kg = breakdown.total_kg
 
     if thermal_architecture is None:
@@ -253,7 +291,9 @@ def evaluate_verbose(
         thermal_architecture = default_architecture_for_design(surface_area_m2=surface_area_m2)
     thermal_result = evaluate_thermal(
         thermal_architecture,
-        design.avionics_power_w,
+        # Schema v9: payload power dissipates as heat in the hot case,
+        # so it adds to the operating-mode internal load.
+        design.avionics_power_w + payload_power,
         scenario.latitude_deg,
     )
     thermal_ok = thermal_result.survives
@@ -285,6 +325,9 @@ def evaluate_verbose(
         correction=correction,
         force_backend=force_backend,
         operational_duty_cycle_override=operational_duty_cycle,
+        payload_power_w=payload_power,
+        panel_tilt_deg=panel_tilt_deg,
+        panel_azimuth_deg=panel_azimuth_deg,
     )
 
     range_km = float(log.position_m[-1]) / 1000.0
@@ -337,13 +380,17 @@ def evaluate(
     correction: WheelLevelCorrection | None = None,
     force_backend: str = "bw",
     operational_duty_cycle: float | None = None,
+    payload_mass_kg: float | None = None,
+    payload_power_w: float | None = None,
+    panel_tilt_deg: float = 0.0,
+    panel_azimuth_deg: float = 180.0,
 ) -> MissionMetrics:
     """Run the full mission evaluator on one design in one scenario.
 
     Thin wrapper around :func:`evaluate_verbose` that discards the
     :class:`TraverseLog` and :class:`MassBreakdown`. This is the
     canonical public entry point; callers that need the supporting
-    artefacts (e.g. the Phase-2 dataset builder) should call
+    artefacts (e.g. the surrogate-training dataset builder) should call
     ``evaluate_verbose`` directly.
     """
     return evaluate_verbose(
@@ -357,4 +404,8 @@ def evaluate(
         correction=correction,
         force_backend=force_backend,
         operational_duty_cycle=operational_duty_cycle,
+        payload_mass_kg=payload_mass_kg,
+        payload_power_w=payload_power_w,
+        panel_tilt_deg=panel_tilt_deg,
+        panel_azimuth_deg=panel_azimuth_deg,
     ).metrics

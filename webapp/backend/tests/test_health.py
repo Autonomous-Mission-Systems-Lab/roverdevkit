@@ -35,9 +35,10 @@ def test_version_returns_metadata(client: TestClient) -> None:
         "quantile_bundles_path",
     }
     assert body["api_version"] == "0.1.0"
-    # Schema v7_1 (W12 step B follow-on): dataset_version bumped to
-    # "v7_1" when ``operational_duty_cycle`` was promoted from a per-
-    # family constant to a per-row LHS feature uniform on [0, 0.6].
-    # See ``data/analytical/SCHEMA.md`` and
+    # Schema v9: dataset_version bumped to "v9" when scientific payload
+    # was promoted from a per-rover ``chassis_mass_kg`` convention to two
+    # explicit mission-requirement inputs (``payload_mass_kg`` /
+    # ``payload_power_w``), each an LHS feature uniform on [0, 30]. See
+    # ``data/analytical/SCHEMA.md`` and
     # ``webapp/backend/config.py::get_settings``.
-    assert body["dataset_version"] == "v7_1"
+    assert body["dataset_version"] == "v9"
