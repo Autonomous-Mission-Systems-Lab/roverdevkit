@@ -1,8 +1,6 @@
 {
   "scenario_name": "crater_rim_survey",
   "backend": "evaluator",
-  "correction_path": "data/scm/correction_v1.joblib",
-  "correction_enabled": true,
   "dataset_version": "v9",
   "objectives": [
     {
@@ -30,7 +28,7 @@
   "seed": 12,
   "panel_tilt_deg": 0.0,
   "panel_azimuth_deg": 180.0,
-  "elapsed_s": 70.4813863330055,
+  "elapsed_s": 34.0084458750207,
   "pareto_size": 50,
   "front_csv": "reports/pareto_fronts/front_crater_rim_survey.csv"
 }

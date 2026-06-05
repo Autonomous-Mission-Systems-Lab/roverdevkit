@@ -256,7 +256,6 @@ export interface EvaluateResponse {
    * `DesignVector.nominal_speed_mps` design input.
    */
   cruise_speed_mps: number;
-  used_scm_correction: boolean;
   elapsed_ms: number;
 }
 
@@ -368,7 +367,6 @@ export interface SweepResponse {
   z_values: number[] | number[][];
   backend_used: "evaluator" | "surrogate";
   backend_requested: SweepBackend;
-  used_scm_correction: boolean;
   n_cells: number;
   elapsed_ms: number;
   sensitivity: SweepSensitivity;
@@ -504,61 +502,6 @@ export interface RegistryListResponse {
 }
 
 /**
- * Mirror of the FastAPI `RediscoveryBackend` literal. The evaluator
- * sweep is the source of truth (corrected-evaluator-truth fronts);
- * the v8 surrogate sweep is offered as a wall-clock benchmark
- * alongside it. See `reports/rediscovery_loo_comparison.md` for the
- * 2026-05-28 panel-tilt fix that makes the polar trio's energy
- * margins physically defensible under the evaluator backend.
- */
-export type RediscoveryBackend = "evaluator" | "surrogate";
-
-export interface RediscoveryParetoPoint {
-  design: DesignVector;
-  metrics: Record<string, number>;
-}
-
-export interface RediscoverySummary {
-  /** URL-safe identifier matching the per-rover JSON file stem. */
-  slug: string;
-  /** Human-readable name from the registry (e.g. `"CADRE-unit"`). */
-  rover_name: string;
-  /** True for rovers that have actually flown (Pragyan, Yutu-2). */
-  is_flown: boolean;
-  /** Class-generic `*_micro` scenario the rediscovery harness used. */
-  class_generic_scenario: string;
-  backend: RediscoveryBackend;
-  design_space_distance: number;
-  pareto_dominated: boolean;
-  mass_budget_kg: number;
-  pareto_front_size: number;
-}
-
-export interface RediscoveryListResponse {
-  backend: RediscoveryBackend;
-  rovers: RediscoverySummary[];
-}
-
-export interface RediscoveryDetail {
-  slug: string;
-  rover_name: string;
-  is_flown: boolean;
-  class_generic_scenario: string;
-  backend: RediscoveryBackend;
-  rover_design: DesignVector;
-  rover_metrics_under_generic_scenario: Record<string, number>;
-  design_space_distance: number;
-  pareto_dominated: boolean;
-  mass_budget_kg: number;
-  integer_matches: Record<string, boolean>;
-  per_variable_percent_errors: Record<string, number>;
-  nearest_pareto_index: number;
-  nearest_pareto_design: DesignVector;
-  nearest_pareto_metrics: Record<string, number>;
-  pareto_front: RediscoveryParetoPoint[];
-}
-
-/**
  * Static design-space bounds, kept aligned with
  * `roverdevkit/schema.py::DesignVector`. The form uses these for
  * range validation, slider extents, and step sizes; if the Python
@@ -621,8 +564,7 @@ export const DESIGN_BOUNDS: Record<keyof DesignVector, FieldBounds> = {
     step: 0.1,
     unit: "kg",
     label: "Chassis mass",
-    description:
-      "m_c, dry chassis mass (subsystem masses are added by the model). Floor lowered to 0.5 kg to admit CADRE / Tenacious-class ultra-micro rovers; designs below 3 kg are outside the v4 surrogate's training support and fall back to the deterministic evaluator (no PIs).",
+    description: "m_c, dry chassis mass.",
   },
   wheelbase_m: {
     min: 0.3,
@@ -646,8 +588,7 @@ export const DESIGN_BOUNDS: Record<keyof DesignVector, FieldBounds> = {
     step: 1,
     unit: "Wh",
     label: "Battery capacity",
-    description:
-      "C_b, usable battery capacity. Floor lowered to 5 Wh to admit CADRE-class flotilla rovers; designs below 20 Wh are outside the v4 surrogate's training support.",
+    description: "C_b, usable battery capacity.",
   },
   avionics_power_w: {
     min: 5,
@@ -663,8 +604,7 @@ export const DESIGN_BOUNDS: Record<keyof DesignVector, FieldBounds> = {
     step: 0.01,
     unit: "Nm",
     label: "Peak wheel torque",
-    description:
-      "T_hub^peak, peak per-wheel hub torque the drivetrain (motor + gearbox combined) can sustain. Sizes motor mass and gates whether the rover stalls on slope; cruise speed is derived from this and the slip-balance torque demand. Floor lowered to 0.05 Nm to admit CADRE-class flotilla rovers; designs below 0.3 Nm are outside the v4 surrogate's training support.",
+    description: "T_hub^peak, peak per-wheel hub torque.",
   },
 };
 
@@ -684,8 +624,7 @@ export const PAYLOAD_BOUNDS: Record<
     step: 0.5,
     unit: "kg",
     label: "Payload mass",
-    description:
-      "m_payload, scientific-instrument mass. A mission requirement added to total vehicle mass outside the dry-mass growth margin.",
+    description: "m_payload, scientific-instrument mass.",
   },
   payload_power_w: {
     min: 0,
@@ -693,8 +632,7 @@ export const PAYLOAD_BOUNDS: Record<
     step: 0.5,
     unit: "W",
     label: "Payload power",
-    description:
-      "P_payload, continuous ops-time instrument power. Adds to the electrical load alongside avionics in the traverse budget.",
+    description: "P_payload, continuous instrument power draw.",
   },
 };
 
@@ -706,25 +644,21 @@ export const TARGET_META: Record<
   range_km: {
     label: "Range",
     unit: "km",
-    description:
-      "Distance the rover can traverse during the scenario at its commanded drive duty cycle.",
+    description: "Traverse distance in the scenario.",
   },
   energy_margin_raw_pct: {
     label: "Energy margin",
     unit: "%",
-    description:
-      "(Energy generated − energy used) / energy used over the traverse. Positive values mean surplus solar generation; large positive values are typical for energy-rich designs.",
+    description: "Solar surplus over energy used.",
   },
   slope_capability_deg: {
     label: "Slope capability",
     unit: "deg",
-    description:
-      "Steepest slope the rover can sustain on the scenario's soil at its commanded speed.",
+    description: "Max sustainable slope on scenario soil.",
   },
   total_mass_kg: {
     label: "Total mass",
     unit: "kg",
-    description:
-      "Estimated dry mass of the rover, including chassis, motors, structure, power, and avionics.",
+    description: "Rover dry mass.",
   },
 };

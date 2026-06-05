@@ -17,11 +17,6 @@ on top of the corrected evaluator that exists for:
 6. Deployment portability (a pickled XGBoost is much smaller than the
    full evaluator stack).
 
-The wheel-level multi-fidelity correction lives elsewhere — see
-:class:`roverdevkit.terramechanics.correction_model.WheelLevelCorrection`
-— and is composed into the analytical traverse loop directly, not via
-this package.
-
 Modules:
 
 - :mod:`.sampling` — stratified Latin-Hypercube sampler over the 12-D

@@ -142,9 +142,7 @@ function sweepCaption(data: ReturnType<typeof useSweep>["data"]): string {
   if (!data) return "";
   const backendLabel =
     data.backend_used === "evaluator"
-      ? data.used_scm_correction
-        ? "corrected evaluator (ground truth)"
-        : "evaluator (BW-only fallback)"
+      ? "Bekker–Wong evaluator (ground truth)"
       : "surrogate (calibrated)";
   const elapsed =
     data.elapsed_ms < 1000

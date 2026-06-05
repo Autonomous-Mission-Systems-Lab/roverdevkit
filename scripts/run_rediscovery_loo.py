@@ -96,7 +96,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=1000,
         help=(
             "Evaluator-backend NSGA-II evaluation cap per seed. Default 1000 "
-            "matches the webapp safety cap; paper-grade runs typically use "
+            "matches the webapp safety cap; high-budget runs typically use "
             "10_000-25_000."
         ),
     )

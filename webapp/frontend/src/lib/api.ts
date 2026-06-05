@@ -19,9 +19,6 @@ import type {
   OptimizeResultResponse,
   PredictRequest,
   PredictResponse,
-  RediscoveryBackend,
-  RediscoveryDetail,
-  RediscoveryListResponse,
   RegistryListResponse,
   ScenarioListResponse,
   ShapExplainRequest,
@@ -116,14 +113,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify(req),
     }),
-  listRediscovery: (backend: RediscoveryBackend) =>
-    request<RediscoveryListResponse>(
-      `/validate/rediscovery?backend=${backend}`,
-    ),
-  getRediscoveryDetail: (slug: string, backend: RediscoveryBackend) =>
-    request<RediscoveryDetail>(
-      `/validate/rediscovery/${encodeURIComponent(slug)}?backend=${backend}`,
-    ),
 };
 
 export { ApiError };

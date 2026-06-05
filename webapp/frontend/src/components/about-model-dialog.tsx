@@ -18,12 +18,6 @@ const PRIMARY_TARGETS: Array<{
   { label: "Total mass", medianR2: "1.000", coverage: "91.5%" },
 ];
 
-const CORRECTION_TARGETS: Array<{ label: string; r2: string }> = [
-  { label: "Drawbar pull", r2: "0.965" },
-  { label: "Driving torque", r2: "0.912" },
-  { label: "Sinkage", r2: "0.913" },
-];
-
 export function AboutModelDialog({ children }: { children: React.ReactNode }) {
   return (
     <Dialog>
@@ -72,47 +66,14 @@ export function AboutModelDialog({ children }: { children: React.ReactNode }) {
             </p>
             <p className="mt-2 text-[var(--color-muted-foreground)]">
               <span className="font-medium text-[var(--color-foreground)]">
-                Wheel&ndash;soil correction layer.
+                Wheel&ndash;soil model.
               </span>{" "}
               Inside each mission, wheel forces are computed analytically with
               Bekker&ndash;Wong, augmented with an engaged-grouser shear-thrust
               term that scales tractive shear stress with grouser height and
               count up to a saturation cap matching the Iizuka &amp; Kubota
-              lab-reported asymptote. A learned correction term then shifts
-              the analytical forces toward the higher-fidelity Soil Contact
-              Model (SCM) implemented in PyChrono. The correction was fit on
-              500 wheel-level operating points evaluated under both models:
-              three XGBoost regressors learn the residuals (&Delta;drawbar
-              pull, &Delta;driving torque, &Delta;sinkage) from a 12-D feature
-              vector (vertical load, slip, wheel geometry, soil parameters);
-              they run in well under a millisecond per call so they can be
-              composed inside the mission loop without changing simulator
-              wall-clock noticeably.
+              lab-reported asymptote.
             </p>
-            <div className="mt-3 overflow-hidden rounded-md border">
-              <table className="w-full text-xs">
-                <thead className="bg-[var(--color-muted)] text-[var(--color-muted-foreground)]">
-                  <tr>
-                    <th className="px-3 py-1.5 text-left font-medium">
-                      Wheel-level correction target
-                    </th>
-                    <th className="px-3 py-1.5 text-right font-medium">
-                      Test R²
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {CORRECTION_TARGETS.map((row) => (
-                    <tr key={row.label} className="border-t">
-                      <td className="px-3 py-1.5">{row.label}</td>
-                      <td className="px-3 py-1.5 text-right tabular-nums">
-                        {row.r2}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
             <p className="mt-3 text-[var(--color-muted-foreground)]">
               <span className="font-medium text-[var(--color-foreground)]">
                 Where it is used.
@@ -229,9 +190,10 @@ export function AboutModelDialog({ children }: { children: React.ReactNode }) {
                 run mission profiles outside the canonical scenario set.
               </li>
               <li>
-                The wheel-soil correction is learned from PyChrono SCM, not
-                from physical lunar regolith data, so absolute accuracy is
-                bounded by SCM&rsquo;s own validation envelope.
+                The Bekker&ndash;Wong wheel-soil model carries the published
+                ~15&ndash;30% model-form error for single-wheel drawbar pull
+                and sinkage, so absolute mobility accuracy is bounded
+                accordingly.
               </li>
             </ul>
           </section>

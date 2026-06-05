@@ -77,15 +77,6 @@ Open <http://localhost:5173> after the frontend server starts.
   fronts.
 - **Explain Design** shows SHAP-style feature attributions for the active
   design and selected target.
-- **Rediscovery Validation** overlays each registry rover's published
-  design point on the optimizer's leave-one-out NSGA-II Pareto front
-  under its class-generic `*_micro` scenario. Backed by the
-  precomputed artifacts under `reports/rediscovery_loo_evaluator/`
-  (every Pareto point is corrected-evaluator output) and
-  `reports/rediscovery_loo_surrogate_v9/` (faster surrogate-backed
-  reference). This is the live, in-app rendering of the Layer-5
-  rover-rediscovery validation summarised in the top-level
-  `README.md`.
 
 ## Canonical Pareto Fronts
 
@@ -101,8 +92,7 @@ documentation figures and notebook fixtures; the evaluator is
 deterministic and each file is small (~14 kB), so they are committed
 to the repo for reproducibility.
 
-Regenerate them whenever scenario configs or the wheel-level correction
-artifact change:
+Regenerate them whenever scenario configs change:
 
 ```bash
 make pareto-fronts
@@ -114,9 +104,9 @@ Pass extra arguments through `SCRIPT_ARGS`:
 make pareto-fronts SCRIPT_ARGS="--population-size 80 --generations 80"
 ```
 
-The default settings (50-point population, 60 generations, BW + SCM
-evaluator) complete all four canonical scenarios in about 4 minutes on a
-laptop.
+The default settings (50-point population, 60 generations, analytical
+Bekker-Wong evaluator) complete all four canonical scenarios in about
+4 minutes on a laptop.
 
 ## Docker / Hosted Deploy
 
@@ -124,27 +114,17 @@ A multi-stage [`webapp/Dockerfile`](Dockerfile) builds the React frontend
 with Node 20 LTS, then installs the Python package + the `[webapp]`
 extras on top of `python:3.12-slim` and bakes in:
 
-- the corrected mission evaluator and the wheel-level SCM correction
-  (`data/scm/correction_v1.joblib`),
+- the analytical Bekker-Wong mission evaluator,
 - the v9 quantile-XGB surrogate bundles
   (`reports/surrogate_v9/quantile_bundles.joblib`),
 - the canonical Pareto fronts (`reports/pareto_fronts/`),
-- the rediscovery LOO artifacts
-  (`reports/rediscovery_loo_evaluator/`,
-  `reports/rediscovery_loo_surrogate_v9/`),
 - the built React frontend at `/app/static`.
 
 The runtime image runs a single `uvicorn` process that serves the
 FastAPI backend at `/healthz`, `/predict`, `/evaluate`, `/sweep`,
-`/optimize`, `/shap`, `/registry`, `/scenarios`, and
-`/validate/rediscovery`, and serves the React SPA off
+`/optimize`, `/shap`, `/registry`, `/scenarios`, and serves the React SPA off
 `ROVERDEVKIT_STATIC_DIR=/app/static` with a history-mode catch-all so
 deep links survive a hard refresh.
-
-PyChrono is **not** installed in the image. The runtime evaluator
-loads the wheel-level SCM correction from a precomputed `joblib`
-blob; regenerating that blob requires the conda PyChrono build and is
-done outside Docker via `scripts/run_scm_sweep.py`.
 
 ### Local boot via Docker Compose
 
@@ -173,7 +153,7 @@ through this checklist:
 
 - [ ] `docker build -f webapp/Dockerfile -t roverdevkit/webapp:dev .`
       succeeds locally; record the resulting image size (~700 MB
-      compressed for the v9 + rediscovery + correction bundle).
+      compressed for the v9 surrogate bundle).
 - [ ] `docker run --rm -p 8000:8000 roverdevkit/webapp:dev` boots
       cleanly; `curl localhost:8000/healthz` returns
       `{"status":"ok","surrogate_loaded":true,...}`.
@@ -187,29 +167,22 @@ through this checklist:
 - [ ] Confirm the image runs as `roverdevkit` (UID 1000) — Fly.io,
       HF Spaces, and most K8s pod-security policies require non-root.
 - [ ] If the deploy uses a persistent volume to mount alternate
-      surrogate / correction artefacts, point the volume at
+      surrogate artefacts, point the volume at
       `/app/reports/surrogate_v9/quantile_bundles.joblib` (or
       override via `ROVERDEVKIT_QUANTILE_BUNDLES`); see
       `webapp/backend/config.py` for the full env-var surface.
 - [ ] (HF Spaces) drop a `Dockerfile` symlink or a one-line
       `Spaces config: docker` block at the repo root that points at
       `webapp/Dockerfile`.
-- [ ] Smoke-test `GET /validate/rediscovery` and
-      `GET /validate/rediscovery/pragyan` against the hosted URL —
-      these touch the rediscovery JSON tree and confirm the
-      committed artefacts shipped intact.
 
 ### Image size and build context
 
 `.dockerignore` at the repo root excludes the LHS training corpora
-(`data/analytical/`, `data/scm/runs_*.parquet`), the training-time
-reports (`reports/baselines_*`, `reports/tuned_*`,
-`reports/validation_*`, `reports/intervals_*`) and any superseded
-surrogate versions (`reports/surrogate_v7_1/`, `reports/surrogate_v8/`),
-and Node / Python build caches. Only the runtime artefacts the backend
-actually loads — `reports/surrogate_v9/quantile_bundles.joblib`, the
-Pareto fronts, and the rediscovery LOO trees — are baked into the
-image.
+(`data/analytical/`), the training-time reports, any superseded
+surrogate versions, and Node / Python build caches. Only the runtime
+artefacts the backend actually loads — the current surrogate bundle
+(`reports/surrogate_v9/quantile_bundles.joblib`) and the Pareto fronts
+— are baked into the image.
 
 ## Tests
 

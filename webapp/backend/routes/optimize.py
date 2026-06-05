@@ -30,7 +30,6 @@ from roverdevkit.tradespace.optimizer import (
 )
 from webapp.backend.loaders import (
     get_canonical_scenarios,
-    get_correction,
     get_quantile_bundles,
     get_soil_for_simulant,
 )
@@ -120,7 +119,6 @@ def optimize(req: OptimizeRequest) -> OptimizeJobResponse:
     )
 
     soil = get_soil_for_simulant(scenario.soil_simulant)
-    correction = get_correction()
     bundles = None
     if req.backend == "surrogate":
         try:
@@ -144,7 +142,6 @@ def optimize(req: OptimizeRequest) -> OptimizeJobResponse:
             scenario,
             soil,
             bundles=bundles,
-            correction=correction,
             backend=req.backend,
             objectives=objectives,
             constraints=constraints,
@@ -153,7 +150,7 @@ def optimize(req: OptimizeRequest) -> OptimizeJobResponse:
             seed=req.seed,
             # Live evaluator-backed jobs are interactive: cap chosen so a
             # worst-case run finishes inside ~2 min wall clock at the
-            # corrected evaluator's ~22 ms/call. Surrogate-backed jobs
+            # analytical evaluator's ~22 ms/call. Surrogate-backed jobs
             # are not bound by this cap (the optimizer's own check is
             # gated on backend == "evaluator").
             evaluator_eval_cap=5000,

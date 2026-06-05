@@ -151,49 +151,6 @@ def test_denser_soil_boosts_slope_capability(
     assert dense.slope_capability_deg > loose.slope_capability_deg
 
 
-@pytest.mark.integration
-def test_scm_correction_loads_when_artifact_present(
-    rashid_like_design: DesignVector, equatorial_scenario: MissionScenario
-) -> None:
-    """SCM-correction: ``use_scm_correction=True`` must successfully run and
-    must produce metrics that **differ** from the BW-only baseline when
-    the canonical artifact is on disk. If it is absent (e.g. a fresh
-    clone before the SCM-correction build), the call still succeeds (graceful
-    fallback with a warning) but returns BW-identical metrics — which
-    is captured here by allowing equality in that case.
-    """
-    from roverdevkit.terramechanics.correction_model import DEFAULT_CORRECTION_PATH
-
-    bw = evaluate(rashid_like_design, equatorial_scenario, use_scm_correction=False)
-
-    # Either succeeds-and-applies-correction, or warn-and-falls-back to BW.
-    import warnings
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("always")
-        scm = evaluate(rashid_like_design, equatorial_scenario, use_scm_correction=True)
-
-    if DEFAULT_CORRECTION_PATH.exists():
-        # Production artifact present → at least one mobility-driven
-        # metric must move. ``range_km`` saturates at the scenario's
-        # traverse-distance ceiling for benign equatorial designs, so
-        # pick the unbounded mobility outputs instead.
-        moved = (
-            scm.sinkage_max_m != bw.sinkage_max_m
-            or scm.peak_motor_torque_nm != bw.peak_motor_torque_nm
-            or scm.energy_margin_raw_pct != bw.energy_margin_raw_pct
-        )
-        assert moved, (
-            "correction artifact loaded but every mobility-derived metric "
-            "matched BW exactly; the wheel-level deltas should perturb at "
-            "least one mission-level output"
-        )
-    else:
-        # No artifact on disk → graceful fallback should yield BW-identical metrics.
-        assert scm.sinkage_max_m == bw.sinkage_max_m
-        assert scm.peak_motor_torque_nm == bw.peak_motor_torque_nm
-
-
 # ---------------------------------------------------------------------------
 # Schema v6/v7 (v6 schema update): operational_duty_cycle override
 # ---------------------------------------------------------------------------

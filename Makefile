@@ -50,8 +50,8 @@ webapp-build:
 # Regenerate the canonical evaluator-driven Pareto fronts that ship with
 # the repo. The Pareto Explorer tab in the webapp loads these via
 # `/pareto/fronts`, so a fresh clone gets a working explorer without
-# anyone running NSGA-II live. Re-run after editing scenario configs or
-# the wheel-level correction artifact. Defaults (50 pop × 60 gens, ~4 min
+# anyone running NSGA-II live. Re-run after editing scenario configs.
+# Defaults (50 pop × 60 gens, ~4 min
 # total for all four scenarios) are tuned for offline use; pass extra
 # args via SCRIPT_ARGS.
 pareto-fronts:

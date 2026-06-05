@@ -1,8 +1,8 @@
 """Top-level mission evaluator.
 
 This is the **primary artifact** of the package. After
-the BW/SCM bake-off traverse-loop lift-out it runs in ~40 ms / mission with the
-wheel-level SCM correction enabled (~30 ms BW-only); the
+the traverse-loop lift-out it runs in ~30 ms / mission on the
+analytical Bekker-Wong path; the
 :mod:`roverdevkit.surrogate` layer is an *optional* acceleration and
 uncertainty layer used for NSGA-II inner loops, batch sensitivity studies,
 and prediction-interval calibration. Most webapp workflows can run against
@@ -88,11 +88,6 @@ from roverdevkit.power.thermal import (
 )
 from roverdevkit.schema import DesignVector, MissionMetrics, MissionScenario
 from roverdevkit.terramechanics.bekker_wong import SoilParameters, WheelGeometry
-from roverdevkit.terramechanics.correction_model import (
-    DEFAULT_CORRECTION_PATH,
-    WheelLevelCorrection,
-    load_correction_or_none,
-)
 from roverdevkit.terramechanics.soils import get_soil_parameters
 
 
@@ -167,9 +162,6 @@ def evaluate_verbose(
     thermal_architecture: ThermalArchitecture | None = None,
     gravity_m_per_s2: float | None = None,
     soil_override: SoilParameters | None = None,
-    use_scm_correction: bool = False,
-    correction: WheelLevelCorrection | None = None,
-    force_backend: str = "bw",
     operational_duty_cycle: float | None = None,
     payload_mass_kg: float | None = None,
     payload_power_w: float | None = None,
@@ -206,27 +198,6 @@ def evaluate_verbose(
         parameters so the surrogate learns a continuous soil → metric
         mapping instead of a four-category one
         used by the surrogate-training workflow.
-    use_scm_correction
-        When ``True`` and ``correction`` is ``None``, loads the
-        production wheel-level correction artifact from
-        :data:`roverdevkit.terramechanics.correction_model.DEFAULT_CORRECTION_PATH`
-        and falls back to the BW-only path with a one-time ``UserWarning``
-        if the file is missing (e.g. during the dataset rebuild that
-        produces the artifact in the first place). Ignored when
-        ``correction`` is not ``None`` so callers can pre-load once and
-        opt in per-call without flipping a separate flag.
-    correction
-        Pre-loaded
-        :class:`roverdevkit.terramechanics.correction_model.WheelLevelCorrection`.
-        Allows the LHS dataset builder to load the artifact once and
-        share it across worker processes / repeated calls instead of
-        joblib-loading on every evaluate.
-    force_backend
-        Wheel-level force backend (``"bw"`` default or ``"scm"`` for
-        the BW/SCM bake-off bake-off — runs PyChrono SCM directly inside the
-        slip solve). ``"scm"`` ignores ``correction`` /
-        ``use_scm_correction`` since SCM-direct is the ground truth
-        the correction tries to approximate.
     operational_duty_cycle
         Schema v6 (v6 schema update): per-call override of
         ``scenario.operational_duty_cycle``. ``None`` (default) uses
@@ -258,9 +229,6 @@ def evaluate_verbose(
         scenario-driven ``tilt = min(80, |latitude|)`` override
         used at high latitudes).
     """
-    if correction is None and use_scm_correction and force_backend != "scm":
-        correction = load_correction_or_none(DEFAULT_CORRECTION_PATH, on_missing="warn")
-
     mass_params = mass_params or MassModelParams()
     if gravity_m_per_s2 is not None and not math.isclose(
         gravity_m_per_s2, mass_params.gravity_moon_m_per_s2
@@ -322,8 +290,6 @@ def evaluate_verbose(
         soil,
         total_mass_kg=total_mass_kg,
         gravity_m_per_s2=active_g,
-        correction=correction,
-        force_backend=force_backend,
         operational_duty_cycle_override=operational_duty_cycle,
         payload_power_w=payload_power,
         panel_tilt_deg=panel_tilt_deg,
@@ -376,9 +342,6 @@ def evaluate(
     thermal_architecture: ThermalArchitecture | None = None,
     gravity_m_per_s2: float | None = None,
     soil_override: SoilParameters | None = None,
-    use_scm_correction: bool = False,
-    correction: WheelLevelCorrection | None = None,
-    force_backend: str = "bw",
     operational_duty_cycle: float | None = None,
     payload_mass_kg: float | None = None,
     payload_power_w: float | None = None,
@@ -400,9 +363,6 @@ def evaluate(
         thermal_architecture=thermal_architecture,
         gravity_m_per_s2=gravity_m_per_s2,
         soil_override=soil_override,
-        use_scm_correction=use_scm_correction,
-        correction=correction,
-        force_backend=force_backend,
         operational_duty_cycle=operational_duty_cycle,
         payload_mass_kg=payload_mass_kg,
         payload_power_w=payload_power_w,

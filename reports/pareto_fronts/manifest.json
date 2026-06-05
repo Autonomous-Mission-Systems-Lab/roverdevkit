@@ -1,9 +1,7 @@
 [
   {
-    "scenario_name": "crater_rim_survey",
+    "scenario_name": "highland_slope_capability",
     "backend": "evaluator",
-    "correction_path": "data/scm/correction_v1.joblib",
-    "correction_enabled": true,
     "dataset_version": "v9",
     "objectives": [
       {
@@ -29,118 +27,10 @@
     "population_size": 50,
     "generations": 60,
     "seed": 12,
-    "panel_tilt_deg": 0.0,
-    "panel_azimuth_deg": 180.0,
-    "elapsed_s": 70.4813863330055,
-    "pareto_size": 50,
-    "front_csv": "reports/pareto_fronts/front_crater_rim_survey.csv"
-  },
-  {
-    "scenario_name": "equatorial_mare_traverse",
-    "backend": "evaluator",
-    "correction_path": "data/scm/correction_v1.joblib",
-    "correction_enabled": true,
-    "dataset_version": "v9",
-    "objectives": [
-      {
-        "target": "range_km",
-        "direction": "max"
-      },
-      {
-        "target": "total_mass_kg",
-        "direction": "min"
-      },
-      {
-        "target": "slope_capability_deg",
-        "direction": "max"
-      }
-    ],
-    "constraints": [
-      {
-        "target": "range_km",
-        "sense": "min",
-        "value": 0.1
-      }
-    ],
-    "population_size": 50,
-    "generations": 60,
-    "seed": 13,
-    "panel_tilt_deg": 20.2,
-    "panel_azimuth_deg": 180.0,
-    "elapsed_s": 56.72387441698811,
-    "pareto_size": 50,
-    "front_csv": "reports/pareto_fronts/front_equatorial_mare_traverse.csv"
-  },
-  {
-    "scenario_name": "highland_slope_capability",
-    "backend": "evaluator",
-    "correction_path": "data/scm/correction_v1.joblib",
-    "correction_enabled": true,
-    "dataset_version": "v9",
-    "objectives": [
-      {
-        "target": "range_km",
-        "direction": "max"
-      },
-      {
-        "target": "total_mass_kg",
-        "direction": "min"
-      },
-      {
-        "target": "slope_capability_deg",
-        "direction": "max"
-      }
-    ],
-    "constraints": [
-      {
-        "target": "range_km",
-        "sense": "min",
-        "value": 0.1
-      }
-    ],
-    "population_size": 50,
-    "generations": 60,
-    "seed": 14,
     "panel_tilt_deg": 10.0,
     "panel_azimuth_deg": 180.0,
-    "elapsed_s": 68.3572085830092,
+    "elapsed_s": 36.285881332994904,
     "pareto_size": 50,
     "front_csv": "reports/pareto_fronts/front_highland_slope_capability.csv"
-  },
-  {
-    "scenario_name": "polar_prospecting",
-    "backend": "evaluator",
-    "correction_path": "data/scm/correction_v1.joblib",
-    "correction_enabled": true,
-    "dataset_version": "v9",
-    "objectives": [
-      {
-        "target": "range_km",
-        "direction": "max"
-      },
-      {
-        "target": "total_mass_kg",
-        "direction": "min"
-      },
-      {
-        "target": "slope_capability_deg",
-        "direction": "max"
-      }
-    ],
-    "constraints": [
-      {
-        "target": "range_km",
-        "sense": "min",
-        "value": 0.1
-      }
-    ],
-    "population_size": 50,
-    "generations": 60,
-    "seed": 15,
-    "panel_tilt_deg": 80.0,
-    "panel_azimuth_deg": 0.0,
-    "elapsed_s": 69.83276370802196,
-    "pareto_size": 50,
-    "front_csv": "reports/pareto_fronts/front_polar_prospecting.csv"
   }
 ]

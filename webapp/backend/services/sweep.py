@@ -2,14 +2,14 @@
 
 Pure-Python core lives in :mod:`roverdevkit.tradespace.sweeps` (axis
 definitions, grid expansion, backend picking). This module is the
-glue that loads the artifacts (correction model, quantile bundles,
-soil parameters), runs the chosen backend, and returns a
+glue that loads the artifacts (quantile bundles, soil parameters),
+runs the chosen backend, and returns a
 :class:`~roverdevkit.tradespace.sweeps.SweepResult`.
 
 Two backends, two performance profiles
 --------------------------------------
-- **Evaluator**: corrected analytical pipeline + wheel-level SCM
-  correction. ~40 ms / cell after the BW/SCM bake-off lift-out. Ground truth.
+- **Evaluator**: analytical Bekker-Wong pipeline. ~30 ms / cell after
+  the traverse-loop lift-out. Ground truth.
   Used for ≤ ``EVALUATOR_AUTO_THRESHOLD`` cells in auto mode.
 - **Surrogate**: τ=0.5 head from the quantile bundles. Vectorised --
   one batch ``predict`` over the whole grid. ~5 ms total for any
@@ -31,7 +31,6 @@ from roverdevkit.mission.evaluator import evaluate as evaluator_evaluate
 from roverdevkit.schema import DesignVector, MissionScenario
 from roverdevkit.surrogate.uncertainty import QuantileHeads
 from roverdevkit.terramechanics.bekker_wong import SoilParameters
-from roverdevkit.terramechanics.correction_model import WheelLevelCorrection
 from roverdevkit.tradespace.sweeps import (
     SweepResult,
     SweepSpec,
@@ -47,7 +46,6 @@ def run_sweep(
     scenario: MissionScenario,
     soil: SoilParameters,
     *,
-    correction: WheelLevelCorrection | None,
     bundles: dict[str, QuantileHeads],
 ) -> SweepResult:
     """Resolve the backend, execute the sweep, return a packed result.
@@ -63,10 +61,6 @@ def run_sweep(
         The mission scenario (already resolved to one of the canonical
         four) and its nominal soil parameters. Both are constant
         across the grid -- a sweep varies design, not scenario.
-    correction
-        Wheel-level SCM correction artifact for the evaluator path.
-        Pass ``None`` to fall back to BW-only; the route is
-        responsible for surfacing the degraded mode in the response.
     bundles
         Quantile XGBoost bundles for the surrogate path. Required
         even when the auto-picker chooses the evaluator -- the route
@@ -77,7 +71,7 @@ def run_sweep(
 
     t0 = time.perf_counter()
     if backend == "evaluator":
-        z_flat = _run_evaluator(spec, designs, scenario, correction=correction)
+        z_flat = _run_evaluator(spec, designs, scenario)
     elif backend == "surrogate":
         z_flat = _run_surrogate(spec, designs, scenario, soil, bundles=bundles)
     else:  # pragma: no cover -- pick_backend guards this
@@ -112,23 +106,15 @@ def _run_evaluator(
     spec: SweepSpec,
     designs: list[DesignVector],
     scenario: MissionScenario,
-    *,
-    correction: WheelLevelCorrection | None,
 ) -> np.ndarray:
     """Per-cell call to :func:`roverdevkit.mission.evaluator.evaluate`.
 
     Returns a 1-D array of length ``len(designs)`` (already in
     row-major order; the caller reshapes for 2-D sweeps).
     """
-    use_corr = correction is not None
     out = np.empty(len(designs), dtype=float)
     for i, d in enumerate(designs):
-        metrics = evaluator_evaluate(
-            d,
-            scenario,
-            use_scm_correction=use_corr,
-            correction=correction,
-        )
+        metrics = evaluator_evaluate(d, scenario)
         out[i] = float(getattr(metrics, spec.target))
     return out
 

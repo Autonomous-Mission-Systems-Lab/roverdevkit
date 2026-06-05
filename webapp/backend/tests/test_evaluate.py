@@ -1,11 +1,7 @@
 """Smoke tests for ``POST /evaluate``.
 
-These run the corrected mission evaluator end-to-end. Unlike the
-predict tests they do *not* depend on the quantile-calibration quantile artifact;
-they only need the SCM correction artifact at
-``data/scm/correction_v1.joblib`` to assert SCM correction was used.
-If that artifact is missing the route falls back to BW-only and the
-test asserts ``used_scm_correction=False``.
+These run the analytical mission evaluator end-to-end. Unlike the
+predict tests they do *not* depend on the quantile-calibration artifact.
 """
 
 from __future__ import annotations
@@ -77,7 +73,6 @@ def test_evaluate_returns_all_primary_targets(
     assert "cruise_speed_mps" in body
     assert body["cruise_speed_mps"] >= 0.0
 
-    assert isinstance(body["used_scm_correction"], bool)
     assert body["elapsed_ms"] > 0
 
 

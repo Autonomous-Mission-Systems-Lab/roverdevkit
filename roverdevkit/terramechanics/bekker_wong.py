@@ -38,16 +38,15 @@ Assumptions
 - Exit angle θ₂ = 0 (Wong's standard assumption — the soil rebounds
   elastically behind the wheel and contributes nothing to the net
   stress). More elaborate treatments (Ishigami 2007) let θ₂ < 0 with
-  an explicit bulldozing contribution; deferred to the SCM layer.
+  an explicit bulldozing contribution; not modelled here.
 - Transition angle for peak stress θ_m = (c₁ + c₂·|s|)·θ₁ with
   c₁ = 0.4, c₂ = 0.2. These are Wong's typical empirical defaults;
   Ding 2011 reports soil-dependent fits spanning c₁ ∈ [0.18, 0.43],
-  c₂ ∈ [0.09, 0.25]. Residuals go into the Path-2 correction layer.
+  c₂ ∈ [0.09, 0.25].
 - Grousers contribute a multiplicative shear-thrust lift derived
   from Iizuka & Kubota 2011 (see ``_grouser_shear_lift``). The term
   is closed-form in (R, N_g, h_g) and saturates at large grouser
-  packs; residuals against PyChrono SCM are absorbed by the Path-2
-  correction layer.
+  packs.
 
 Validation (Layer 3)
 --------------------
@@ -74,8 +73,7 @@ from numpy.typing import NDArray
 from scipy.optimize import brentq
 
 # Empirical coefficients for θ_m = (c₁ + c₂·|s|)·θ₁ (Wong & Reece 1967;
-# Wong 2008 §4.2). Treated as tunable "priors" whose residual is
-# absorbed by the Path-2 SCM correction layer.
+# Wong 2008 §4.2).
 _C1_THETA_M: float = 0.4
 _C2_THETA_M: float = 0.2
 

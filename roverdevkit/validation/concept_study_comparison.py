@@ -36,7 +36,7 @@ carries:
 - and optionally a ``published_metrics`` dict if the paper
   reported headline numbers (range, mass) directly. The
   comparator predicts metrics for the published design under the
-  corrected evaluator and reports both numbers side-by-side so a
+  analytical evaluator and reports both numbers side-by-side so a
   reviewer can see where our prediction differs from the paper's.
 
 The first concept-study entry is MoonRanger from Kumar et al.
@@ -56,7 +56,6 @@ from roverdevkit.mission.evaluator import evaluate as evaluator_evaluate
 from roverdevkit.mission.scenarios import load_scenario
 from roverdevkit.schema import DesignVector, MissionScenario
 from roverdevkit.surrogate.uncertainty import QuantileHeads
-from roverdevkit.terramechanics.correction_model import WheelLevelCorrection
 from roverdevkit.terramechanics.soils import get_soil_parameters
 from roverdevkit.tradespace.optimizer import (
     DEFAULT_OBJECTIVES,
@@ -141,11 +140,11 @@ class ConceptStudyComparison:
     backend_used
         ``"evaluator"`` or ``"surrogate"`` (for the optimiser; the
         head-to-head metrics for the published design are always
-        computed by the corrected evaluator so the apples-to-apples
+        computed by the analytical evaluator so the apples-to-apples
         objective comparison is well-defined regardless of which
         backend NSGA-II used).
     published_metrics_predicted
-        ``{target -> value}`` from running the corrected evaluator
+        ``{target -> value}`` from running the analytical evaluator
         on ``published_design`` under ``scenario_name``.
     published_metrics_cited
         ``{target -> value}`` reported directly in the concept paper
@@ -324,16 +323,9 @@ numbers without provenance.
 def _evaluate_published_metrics(
     design: DesignVector,
     scenario: MissionScenario,
-    *,
-    correction: WheelLevelCorrection | None,
 ) -> dict[str, float]:
-    """Run the corrected evaluator on a single design under a scenario."""
-    metrics = evaluator_evaluate(
-        design,
-        scenario,
-        use_scm_correction=correction is not None,
-        correction=correction,
-    )
+    """Run the analytical evaluator on a single design under a scenario."""
+    metrics = evaluator_evaluate(design, scenario)
     return {
         "range_km": float(metrics.range_km),
         "energy_margin_raw_pct": float(metrics.energy_margin_raw_pct),
@@ -351,7 +343,7 @@ def _best_per_objective(
 
     ``percent_delta`` is ``NaN`` when the concept's value rounds to
     zero (typically because the published design has an infeasible
-    energy budget under our corrected physics). A percent change
+    energy budget under our analytical physics). A percent change
     against zero is mathematically undefined; the absolute ``delta``
     remains the canonical headline in that case.
     """
@@ -390,7 +382,6 @@ def compare_concept_to_pareto(
     n_generations: int = 50,
     seed: int = 0,
     evaluator_eval_cap: int = 25_000,
-    use_scm_correction: bool = True,
 ) -> ConceptStudyComparison:
     """Run NSGA-II under the concept's scenario, compare to its published design.
 
@@ -412,17 +403,13 @@ def compare_concept_to_pareto(
         the two layers' tables are directly comparable.
     backend, bundles, evaluator_eval_cap
         Same semantics as :func:`rover_rediscovery.rediscover`.
-        The corrected evaluator is *always* used for the head-to-
+        The analytical evaluator is *always* used for the head-to-
         head metrics on ``published_design`` so the comparison
         is well-defined regardless of the NSGA-II backend.
     population_size, n_generations, seed
         NSGA-II hyperparameters. The default 200 × 50 = 10 000
-        evaluations is paper-grade on the evaluator (under the
+        evaluations is a high-budget run on the evaluator (under the
         25k safety cap) and trivially cheap on the surrogate.
-    use_scm_correction
-        Whether the corrected evaluator should compose the
-        wheel-level SCM correction. Defaults to ``True`` to match
-        the paper's headline physics fidelity.
 
     Returns
     -------
@@ -432,15 +419,6 @@ def compare_concept_to_pareto(
     """
     scenario = entry.load_scenario()
     soil = get_soil_parameters(scenario.soil_simulant)
-
-    correction: WheelLevelCorrection | None = None
-    if use_scm_correction:
-        from roverdevkit.terramechanics.correction_model import (
-            DEFAULT_CORRECTION_PATH,
-            load_correction_or_none,
-        )
-
-        correction = load_correction_or_none(DEFAULT_CORRECTION_PATH, on_missing="warn")
 
     constraints: tuple[OptimizationConstraint, ...] = ()
     if entry.mass_envelope_kg is not None:
@@ -457,7 +435,6 @@ def compare_concept_to_pareto(
         soil,
         backend=backend,
         bundles=bundles,
-        correction=correction,
         objectives=objectives,
         constraints=constraints,
         population_size=population_size,
@@ -474,11 +451,11 @@ def compare_concept_to_pareto(
             f"{entry.mass_envelope_kg!r} kg under scenario {entry.scenario_name!r}."
         )
 
-    # Always evaluate the published design with the corrected physics
+    # Always evaluate the published design with the analytical physics
     # so the head-to-head comparison is apples-to-apples regardless of
     # which backend NSGA-II used for its fitness function.
     published_metrics_predicted = _evaluate_published_metrics(
-        entry.published_design, scenario, correction=correction
+        entry.published_design, scenario
     )
 
     n_dom = sum(

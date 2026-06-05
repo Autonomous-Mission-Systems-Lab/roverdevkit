@@ -4,8 +4,7 @@ Top-level package. Most public API lives in submodules:
 
 - :mod:`roverdevkit.schema` — shared dataclasses for design vectors, scenarios,
   and mission metrics.
-- :mod:`roverdevkit.terramechanics` — Bekker-Wong analytical terramechanics,
-  PyChrono SCM wrapper, and the ML correction layer.
+- :mod:`roverdevkit.terramechanics` — Bekker-Wong analytical terramechanics.
 - :mod:`roverdevkit.power` — solar, battery, and thermal survival sub-models.
 - :mod:`roverdevkit.mass` — parametric mass-estimating relationships.
 - :mod:`roverdevkit.mission` — top-level mission evaluator, scenarios,

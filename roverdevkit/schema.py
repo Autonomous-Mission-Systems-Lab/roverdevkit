@@ -24,19 +24,6 @@ class DesignVector(BaseModel):
 
     Units are SI unless otherwise noted.
 
-    Schema v7 (v7 schema follow-up) consolidated the v6 designed /
-    operational duty-cycle split back into a single per-scenario
-    ``operational_duty_cycle``. The v6 ``designed_duty_cycle`` design
-    field carried no engineering content — the v6 mass model never
-    actually scaled with it (battery, thermal, and motor masses size
-    on capacity / area / torque-capacity respectively, none on duty
-    cycle) — so the only role of ``δ_des`` was to act as an upper
-    bound on ``δ_eff``, which a user can equivalently express by
-    lowering ``operational_duty_cycle``. Removing it gets us a clean
-    11-D design space, matches surrogate dimensionality to the
-    user-facing form, and removes the LHS-saturation artefact in
-    high-δ_des / low-δ_ops cells. See
-    the version history in ``data/analytical/SCHEMA.md`` for the full rationale.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -115,19 +102,8 @@ class DesignVector(BaseModel):
             "flotilla rovers (2 kg / 4-wheel / R=0.08 at lunar gravity "
             "anchors at ~0.06 Nm per wheel); 20 Nm covers over-sized "
             "direct-drive concepts at the top of the design space. "
-            "Floor lowered from 0.3 Nm (2026-05-27) to admit the "
-            "ultra-micro registry entries; designs below 0.3 Nm are "
-            "OOD for the v4 surrogate until the v5 LHS regeneration. "
-            "Schema-bumped to v6 (v6 schema update) to replace "
-            "``nominal_speed_mps`` with a true drivetrain capability "
-            "input; see the version history in ``data/analytical/SCHEMA.md``."
         ),
     )
-    # Schema v7 (v7 schema follow-up) removed the v6
-    # ``designed_duty_cycle`` field. Drive duty cycle is now a
-    # per-scenario quantity (``MissionScenario.operational_duty_cycle``)
-    # with an optional per-call API override; see the class docstring
-    # above for the rationale.
 
 
 # ---------------------------------------------------------------------------
@@ -174,11 +150,7 @@ class MissionScenario(BaseModel):
         le=0.6,
         default=0.05,
         description=(
-            "Default ground-ops drive duty for this scenario, in [0, 0.6]. "
-            "The evaluator uses this directly as δ_eff (clamped to "
-            "[0, 1]); schema v7 removed the v6 ``designed_duty_cycle`` "
-            "design field after that field turned out to do no engineering "
-            "work in the v6 mass model. Calibrated against published "
+            "Calibrated against published "
             "rover-on-mission ops cadence (mare 0.30, crater 0.20, highland "
             "0.15, polar 0.05; see ``data/analytical/SCHEMA.md``). "
             "Users can override via the /evaluate / /predict API "

@@ -6,29 +6,45 @@ import { roverColor } from "@/lib/rover-colors";
 import { cn } from "@/lib/utils";
 import { useDesignStore } from "@/store/design-store";
 
+interface RegistryOverlayPickerProps {
+  /** Extra classes on the outer wrapper. */
+  className?: string;
+  /**
+   * When true, wrap the control in a bordered panel (used inside
+   * other cards). When false, render inline.
+   */
+  framed?: boolean;
+  /** When false, omit the title and helper text (parent card supplies them). */
+  showHeader?: boolean;
+}
+
 /**
  * Multi-select pill row for the registry overlay.
  *
  * Each pill is a real-rover entry from `/registry`; clicking one
  * toggles whether its prediction (run under the *user's* currently
- * selected scenario) is overlaid on the chart. We deliberately keep
- * the picker visually compact rather than expanding into a
- * combobox/popover so it sits inline next to the scenario picker
- * without distracting from the design form.
+ * selected scenario) is overlaid on the chart.
  */
-export function RegistryOverlayPicker() {
+export function RegistryOverlayPicker({
+  className,
+  framed = false,
+  showHeader = true,
+}: RegistryOverlayPickerProps) {
   const { data, isPending, isError } = useRegistry();
   const overlayRovers = useDesignStore((s) => s.overlayRovers);
   const toggleOverlayRover = useDesignStore((s) => s.toggleOverlayRover);
 
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <Label className="text-sm font-medium">Compare with real rovers</Label>
-        <span className="text-xs text-[var(--color-muted-foreground)]">
-          predictions overlaid on the chart
-        </span>
-      </div>
+  const body = (
+    <div className={cn("space-y-3", className)}>
+      {showHeader ? (
+        <div>
+          <Label className="text-sm font-semibold">Compare with real rovers</Label>
+          <p className="text-[0.65rem] leading-snug text-[var(--color-muted-foreground)]">
+            Select registry rovers to overlay their evaluator output on the chart
+            under the current scenario and mission inputs.
+          </p>
+        </div>
+      ) : null}
 
       {isPending ? (
         <p className="text-xs text-[var(--color-muted-foreground)]">
@@ -77,6 +93,14 @@ export function RegistryOverlayPicker() {
           })}
         </div>
       )}
+    </div>
+  );
+
+  if (!framed) return body;
+
+  return (
+    <div className="rounded-md border border-[var(--color-border)] bg-[var(--color-muted)]/25 px-4 py-3">
+      {body}
     </div>
   );
 }

@@ -29,8 +29,7 @@ from roverdevkit.schema import DesignVector, MissionScenario
 # Schema v9: scientific payload is a *mission requirement* carried on
 # ``MissionScenario`` (``payload_mass_kg`` / ``payload_power_w``), not a
 # design-vector trade. Every request that resolves a scenario server-side
-# accepts an optional per-call override so the Mission-Inputs panel (and
-# the rediscovery harness) can substitute a mission's own payload without
+# accepts an optional per-call override so the Mission-Inputs panel can
 # editing the canonical scenario catalogue. Both are LHS-sampled surrogate
 # inputs over ``[0, 30]`` (mirroring the v7_1 δ_ops promotion), so any
 # in-bounds override stays on the surrogate path with calibrated PIs.
@@ -89,10 +88,6 @@ __all__ = [
     "PredictRequest",
     "PredictResponse",
     "PredictTarget",
-    "RediscoveryDetail",
-    "RediscoveryListResponse",
-    "RediscoverySummary",
-    "RediscoveryParetoPoint",
     "RegistryEntrySummary",
     "RegistryListResponse",
     "ScenarioListResponse",
@@ -341,19 +336,19 @@ class PredictResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Evaluate (deterministic mission evaluator with SCM correction)
+# Evaluate (deterministic analytical mission evaluator)
 # ---------------------------------------------------------------------------
 
 
 class EvaluateRequest(BaseModel):
     """Input payload for :http:post:`/evaluate`.
 
-    Drives the corrected mission evaluator
-    (:func:`roverdevkit.mission.evaluator.evaluate`, BW + wheel-level
-    SCM correction) on a single ``DesignVector`` and a canonical
-    scenario. Used by the single-design panel as the source of truth
-    for the median value of each performance metric; the surrogate's
-    quantile heads supply the prediction-interval band around it.
+    Drives the analytical mission evaluator
+    (:func:`roverdevkit.mission.evaluator.evaluate`, Bekker-Wong) on a
+    single ``DesignVector`` and a canonical scenario. Used by the
+    single-design panel as the source of truth for the median value of
+    each performance metric; the surrogate's quantile heads supply the
+    prediction-interval band around it.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -468,7 +463,6 @@ class EvaluateResponse(BaseModel):
     """Derived rover cruise speed used by the time loop. Replaces the
     v5 ``DesignVector.nominal_speed_mps`` design input. See
     :func:`roverdevkit.drivetrain.motor.cruise_speed`."""
-    used_scm_correction: bool
     elapsed_ms: float
 
 
@@ -564,12 +558,6 @@ class SweepResponse(BaseModel):
     z_values: list[float] | list[list[float]]
     backend_used: Literal["evaluator", "surrogate"]
     backend_requested: Literal["auto", "evaluator", "surrogate"]
-    used_scm_correction: bool
-    """``True`` when the evaluator path ran with the SCM correction
-    artifact loaded; ``False`` when running on BW-only fallback or
-    when the surrogate path served the request (the surrogate was
-    already trained on a corrected corpus)."""
-
     n_cells: int
     elapsed_ms: float
 
@@ -727,125 +715,3 @@ class ShapLocalResponse(BaseModel):
     prediction: float
     base_value: float
     contributions: list[ShapFeatureScore]
-
-
-# ---------------------------------------------------------------------------
-# Rediscovery validation (Layer-5 LOO sweep, paper headline figure)
-# ---------------------------------------------------------------------------
-
-
-RediscoveryBackend = Literal["evaluator", "surrogate"]
-"""Which fitness backend produced the precomputed rediscovery artifacts.
-
-The evaluator-backed sweep
-(``reports/rediscovery_loo_evaluator/``) is the source of truth for
-the paper figure: every front point is corrected-evaluator-truth.
-The surrogate-backed sweep (``reports/rediscovery_loo_surrogate_v8/``)
-is offered as a faster reference alongside it; per the 2026-05-28
-panel-tilt fix in ``reports/rediscovery_loo_comparison.md``, the
-v8 surrogate's polar-front predictions are still horizontal-panel
-based, so it should be read as a wall-clock benchmark, not a
-fidelity check at high latitudes."""
-
-
-class RediscoveryParetoPoint(BaseModel):
-    """One point on the rediscovery Pareto front.
-
-    The metrics block stores the four primary regression targets
-    evaluated for this design under the rover's class-generic
-    scenario (``polar_micro``, ``mare_micro``, etc.). Not every
-    rediscovery JSON carries every target on every point — older
-    artifacts predate the schema-v6 stall flag — so the metrics
-    dict is left open-shape rather than a fixed PrimaryTarget map.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    design: DesignVector
-    metrics: dict[str, float]
-
-
-class RediscoverySummary(BaseModel):
-    """One rover's rediscovery result, summary view.
-
-    Mirrors the per-rover row of the published Layer-5 report
-    (``reports/rediscovery_loo_evaluator/rediscovery_loo_report.md``)
-    plus the registry's ``is_flown`` tier so the frontend can label
-    flown rovers (Pragyan, Yutu-2) separately from design-target
-    registry cases (MoonRanger, Rashid-1, CADRE-unit, Tenacious).
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    slug: str
-    """URL-safe identifier matching the per-rover JSON file stem
-    in ``reports/rediscovery_loo_evaluator/``. Use as the path
-    component on the detail endpoint."""
-
-    rover_name: str
-    """Human-readable name from the registry (e.g. ``"CADRE-unit"``)."""
-
-    is_flown: bool
-    """``True`` for rovers that have actually flown a lunar
-    mission (Pragyan, Yutu-2). Other registry rovers are
-    well-spec'd design-target lunar micro-rovers added for
-    Layer-5 OOD coverage."""
-
-    class_generic_scenario: str
-    """Class-generic ``*_micro`` scenario the rediscovery harness
-    placed this rover under (e.g. ``"polar_micro"``)."""
-
-    backend: RediscoveryBackend
-    design_space_distance: float
-    pareto_dominated: bool
-    mass_budget_kg: float
-    pareto_front_size: int
-
-
-class RediscoveryListResponse(BaseModel):
-    """All rovers' rediscovery summaries for a single backend."""
-
-    model_config = ConfigDict(frozen=True)
-
-    backend: RediscoveryBackend
-    rovers: list[RediscoverySummary]
-
-
-class RediscoveryDetail(BaseModel):
-    """Full rediscovery result for one rover under one backend.
-
-    Includes the summary fields plus the Pareto front itself, the
-    rover's own metrics under the class-generic scenario, the
-    per-variable percent error against the nearest Pareto point,
-    and the integer-match flags for ``grouser_count`` /
-    ``n_wheels``.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    slug: str
-    rover_name: str
-    is_flown: bool
-    class_generic_scenario: str
-    backend: RediscoveryBackend
-
-    rover_design: DesignVector
-    """The real rover's published design vector. Plotted as the
-    overlay marker on the Pareto-front figure."""
-
-    rover_metrics_under_generic_scenario: dict[str, float]
-    """Metrics from re-evaluating ``rover_design`` under the
-    class-generic scenario (with the 2026-05-28 panel-tilt fix
-    applied — see ``reports/rediscovery_loo_comparison.md``)."""
-
-    design_space_distance: float
-    pareto_dominated: bool
-    mass_budget_kg: float
-    integer_matches: dict[str, bool]
-    per_variable_percent_errors: dict[str, float]
-
-    nearest_pareto_index: int
-    nearest_pareto_design: DesignVector
-    nearest_pareto_metrics: dict[str, float]
-
-    pareto_front: list[RediscoveryParetoPoint]

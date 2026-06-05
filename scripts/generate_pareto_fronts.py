@@ -2,9 +2,9 @@
 
 The Pareto Explorer ships one precomputed front per canonical scenario so
 that a fresh clone gets a working visualization without running NSGA-II
-live. The canonical fronts are produced with the **corrected analytical
-+ SCM-correction evaluator** as the fitness function: every Pareto point
-is therefore evaluator-truth, not a surrogate prediction.
+live. The canonical fronts are produced with the **analytical Bekker-Wong
+evaluator** as the fitness function: every Pareto point is therefore
+evaluator-truth, not a surrogate prediction.
 
 The surrogate stays the default for the *live* Optimize tab inside the
 webapp (where ~1 ms / call lets NSGA-II finish in seconds), but the
@@ -17,7 +17,7 @@ Outputs under ``--out-dir`` (defaults to ``reports/pareto_fronts``):
 - ``front_<scenario>.csv``      — one Pareto point per row, design
   fields + the four primary metrics + ``backend_used = "evaluator"``.
 - ``front_<scenario>.metadata.json`` — population/generations/seed,
-  objectives, evaluator cost, and the correction artifact's path.
+  objectives, and evaluator cost.
 - ``manifest.json`` — aggregate metadata across scenarios.
 
 Example
@@ -40,11 +40,6 @@ from typing import Any
 
 from roverdevkit.mission.scenarios import list_scenarios, load_scenario
 from roverdevkit.schema import ScenarioName
-from roverdevkit.terramechanics.correction_model import (
-    DEFAULT_CORRECTION_PATH,
-    WheelLevelCorrection,
-    load_correction_or_none,
-)
 from roverdevkit.terramechanics.soils import get_soil_parameters
 from roverdevkit.tradespace.optimizer import (
     DEFAULT_OBJECTIVES,
@@ -63,7 +58,7 @@ from roverdevkit.validation.rover_rediscovery import _scenario_panel_orientation
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Default NSGA-II budget for the canonical offline run. Sized so the
-# corrected evaluator (~22 ms / call) finishes one scenario in ~1 min
+# analytical evaluator (~22 ms / call) finishes one scenario in ~1 min
 # and all four scenarios in ~4 min on a laptop. The Pareto Explorer
 # only needs a few dozen non-dominated points to communicate the
 # tradeoff shape, so denser fronts would buy little but cost more.
@@ -115,25 +110,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=12,
     )
-    p.add_argument(
-        "--no-correction",
-        action="store_true",
-        help=(
-            "Run the analytical-only (Bekker-Wong) evaluator instead of the "
-            "corrected BW + SCM evaluator. The shipped artifacts use the "
-            "correction; this flag is for environments without the SCM "
-            "correction joblib."
-        ),
-    )
-    p.add_argument(
-        "--correction-path",
-        type=Path,
-        default=None,
-        help=(
-            "Override path to the wheel-level correction joblib. Defaults to "
-            "the package default (data/scm/correction_v1.joblib)."
-        ),
-    )
     return p.parse_args(argv)
 
 
@@ -142,7 +118,6 @@ def main(argv: list[str] | None = None) -> int:
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    correction, correction_path = _load_correction(args)
     scenarios = _scenario_names(args.scenarios)
 
     constraints = (
@@ -159,7 +134,6 @@ def main(argv: list[str] | None = None) -> int:
         result = NSGA2Runner(
             scenario,
             soil,
-            correction=correction,
             backend="evaluator",
             constraints=constraints,
             population_size=args.population_size,
@@ -179,8 +153,6 @@ def main(argv: list[str] | None = None) -> int:
         metadata = {
             "scenario_name": scenario_name,
             "backend": result.backend_used,
-            "correction_path": _repo_relative(correction_path) if correction_path else None,
-            "correction_enabled": correction is not None,
             "dataset_version": os.environ.get("ROVERDEVKIT_DATASET_VERSION", "v9"),
             "objectives": [
                 {"target": obj.target, "direction": obj.direction}
@@ -212,26 +184,6 @@ def main(argv: list[str] | None = None) -> int:
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"wrote manifest {manifest_path}", flush=True)
     return 0
-
-
-def _load_correction(args: argparse.Namespace) -> tuple[WheelLevelCorrection | None, Path | None]:
-    if args.no_correction:
-        return None, None
-    path = (args.correction_path or DEFAULT_CORRECTION_PATH).expanduser().resolve()
-    correction = load_correction_or_none(path, on_missing="warn")
-    return correction, path
-
-
-def _repo_relative(path: Path) -> str:
-    """Return ``path`` relative to the repo root when possible, else as-is.
-
-    Keeps the checked-in metadata portable across machines without
-    leaking user-specific absolute paths into git.
-    """
-    try:
-        return str(path.resolve().relative_to(REPO_ROOT))
-    except ValueError:
-        return str(path)
 
 
 def _scenario_names(raw: list[str] | None) -> list[ScenarioName]:

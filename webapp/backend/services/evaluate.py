@@ -34,7 +34,6 @@ from roverdevkit.mission.evaluator import evaluate_verbose
 from roverdevkit.power.thermal import ThermalResult
 from roverdevkit.schema import DesignVector, MissionMetrics, MissionScenario
 from roverdevkit.surrogate.features import PRIMARY_REGRESSION_TARGETS
-from roverdevkit.terramechanics.correction_model import WheelLevelCorrection
 
 
 @dataclass(frozen=True)
@@ -77,17 +76,15 @@ class EvaluatorOutput:
     effective_duty_cycle: float
     cruise_speed_mps: float
     elapsed_ms: float
-    used_scm_correction: bool
 
 
 def evaluate_design(
     design: DesignVector,
     scenario: MissionScenario,
     *,
-    correction: WheelLevelCorrection | None,
     operational_duty_cycle: float | None = None,
 ) -> EvaluatorOutput:
-    """Run the corrected mission evaluator on one design × one scenario.
+    """Run the analytical mission evaluator on one design × one scenario.
 
     Parameters
     ----------
@@ -96,11 +93,6 @@ def evaluate_design(
         bounds at the HTTP boundary).
     scenario
         One of the canonical scenarios resolved server-side.
-    correction
-        The shared wheel-level SCM correction artifact (loaded once per
-        process by :func:`webapp.backend.loaders.get_correction`). Pass
-        ``None`` to fall back to the BW-only evaluator; the route
-        decides whether that fallback is acceptable.
     operational_duty_cycle
         Schema v6 (v6 schema update): per-call override of
         ``MissionScenario.operational_duty_cycle``. ``None`` (default)
@@ -110,17 +102,14 @@ def evaluate_design(
     Returns
     -------
     EvaluatorOutput
-        :class:`MissionMetrics` plus a wall-clock measurement, an SCM-
-        correction flag, the :class:`ThermalResult`, the
-        :class:`StallDiagnostic`, and the runtime-resolved
-        ``effective_duty_cycle`` / ``cruise_speed_mps``.
+        :class:`MissionMetrics` plus a wall-clock measurement, the
+        :class:`ThermalResult`, the :class:`StallDiagnostic`, and the
+        runtime-resolved ``effective_duty_cycle`` / ``cruise_speed_mps``.
     """
     t0 = time.perf_counter()
     detailed = evaluate_verbose(
         design,
         scenario,
-        use_scm_correction=correction is not None,
-        correction=correction,
         operational_duty_cycle=operational_duty_cycle,
     )
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -138,7 +127,6 @@ def evaluate_design(
         effective_duty_cycle=float(detailed.log.effective_duty_cycle),
         cruise_speed_mps=float(detailed.log.cruise_speed_mps),
         elapsed_ms=elapsed_ms,
-        used_scm_correction=correction is not None,
     )
 
 

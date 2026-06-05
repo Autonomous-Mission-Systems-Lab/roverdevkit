@@ -17,8 +17,7 @@ Column schema (documented in ``data/analytical/SCHEMA.md``):
   / ``sinkage_max_m`` / ``motor_torque_ok`` — :class:`MissionMetrics`
   targets the surrogate predicts.
 - ``stat_*`` — aggregate statistics (mean / p95 / max / final) from the
-  :class:`TraverseLog` time series for the SCM-correction
-  gate and surrogate diagnostics.
+  :class:`TraverseLog` time series for surrogate diagnostics.
 
 Thermal scope (v2)
 ------------------
@@ -87,13 +86,11 @@ History
   at corner points. Column schema is byte-identical to v2; the bump
   signals the changed training distribution so a v2-trained surrogate
   isn't silently reused on a v3 dataset.
-- v4 (SCM-corrected surrogate schema, 2026-04-26): rebuild with the trained wheel-level
-  SCM correction (``use_scm_correction=True``) composed into the
-  analytical evaluator. Column schema is byte-identical to v3; the
-  bump signals the corrected mobility physics so a v3-trained
-  surrogate isn't silently reused on v4 data. Promotion was gated
-  by the SCM-correction sign-flip gate (``reports/scm_correction_gate``) and the
-  BW-vs-SCM-direct bake-off (``reports/bw_scm_bakeoff``).
+- v4 (retired): briefly rebuilt with a learned wheel-level SCM
+  correction composed into the analytical evaluator. The correction
+  layer was subsequently removed (it degraded agreement with measured
+  single-wheel drawbar pull relative to the plain Bekker-Wong kernel),
+  so v4 is superseded by the analytical-only schema below.
 - v5 (grouser-aware surrogate schema, 2026-04-27): rebuild after the Bekker-Wong kernel
   gained the Iizuka & Kubota 2011 grouser shear-thrust term (see
   ``_grouser_shear_lift`` in ``roverdevkit/terramechanics/bekker_wong.py``).
@@ -110,7 +107,7 @@ History
   gained an energy-feasibility throttle that drops effective duty when
   the battery hits its DoD floor (see ``run_traverse`` in
   ``roverdevkit/mission/traverse_sim.py`` and
-  the version history in ``data/analytical/SCHEMA.md``). Column schema is byte-
+  ``data/analytical/SCHEMA.md``). Column schema is byte-
   identical to v5; the bump signals the achievable-range semantics —
   a v5-trained range_km head is a capability-envelope predictor and
   is no longer aligned with the v5_1 evaluator's range labels (range
@@ -139,8 +136,7 @@ History
   whether δ_des or δ_ops is binding; total_mass_kg ±1 kg drift from
   the mass-model touch-up (motor mass now keyed off
   ``design_peak_wheel_torque_nm`` directly, removing the v5 fixed-point
-  iteration). See the version history in ``data/analytical/SCHEMA.md`` for full
-  rationale and validation gates.
+  iteration). See ``data/analytical/SCHEMA.md`` for the current schema.
 - v7 (single-duty-knob schema, 2026-04-28): drops
   ``design_designed_duty_cycle`` from the feature schema after that
   field turned out to do no engineering work in the v6 mass model
@@ -153,7 +149,7 @@ History
   reflect the changed feature-vector dimensionality (11 design dims
   instead of 12) and to invalidate v6 surrogate artifacts that
   expect the dropped column. See
-  the version history in ``data/analytical/SCHEMA.md`` for full rationale.
+  ``data/analytical/SCHEMA.md`` for the current schema.
 - v7_1 (duty-cycle sampled schema, 2026-04-28): rebuild after
   ``operational_duty_cycle`` was promoted from a per-family constant
   (mare 0.30, polar 0.05, highland 0.15, crater 0.20) to a per-row
@@ -190,35 +186,6 @@ History
   slope-range) will exceed the torque ceiling and stall."""
 
 DEFAULT_FIDELITY = "analytical"
-
-
-# ---------------------------------------------------------------------------
-# Per-worker correction cache (loaded once per pool worker, not per sample)
-# ---------------------------------------------------------------------------
-
-_WORKER_USE_SCM_CORRECTION: bool = False
-_WORKER_CORRECTION: Any = None  # WheelLevelCorrection | None, set in _init_worker
-
-
-def _init_worker(use_scm_correction: bool) -> None:
-    """Pool initializer: cache the SCM correction artifact per worker.
-
-    Loaded once per spawned process so each ``_evaluate_sample`` call
-    skips the joblib disk read. Falls back gracefully (warn-once,
-    BW-only) if the artifact is missing — same contract as
-    :func:`evaluate_verbose`.
-    """
-    global _WORKER_USE_SCM_CORRECTION, _WORKER_CORRECTION
-    _WORKER_USE_SCM_CORRECTION = use_scm_correction
-    if use_scm_correction:
-        from roverdevkit.terramechanics.correction_model import (
-            DEFAULT_CORRECTION_PATH,
-            load_correction_or_none,
-        )
-
-        _WORKER_CORRECTION = load_correction_or_none(DEFAULT_CORRECTION_PATH, on_missing="warn")
-    else:
-        _WORKER_CORRECTION = None
 
 
 # ---------------------------------------------------------------------------
@@ -418,7 +385,6 @@ def _evaluate_sample(sample: LHSSample) -> dict[str, Any]:
             sample.design,
             sample.scenario,
             soil_override=sample.soil,
-            correction=_WORKER_CORRECTION,
         )
         row.update(_flatten_metrics(result.metrics))
         row.update(_flatten_log_stats(result.log))
@@ -457,7 +423,6 @@ class DatasetMetadata:
     test_frac: float = 0.1
     fidelity: str = DEFAULT_FIDELITY
     evaluator_version: str = "0.1.0"
-    use_scm_correction: bool = False
     built_at_utc: str = field(
         default_factory=lambda: datetime.now(UTC).isoformat(timespec="seconds")
     )
@@ -473,7 +438,6 @@ class DatasetMetadata:
             b"test_frac": str(self.test_frac).encode(),
             b"fidelity": self.fidelity.encode(),
             b"evaluator_version": self.evaluator_version.encode(),
-            b"use_scm_correction": str(self.use_scm_correction).encode(),
             b"built_at_utc": self.built_at_utc.encode(),
             b"notes": self.notes.encode(),
         }
@@ -490,7 +454,6 @@ def build_dataset(
     n_workers: int | None = None,
     chunksize: int = 32,
     progress: bool = True,
-    use_scm_correction: bool = False,
 ) -> pd.DataFrame:
     """Evaluate ``samples`` in parallel and return a flattened DataFrame.
 
@@ -526,15 +489,10 @@ def build_dataset(
 
     _iter: Iterable[dict[str, Any]]
     if n_workers == 1:
-        # Serial path: initialise the worker cache in-process once.
-        _init_worker(use_scm_correction)
+        # Serial path (easier to debug / useful for small smoke tests).
         _iter = (_evaluate_sample(s) for s in sample_list)
     else:
-        pool = mp.get_context("spawn").Pool(
-            processes=n_workers,
-            initializer=_init_worker,
-            initargs=(use_scm_correction,),
-        )
+        pool = mp.get_context("spawn").Pool(processes=n_workers)
         _iter = pool.imap_unordered(_evaluate_sample, sample_list, chunksize=chunksize)
 
     rows: list[dict[str, Any]] = []

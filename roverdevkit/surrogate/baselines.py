@@ -50,9 +50,9 @@ All randomised model components (RF, XGBoost subsampling, MLP weight
 init, MLP train/val split) are seeded from the ``random_state``
 parameter on :func:`fit_baselines`.
 
-Hyperparameter tuning is intentionally **deferred to SCM-correction** so the
-baseline-surrogate numbers report sensible-default performance and the SCM-correction
-Optuna lift is cleanly attributable.
+Hyperparameter tuning is intentionally **deferred to a later tuning
+phase** so the baseline-surrogate numbers report sensible-default
+performance and the Optuna lift is cleanly attributable.
 """
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ Layer-1 truth values are the much smaller registry-scenario evaluator
 outputs, so the relative error is dominated by an absolute-scale
 mismatch with no bearing on physical model accuracy.
 
-See ``data/analytical/SCHEMA.md`` for the schema history and full diagnosis."""
+See ``data/analytical/SCHEMA.md`` for the schema and full diagnosis."""
 
 # Numeric columns that must be scaled for Ridge / MLP. Tree models
 # (RF, XGB) don't care, but the same preprocessor is used for them so

@@ -104,16 +104,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=25_000,
         help=(
             "Safety cap on the evaluator backend's pop * gen. Default 25 000 "
-            "supports a paper-grade 200 * 50 = 10 000 run with headroom."
-        ),
-    )
-    p.add_argument(
-        "--no-scm-correction",
-        action="store_true",
-        help=(
-            "Run the evaluator without composing the wheel-level SCM "
-            "correction (BW-only physics). Default: correction is "
-            "composed, matching the paper's headline fidelity."
+            "supports a high-budget 200 * 50 = 10 000 run with headroom."
         ),
     )
     p.add_argument(
@@ -403,8 +394,8 @@ def _markdown_report(c: ConceptStudyComparison) -> str:
             "## Cited vs predicted metrics for the concept design",
             "",
             "Cited = headline numbers reported in the concept paper. "
-            "Predicted = same design vector evaluated under the corrected "
-            "BW + SCM-correction physics that our optimiser uses.",
+            "Predicted = same design vector evaluated under the analytical "
+            "Bekker-Wong physics that our optimiser uses.",
             "",
             "| Target | Concept paper | Our evaluator |",
             "| --- | --- | --- |",
@@ -437,7 +428,7 @@ def _markdown_report(c: ConceptStudyComparison) -> str:
             "## Methodology",
             "",
             "- Concept paper's published design vector is evaluated under "
-            "the same corrected physics as the Pareto front so the "
+            "the same analytical physics as the Pareto front so the "
             "head-to-head is apples-to-apples regardless of which backend "
             "NSGA-II used.",
             scenario_note,
@@ -477,7 +468,6 @@ def _run_one(
         n_generations=args.n_generations,
         seed=args.seed,
         evaluator_eval_cap=args.evaluator_eval_cap,
-        use_scm_correction=not args.no_scm_correction,
     )
 
     sub_dir = args.out_dir / name.lower().replace("-", "_")

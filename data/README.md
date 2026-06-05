@@ -1,7 +1,7 @@
 # Data
 
 Small, curated datasets and citations live here. Large generated datasets
-(LHS samples, SCM runs) are git-ignored — see `.gitignore`.
+(LHS samples) are git-ignored — see `.gitignore`.
 
 ## Files
 
@@ -18,8 +18,6 @@ Small, curated datasets and citations live here. Large generated datasets
   held-out data to sanity-check the evaluator — never used for training.
 - `analytical/` — generated LHS samples from the analytical evaluator.
   Git-ignored except for schema documentation.
-- `scm/` — PyChrono SCM single-wheel runs and correction artifacts.
-  Git-ignored except for directory placeholders.
 
 ## Citation discipline
 

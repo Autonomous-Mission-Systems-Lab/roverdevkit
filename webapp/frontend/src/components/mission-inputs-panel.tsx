@@ -8,6 +8,15 @@ import { Label } from "@/components/ui/label";
 import { useScenarios } from "@/hooks/use-scenarios";
 import { useDesignStore } from "@/store/design-store";
 import { PAYLOAD_BOUNDS } from "@/types/api";
+import { cn } from "@/lib/utils";
+
+interface MissionInputsPanelProps {
+  disabled?: boolean;
+  /** When true, omit the section header and use a horizontal layout on wide screens. */
+  embedded?: boolean;
+  /** When false, omit the helper line under the section title. */
+  showDescription?: boolean;
+}
 
 /**
  * Mission Inputs: the requirements a mission *sets* (scenario, scientific
@@ -24,7 +33,11 @@ import { PAYLOAD_BOUNDS } from "@/types/api";
  * electrical load. Both are LHS-sampled surrogate inputs over [0, 30], so
  * any in-bounds override stays on the surrogate path with calibrated PIs.
  */
-export function MissionInputsPanel({ disabled }: { disabled?: boolean }) {
+export function MissionInputsPanel({
+  disabled,
+  embedded = false,
+  showDescription = true,
+}: MissionInputsPanelProps) {
   const scenarioName = useDesignStore((s) => s.scenarioName);
   const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
   const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
@@ -50,14 +63,22 @@ export function MissionInputsPanel({ disabled }: { disabled?: boolean }) {
   const powerBounds = PAYLOAD_BOUNDS.payload_power_w;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <Label className="text-sm font-semibold">Mission inputs</Label>
-        <p className="text-[0.65rem] text-[var(--color-muted-foreground)]">
-          Requirements set by the mission (scenario, scientific payload,
-          operational duty) — not design variables the rover engineer trades.
-        </p>
-      </div>
+    <div
+      className={cn(
+        "space-y-4",
+        embedded && "lg:grid lg:grid-cols-3 lg:items-start lg:gap-6 lg:space-y-0",
+      )}
+    >
+      {!embedded ? (
+        <div>
+          <Label className="text-sm font-semibold">Mission inputs</Label>
+          {showDescription ? (
+            <p className="text-[0.65rem] text-[var(--color-muted-foreground)]">
+              Scenario, payload, and drive duty cycle.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <ScenarioPicker />
 

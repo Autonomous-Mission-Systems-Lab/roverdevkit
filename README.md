@@ -3,8 +3,8 @@
 **Design-space exploration for lunar micro-rovers.**
 
 RoverDevKit is an open-source research toolkit for early-stage lunar
-micro-rover design. It combines a physics-based mission evaluator, a
-multi-fidelity wheel-soil correction layer, calibrated surrogate models, and an
+micro-rover design. It combines a physics-based mission evaluator,
+calibrated surrogate models, and an
 interactive web app for exploring mobility, power, mass, and mission tradeoffs.
 
 The tool is aimed at conceptual design questions such as:
@@ -27,12 +27,11 @@ The tool is aimed at conceptual design questions such as:
   *requirement* set alongside the scenario, not as a design variable the
   engineer trades; the chassis-mass input is the structural chassis only.
 - **Terramechanics model:** Bekker-Wong wheel-soil mechanics with an
-  engaged-grouser shear-thrust term and an optional learned correction toward
-  PyChrono SCM single-wheel simulations.
+  engaged-grouser shear-thrust term (Iizuka & Kubota 2011).
 - **Surrogate + uncertainty:** quantile XGBoost models that provide
   calibrated 90% prediction intervals around the evaluator's
   deterministic output and power TreeSHAP feature attributions on the
-  Explain Design tab. The corrected physics evaluator is the
+  Explain Design tab. The analytical physics evaluator is the
   reference output and the objective evaluated inside NSGA-II; the
   surrogate sits on top of it as the uncertainty-quantification and
   explainability layer.
@@ -57,16 +56,11 @@ Tabs in the app:
   resulting tradeoff front.
 - **Explain Design:** show SHAP-style feature attributions for the active
   design and selected output.
-- **Rediscovery Validation:** every registry rover's published design
-  point overlaid on the optimizer's leave-one-out Pareto front under
-  its class-generic mission scenario, used to check that the optimizer
-  recovers real flown / design-target rovers from public specs.
 
 ### Run with Docker (one command)
 
 The fastest way to try the tool is the multi-stage container — it bakes
-in the surrogate, the SCM correction artifact, the canonical Pareto
-fronts, and the rediscovery validation data, then serves backend + SPA
+in the surrogate and the canonical Pareto fronts, then serves backend + SPA
 from a single `uvicorn` process.
 
 ```bash
@@ -133,8 +127,7 @@ print(metrics.total_mass_kg)
 
 ## Installation Notes
 
-The recommended setup is **Miniforge/Mambaforge + conda** because PyChrono is
-distributed through conda channels.
+The recommended setup is **Miniforge/Mambaforge + conda**.
 
 ```bash
 mamba env create -f environment.yml
@@ -143,9 +136,7 @@ pip install -e ".[dev,webapp]"
 pytest -q
 ```
 
-The conda environment uses Python 3.12. If PyChrono is not available on your
-platform, most analytical evaluator, surrogate, and web-app workflows can still
-run without invoking SCM directly.
+The conda environment uses Python 3.12.
 
 The web app expects the trained surrogate bundle to be present at the
 configured path under `reports/` or supplied through the
@@ -166,7 +157,7 @@ roverdevkit/
 │   ├── mission/          # Scenarios, evaluator, traverse simulator
 │   ├── power/            # Solar, battery, thermal models
 │   ├── surrogate/        # Features, datasets, baselines, uncertainty
-│   ├── terramechanics/   # Bekker-Wong, SCM wrapper, correction model
+│   ├── terramechanics/   # Bekker-Wong wheel-soil mechanics
 │   ├── tradespace/       # Sweeps, NSGA-II optimization, design explanations
 │   └── validation/       # Rover registry and validation helpers
 ├── scripts/              # Dataset, tuning, validation, and report scripts
@@ -203,23 +194,14 @@ make webapp-test      # backend tests + frontend lint/build
 The toolkit ships with a layered validation chain. Summary numbers
 (full reports under `reports/`):
 
-- **Layer 1 — surrogate vs corrected evaluator.** R² ≥ 0.95 on every
+- **Layer 1 — surrogate vs analytical evaluator.** R² ≥ 0.95 on every
   primary regression target on the canonical 10 % LHS test split
   (range 0.952, energy margin 0.983, slope 0.977, total mass 0.999);
   AUC 0.992 on the feasibility classifier; ≈89–96 % empirical coverage
-  on the calibrated 90 % prediction intervals. The schema-v9 corpus
-  adds scientific payload (mass and power) as two explicit
-  mission-requirement inputs sampled over [0, 30], which adds a little
-  variance to the range and slope heads relative to v8. See
+  on the calibrated 90 % prediction intervals. The training corpus
+  includes scientific payload (mass and power) as two explicit
+  mission-requirement inputs sampled over [0, 30]. See
   `reports/surrogate_v9/`.
-- **Layer 2 — corrected evaluator vs PyChrono SCM.** On a held-out
-  LHS comparison sample, the corrected evaluator (Bekker-Wong +
-  wheel-level SCM correction) reaches ≥ 99 % feasibility-flip
-  agreement with PyChrono SCM, ~10× lower continuous-metric error
-  than uncorrected Bekker-Wong, and ~100× faster wall-clock than
-  PyChrono SCM run end-to-end. PyChrono SCM is itself a semi-empirical
-  contact model (Tasora et al. 2023) and is treated here as a
-  high-fidelity comparator, not as ground truth.
 - **Layer 3 — sub-model checks against published references.**
   Parametric tolerance grid in
   `data/validation/wong_layer3_reference.csv` exercising a Wong (2008)
@@ -227,29 +209,31 @@ The toolkit ships with a layered validation chain. Summary numbers
   points on Apollo regolith, and Iizuka & Kubota (2011) grouser-thrust
   limit cases; assertions in
   `tests/test_terramechanics.py::test_layer3_published_reference_grid`.
-- **Layer 5 — rover rediscovery, leave-one-out.** Six-rover
-  leave-one-out NSGA-II sweep with a class-neutral δ_ops anchor,
-  scenario-driven panel-tilt orientation, and each rover's published
-  scientific payload injected as a mission requirement (schema v9), so
-  the optimiser carries the same instrument mass and power the real
-  rover flew. Median evaluator-backed design-space distance **0.473**
-  (≈ 39 % of the 1.22 random-pair baseline in the 9-D unit cube). Per-
-  rover distances: CADRE-unit 0.291, Tenacious 0.306, Rashid-1 0.363,
-  MoonRanger 0.583, Pragyan 0.626, Yutu-2 1.146 — i.e. the optimiser
-  places **CADRE-unit and Tenacious inside a 0.3 design-distance band**
-  of their published designs and the remaining rovers in their broader
-  neighbourhood. Promoting payload from a per-rover chassis-mass
-  convention to an explicit requirement *tightened* the median distance
-  (0.502 → 0.473) and the median per-rover error (54 % → 50 %): forcing
-  candidates to carry the real payload mass removes the previously
-  spurious ultra-light Pareto points. Five of the six published designs
-  remain Pareto-dominated under the class-neutral δ_ops anchor: at
-  matched mass budgets, lighter sun-tracking designs out-perform the
-  published configurations once panel orientation is matched. Full
-  results and per-rover JSON artefacts are in
-  `reports/rediscovery_loo_evaluator/rediscovery_loo_report.md` (the
-  four-configuration narrative in `reports/rediscovery_loo_comparison.md`
-  carries the supporting panel-tilt and backend-comparison analysis).
+- **Layer 5 — rover rediscovery, leave-one-out.** Leave-one-out
+  NSGA-II sweep over the registry with a class-neutral
+  operational-duty-cycle anchor, scenario-driven panel-tilt
+  orientation, and each rover's published scientific payload injected
+  as a mission requirement (schema v9), so the optimiser carries the
+  same instrument mass and power the real rover flew. Across the five
+  in-scope (< 50 kg) micro-rovers the median evaluator-backed
+  design-space distance is **0.36** (≈ 30 % of the 1.22 random-pair
+  baseline in the 9-D unit cube). Per-rover distances: CADRE-unit 0.29,
+  Tenacious 0.31, Rashid-1 0.36, MoonRanger 0.58, Pragyan 0.63 — all
+  five between 24 % and 51 % of the random-pair baseline. Yutu-2
+  (~135 kg) sits above the micro-rover scope and is reported separately
+  at 1.15 (≈ the random baseline): the optimiser does not spuriously
+  place an out-of-class rover near its front. Distances are reported
+  relative to the random-pair baseline rather than any fixed pass/fail
+  cutoff. (CADRE-unit at 2 kg sits below the ~5–50 kg mass-model
+  calibration band and is flagged out-of-regime — the evaluator still
+  rediscovers it; the surrogate backend cannot reach its mass.)
+  Most published designs are Pareto-dominated
+  by the optimiser front under the class-neutral anchor; this reflects
+  design constraints the conceptual model does not carry (radiation,
+  deployability, integration and redundancy margins), not a claim that
+  flight designs are sub-optimal. Full results and per-rover JSON
+  artefacts are in
+  `reports/rediscovery_loo_evaluator/rediscovery_loo_report.md`.
 
 ## Reproducibility
 
@@ -272,6 +256,16 @@ regenerates the figures into `reports/figures/`.
 RoverDevKit is developed by the Autonomous Mission Systems Lab at Duke University.
 The project focuses on open, reproducible design-space exploration for lunar
 micro-rovers in the pre-Phase A / conceptual-design regime.
+
+## Use of AI Tools
+
+Portions of this repository's code and documentation were developed with the
+assistance of an AI coding tool — Anthropic's Claude (Opus 4.8) via the Cursor
+IDE — for code generation, refactoring, and documentation drafting. All
+AI-assisted contributions were reviewed, tested, and validated by the authors,
+who take full responsibility for the correctness of the physics models,
+methods, results, and claims presented here. This disclosure is provided in the
+interest of research transparency and reproducibility.
 
 ## Citation
 

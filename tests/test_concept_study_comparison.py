@@ -52,7 +52,6 @@ def moonranger_comparison() -> ConceptStudyComparison:
         n_generations=4,
         evaluator_eval_cap=200,
         seed=0,
-        use_scm_correction=True,
     )
 
 
@@ -118,7 +117,6 @@ def test_published_metrics_predicted_matches_evaluator(
     direct = evaluator_evaluate(
         entry.published_design,
         load_scenario(entry.scenario_name),
-        use_scm_correction=True,
     )
     assert c.published_metrics_predicted["range_km"] == pytest.approx(
         float(direct.range_km), rel=1e-6

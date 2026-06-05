@@ -1,9 +1,8 @@
 name: roverdevkit
 channels:
   - conda-forge
-  - projectchrono
 dependencies:
-  - python=3.12   # 3.11 is skipped by the PyChrono conda-forge builds
+  - python=3.12
 
   - pip
   - numpy>=1.26
@@ -15,9 +14,6 @@ dependencies:
   - jupyterlab>=4.0
   - pyyaml>=6.0
   - tqdm>=4.66
-  # PyChrono (Path 2 — SCM corrections). If install fails on macOS/ARM,
-  # skip this line and work from the Path 1 analytical track.
-  - projectchrono::pychrono
   - pip:
       - xgboost>=2.0
       - pymoo>=0.6.1

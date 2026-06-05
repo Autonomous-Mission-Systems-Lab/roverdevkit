@@ -49,7 +49,6 @@ dependencies = [
 
 [project.optional-dependencies]
 torch = ["torch>=2.2"]
-chrono = []  # PyChrono is installed via conda, not pip
 webapp = [
   # Browser-based tradespace tool backend.
   # Frontend toolchain (Node 20 LTS + npm) is managed separately under webapp/frontend/.
@@ -117,6 +116,5 @@ pythonpath = ["."]
 addopts = "-ra --strict-markers"
 markers = [
   "slow: slow tests (>10s)",
-  "chrono: requires PyChrono",
   "integration: full mission evaluator integration tests",
 ]

@@ -41,7 +41,6 @@ from roverdevkit.tradespace.sweeps import (
 )
 from webapp.backend.loaders import (
     get_canonical_scenarios,
-    get_correction,
     get_quantile_bundles,
     get_soil_for_simulant,
 )
@@ -136,7 +135,6 @@ def _cached_sweep(_request_key: str, req_json: str) -> SweepResponse:
     )
 
     soil = get_soil_for_simulant(scenario.soil_simulant)
-    correction = get_correction()
     bundles = get_quantile_bundles()
 
     try:
@@ -145,7 +143,6 @@ def _cached_sweep(_request_key: str, req_json: str) -> SweepResponse:
             req.base_design,
             scenario,
             soil,
-            correction=correction,
             bundles=bundles,
         )
     except ValueError as exc:
@@ -159,8 +156,6 @@ def _cached_sweep(_request_key: str, req_json: str) -> SweepResponse:
         z_values = [float(v) for v in result.z_values.tolist()]
     else:
         z_values = [[float(v) for v in row] for row in result.z_values.tolist()]
-
-    used_scm_correction = result.backend_used == "evaluator" and correction is not None
 
     sens = compute_sensitivity(result)
 
@@ -178,7 +173,6 @@ def _cached_sweep(_request_key: str, req_json: str) -> SweepResponse:
         z_values=z_values,
         backend_used=result.backend_used,  # type: ignore[arg-type]
         backend_requested=req.backend,
-        used_scm_correction=used_scm_correction,
         n_cells=spec.n_cells(),
         elapsed_ms=result.elapsed_s * 1000.0,
         sensitivity=SweepSensitivityOut(

@@ -113,17 +113,6 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Disable the tqdm progress bar.",
     )
     p.add_argument(
-        "--use-scm-correction",
-        action="store_true",
-        help=(
-            "Compose the trained wheel-level SCM correction "
-            "(roverdevkit/terramechanics/correction_model.py) into the "
-            "analytical evaluator. Required for v4 / lhs_v4.parquet "
-            "builds; falls back to BW-only with a warning if the "
-            "correction artifact is missing on disk."
-        ),
-    )
-    p.add_argument(
         "--notes",
         type=str,
         default="",
@@ -150,14 +139,13 @@ def main(argv: list[str] | None = None) -> int:
 
     log.info(
         "schema=%s n_per_scenario=%d families=%d total_samples=%d workers=%d seed=%d "
-        "use_scm_correction=%s out=%s",
+        "out=%s",
         SCHEMA_VERSION,
         args.n_per_scenario,
         len(args.families),
         args.n_per_scenario * len(args.families),
         workers,
         args.seed,
-        args.use_scm_correction,
         args.out,
     )
 
@@ -177,7 +165,6 @@ def main(argv: list[str] | None = None) -> int:
         scenario_families=tuple(args.families),
         val_frac=args.val_frac,
         test_frac=args.test_frac,
-        use_scm_correction=args.use_scm_correction,
         notes=args.notes,
     )
 
@@ -191,7 +178,6 @@ def main(argv: list[str] | None = None) -> int:
             "n_workers": workers,
             "chunksize": args.chunksize,
             "progress": not args.no_progress,
-            "use_scm_correction": args.use_scm_correction,
         },
     )
     elapsed = time.perf_counter() - t0

@@ -13,22 +13,11 @@
 #     docker build -f webapp/Dockerfile -t roverdevkit/webapp:dev .
 #
 # The image bakes in:
-#  - the corrected mission evaluator + wheel-level SCM correction
-#    (`data/scm/correction_v1.joblib`),
+#  - the analytical Bekker-Wong mission evaluator,
 #  - the v9 quantile-XGB surrogate bundles
 #    (`reports/surrogate_v9/quantile_bundles.joblib`),
 #  - the canonical Pareto fronts (`reports/pareto_fronts/`),
-#  - the rediscovery LOO artifacts
-#    (`reports/rediscovery_loo_evaluator/`,
-#    `reports/rediscovery_loo_surrogate_v9/`),
 #  - the built React frontend (`/app/static/`).
-#
-# It does **not** install PyChrono. PyChrono is a conda-only
-# dependency consumed by `scripts/run_scm_sweep.py`, not by the
-# runtime evaluator (the wheel-level correction artefact is loaded
-# as a precomputed joblib blob). If you want to regenerate the
-# correction model from inside the container, mount a host-side
-# conda env at `/opt/conda` and rebuild outside Docker.
 
 # ---------------------------------------------------------------------------
 # Stage 1: build the frontend bundle

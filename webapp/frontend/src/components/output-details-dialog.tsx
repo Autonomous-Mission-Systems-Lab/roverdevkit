@@ -21,12 +21,6 @@ const SURROGATE_METRICS: Record<
   total_mass_kg: { medianR2: "1.000", coverage: "91.5%" },
 };
 
-const WHEEL_CORRECTION_METRICS = [
-  { label: "Drawbar pull residual", r2: "0.965" },
-  { label: "Driving torque residual", r2: "0.912" },
-  { label: "Sinkage residual", r2: "0.913" },
-];
-
 export function OutputDetailsButton({ target }: { target: PrimaryTarget }) {
   const meta = TARGET_META[target];
   return (
@@ -49,9 +43,6 @@ export function OutputDetailsButton({ target }: { target: PrimaryTarget }) {
         <div className="space-y-5 text-sm leading-6">
           <TargetCalculation target={target} />
           <SurrogatePerformance target={target} />
-          {target === "range_km" || target === "slope_capability_deg" ? (
-            <WheelCorrectionPerformance />
-          ) : null}
         </div>
       </DialogContent>
     </Dialog>
@@ -76,7 +67,7 @@ function TargetCalculation({ target }: { target: PrimaryTarget }) {
           throttled to max(0, (P_solar - P_avionics) / P_mobility)
         </Equation>
         <p className="text-[var(--color-muted-foreground)]">
-          Mobility power depends on corrected wheel torque and sinkage, so range
+          Mobility power depends on wheel torque and sinkage, so range
           inherits wheel geometry, soil, mass, slope, solar-area, battery, and
           avionics effects.
         </p>
@@ -99,7 +90,7 @@ function TargetCalculation({ target }: { target: PrimaryTarget }) {
         <p className="text-[var(--color-muted-foreground)]">
           Solar power depends on scenario latitude / sun geometry, panel area,
           panel efficiency, and dust factor. Mobility load comes from the same
-          corrected wheel-force path used by range.
+          Bekker-Wong wheel-force path used by range.
         </p>
       </section>
     );
@@ -109,21 +100,20 @@ function TargetCalculation({ target }: { target: PrimaryTarget }) {
       <section className="space-y-2">
         <h3 className="font-medium">How slope capability is calculated</h3>
         <p className="text-[var(--color-muted-foreground)]">
-          The evaluator searches for the steepest slope where the corrected
+          The evaluator searches for the steepest slope where the Bekker-Wong
           wheel-soil model can still generate enough drawbar pull to balance the
           downslope component of rover weight without exceeding available wheel
           torque.
         </p>
         <Equation>required_drawbar_pull = m_total · g_moon · sin(θ)</Equation>
         <Equation>
-          feasible if Σ F_drawbar_corrected(slip, wheel, soil, load) ≥
+          feasible if Σ F_drawbar(slip, wheel, soil, load) ≥
           required_drawbar_pull
         </Equation>
         <Equation>slope_capability_deg = max feasible θ</Equation>
         <p className="text-[var(--color-muted-foreground)]">
           Grousers increase shear thrust through the engaged-grouser term, with a
-          saturation cap, and the learned SCM correction shifts drawbar pull and
-          torque toward the higher-fidelity PyChrono SCM response.
+          saturation cap (Iizuka &amp; Kubota 2011).
         </p>
       </section>
     );
@@ -145,7 +135,7 @@ function TargetCalculation({ target }: { target: PrimaryTarget }) {
         m_motors scales with n_wheels and peak_wheel_torque_nm
       </Equation>
       <p className="text-[var(--color-muted-foreground)]">
-        Total mass does not use the wheel-force correction model directly, but it
+        Total mass does not use the wheel-force model directly, but it
         feeds back into mobility because heavier designs increase normal load,
         sinkage, and required drawbar pull.
       </p>
@@ -163,43 +153,12 @@ function SurrogatePerformance({ target }: { target: PrimaryTarget }) {
         on evaluator-generated data. The median shown in the table is the
         deterministic evaluator output; the surrogate supplies the uncertainty
         envelope around it (and the SHAP attributions on the Explain Design
-        tab). The Optimize Design tab's NSGA-II search uses the corrected
+        tab). The Optimize Design tab's NSGA-II search uses the analytical
         physics evaluator directly as its fitness function.
       </p>
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
         <Metric label="Median R²" value={perf.medianR2} />
         <Metric label="90% PI coverage" value={perf.coverage} />
-      </div>
-    </section>
-  );
-}
-
-function WheelCorrectionPerformance() {
-  return (
-    <section>
-      <h3 className="font-medium">Wheel-force correction model</h3>
-      <p className="text-[var(--color-muted-foreground)]">
-        Range and slope use wheel forces from Bekker-Wong plus a learned residual
-        correction toward PyChrono SCM. The correction is fit at wheel level and
-        is composed inside the mission evaluator.
-      </p>
-      <div className="mt-2 overflow-hidden rounded-md border">
-        <table className="w-full text-xs">
-          <thead className="bg-[var(--color-muted)] text-[var(--color-muted-foreground)]">
-            <tr>
-              <th className="px-3 py-1.5 text-left font-medium">Correction target</th>
-              <th className="px-3 py-1.5 text-right font-medium">Test R²</th>
-            </tr>
-          </thead>
-          <tbody>
-            {WHEEL_CORRECTION_METRICS.map((row) => (
-              <tr key={row.label} className="border-t">
-                <td className="px-3 py-1.5">{row.label}</td>
-                <td className="px-3 py-1.5 text-right tabular-nums">{row.r2}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </section>
   );

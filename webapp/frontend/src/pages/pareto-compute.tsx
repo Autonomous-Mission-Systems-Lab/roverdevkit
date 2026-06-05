@@ -228,66 +228,64 @@ export function ParetoCompute() {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(20rem,0.85fr)_minmax(0,1.45fr)]">
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Find optimized designs</CardTitle>
-            <CardDescription>
-              Choose mission objectives and constraints, then search the design
-              space for high-performing tradeoff designs. The live search runs
-              NSGA-II with the corrected physics evaluator as the fitness
-              function, capped at {EVALUATOR_EVAL_CAP.toLocaleString()}{" "}
-              evaluations so a job finishes within a minute or so.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <MissionInputsPanel disabled={startOptimize.isPending} />
-            <ObjectiveEditor
-              enabled={objectiveEnabled}
-              directions={objectiveDirections}
-              setEnabled={setObjectiveEnabled}
-              setDirections={setObjectiveDirections}
-            />
-            <ConstraintEditor constraints={constraints} setConstraints={setConstraints} />
-            <BudgetEditor
-              populationSize={populationSize}
-              nGenerations={nGenerations}
-              seed={seed}
-              setPopulationSize={setPopulationSize}
-              setNGenerations={setNGenerations}
-              setSeed={setSeed}
-            />
-            {evaluationBudget > EVALUATOR_EVAL_CAP ? (
-              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                Live NSGA-II is capped at {EVALUATOR_EVAL_CAP.toLocaleString()}{" "}
-                evaluator calls (~2 min wall clock). Lower population or
-                generations before running, or run{" "}
-                <code>make pareto-fronts</code> offline for higher budgets.
-              </p>
-            ) : null}
-            <Button
-              type="button"
-              onClick={handleRun}
-              disabled={
-                startOptimize.isPending ||
-                selectedObjectives.length === 0 ||
-                evaluationBudget > EVALUATOR_EVAL_CAP
-              }
-              className="w-full"
-              size="lg"
-            >
-              <Play className="mr-2 h-4 w-4" />
-              {startOptimize.isPending ? "Queueing job..." : "Run NSGA-II"}
-            </Button>
-            {streamError ? (
-              <p className="text-sm text-[var(--color-destructive)]">{streamError}</p>
-            ) : null}
-          </CardContent>
-        </Card>
-      </div>
+    <>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(20rem,0.85fr)_minmax(0,1.45fr)]">
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Find optimized designs</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <MissionInputsPanel
+                disabled={startOptimize.isPending}
+                showDescription={false}
+              />
+              <ObjectiveEditor
+                enabled={objectiveEnabled}
+                directions={objectiveDirections}
+                setEnabled={setObjectiveEnabled}
+                setDirections={setObjectiveDirections}
+              />
+              <ConstraintEditor constraints={constraints} setConstraints={setConstraints} />
+              <BudgetEditor
+                populationSize={populationSize}
+                nGenerations={nGenerations}
+                seed={seed}
+                setPopulationSize={setPopulationSize}
+                setNGenerations={setNGenerations}
+                setSeed={setSeed}
+              />
+              {evaluationBudget > EVALUATOR_EVAL_CAP ? (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                  Live NSGA-II is capped at {EVALUATOR_EVAL_CAP.toLocaleString()}{" "}
+                  evaluator calls (~2 min wall clock). Lower population or
+                  generations before running, or run{" "}
+                  <code>make pareto-fronts</code> offline for higher budgets.
+                </p>
+              ) : null}
+              <Button
+                type="button"
+                onClick={handleRun}
+                disabled={
+                  startOptimize.isPending ||
+                  selectedObjectives.length === 0 ||
+                  evaluationBudget > EVALUATOR_EVAL_CAP
+                }
+                className="w-full"
+                size="lg"
+              >
+                <Play className="mr-2 h-4 w-4" />
+                {startOptimize.isPending ? "Queueing job..." : "Run NSGA-II"}
+              </Button>
+              {streamError ? (
+                <p className="text-sm text-[var(--color-destructive)]">{streamError}</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
 
-      <ParetoExplorer />
+        <ParetoExplorer />
+      </div>
 
       <Dialog open={progressOpen} onOpenChange={setProgressOpen}>
         <DialogContent>
@@ -332,7 +330,7 @@ export function ParetoCompute() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 

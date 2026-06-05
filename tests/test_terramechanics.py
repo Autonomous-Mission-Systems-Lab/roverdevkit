@@ -182,7 +182,7 @@ def test_drawbar_pull_much_smaller_at_zero_than_driving_slip(
     high-friction low-cohesion soils (Apollo regolith, φ ≈ 46°) this can
     tip the integrated DP slightly positive. That's a known ±15–30 %
     weakness of the analytical model (cf. Ishigami 2007, Ding 2011) and
-    is exactly what the Path-2 SCM correction layer is meant to absorb.
+    is exactly the kind of model-form error the published tolerance band covers.
     The robust first-principles test is therefore on the *ratio*: at
     zero slip, whatever sign it has, the magnitude should be much smaller
     than at moderate driving slip.

@@ -223,7 +223,7 @@ def run_rediscovery_loo(
     evaluator_eval_cap
         Safety cap on the evaluator-backed NSGA-II runner per seed.
         Defaults to 1 000 (webapp value); raise to 10 000 or higher
-        for paper-grade runs.
+        for high-budget validation runs.
 
     Returns
     -------
@@ -489,7 +489,7 @@ def _markdown_for_summary(
         "generic micro-rover scenarios (`polar_micro`, `mare_micro`,",
         "`highland_micro`, `crater_rim_micro`); see the per-YAML header",
         "comments and the `rover_rediscovery` module docstring for the",
-        "two leakage controls (class-neutral δ_ops and mass-only budget).",
+                "two leakage controls (class-neutral operational duty cycle and mass-only budget).",
         "",
         "The bottom-up mass model's specific-mass coefficients in",
         "`MassModelParams` are cited from external space-hardware sources",
@@ -554,20 +554,19 @@ def _markdown_for_summary(
                 "  nearest Pareto point under its class-generic scenario.",
                 "  In a 9-D unit cube the expected L2 between two uniformly",
                 "  random points is sqrt(9/6) ~= 1.22, so distance / 1.22",
-                "  is the fraction-of-random-pair baseline. Distances",
-                "  well below ~0.4 (~30%% of the random-pair baseline)",
-                "  are a meaningful proximity claim; ~0.7-1.0 indicates",
-                "  the optimiser's front lands in the neighbourhood",
-                "  rather than at the rover's design vector.",
+                "  is the fraction of the random-pair baseline. The smaller",
+                "  this fraction, the closer the optimiser's front lands to",
+                "  the rover's published design; ~0.7-1.0 indicates the front",
+                "  lands in the broader neighbourhood rather than at the",
+                "  design vector. Distances are reported relative to this",
+                "  baseline rather than against any fixed pass/fail cutoff.",
                 "- **Pareto-dominated** is a *secondary* signal. Several",
-                "  flown rovers flip to `True` once the canonical",
-                "  scenarios' inspection-calibrated δ_ops anchors are",
-                "  removed (A3): under a class-neutral δ_ops = 0.10",
-                "  assumption, the optimiser's front contains lighter",
-                "  designs that beat real rovers in every objective.",
-                "  This is consistent with the published engineering",
-                "  rationale for those rovers (extreme conservatism for",
-                "  short-mission survival margin) and does **not** by",
+                "  rovers flip to `True` under a class-neutral",
+                "  operational-duty-cycle assumption: the optimiser's front",
+                "  contains lighter designs that beat real rovers in every",
+                "  modelled objective. This reflects design constraints the",
+                "  conceptual model does not carry (radiation, deployability,",
+                "  integration and redundancy margins) and does **not** by",
                 "  itself indicate a problem with the optimiser.",
             ]
         )

@@ -1,9 +1,9 @@
-"""Run the Layer-6 ±20 % soil + MassModelParams robustness sweep.
+"""Run the ±20 % soil + MassModelParams robustness sensitivity check.
 
 Wraps :func:`roverdevkit.validation.robustness.cross_scenario_robustness_sweep`
 with sensible defaults and writes a markdown report plus a flat CSV of
 every (scenario × archetype × perturbation) cell so the §8.5 paper
-paragraph can cite both the headline ranking-preservation table and
+paragraph can cite both the supporting ranking-preservation table and
 the per-cell drift values.
 
 Usage::
@@ -85,21 +85,24 @@ def main() -> None:
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
 
-    print("[layer6] running cross-scenario robustness sweep ...")
+    print("[robustness] running cross-scenario robustness sweep ...")
     summaries = cross_scenario_robustness_sweep()
-    print(f"[layer6] {len(summaries)} perturbations × {summaries[0].n_cells} cells each")
+    print(f"[robustness] {len(summaries)} perturbations × {summaries[0].n_cells} cells each")
 
     report_md = format_robustness_report(summaries)
     md_path = args.out / "layer6_robustness.md"
     md_path.write_text(report_md, encoding="utf-8")
-    print(f"[layer6] wrote {md_path}")
+    print(f"[robustness] wrote {md_path}")
 
     csv_path = args.out / "layer6_entries.csv"
     _write_entries_csv(summaries, csv_path)
-    print(f"[layer6] wrote {csv_path}")
+    print(f"[robustness] wrote {csv_path}")
 
     n_passing = sum(1 for s in summaries if s.all_rankings_preserved)
-    print(f"[layer6] {n_passing}/{len(summaries)} perturbations preserve all archetype rankings")
+    print(
+        f"[robustness] {n_passing}/{len(summaries)} perturbations preserve "
+        "all archetype rankings"
+    )
 
 
 if __name__ == "__main__":

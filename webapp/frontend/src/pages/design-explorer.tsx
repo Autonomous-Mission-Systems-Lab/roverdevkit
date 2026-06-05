@@ -32,9 +32,9 @@ import {
 } from "@/types/api";
 
 /**
- * Single-design panel: scenario picker + 12-D design form on the
- * left, prediction (deterministic median + 90% PI) on the right,
- * with optional real-rover overlays for direct comparison.
+ * Single-design panel: mission inputs and rover comparison across the
+ * top, then design inputs on the left and predicted performance on the
+ * right.
  *
  * The chart's median diamond is the corrected mission evaluator's
  * deterministic output; the surrogate's quantile heads supply the
@@ -142,15 +142,8 @@ export function DesignExplorer() {
 
   const meta: PredictionPanelMeta | undefined = evaluate.data
     ? {
-        used_scm_correction: evaluate.data.used_scm_correction,
-        evaluator_ms: evaluate.data.elapsed_ms,
         thermal: evaluate.data.thermal,
-        // Schema v6 (v6 schema update): the v5 ``motor_torque`` field was
-        // renamed to ``stall`` and now exposes per-wheel torque
-        // demand-vs-capacity directly.
         stall: evaluate.data.stall,
-        effective_duty_cycle: evaluate.data.effective_duty_cycle,
-        cruise_speed_mps: evaluate.data.cruise_speed_mps,
       }
     : undefined;
 
@@ -184,35 +177,56 @@ export function DesignExplorer() {
   const error = evaluate.error ?? (rows === undefined ? predict.error : null);
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Rover design</CardTitle>
+          <CardTitle>Mission inputs</CardTitle>
           <CardDescription>
-            Choose a mission scenario and configure a candidate rover. Inputs
-            are bounded to the calibrated design space; out-of-range values are
-            rejected.
+            Scenario, scientific payload, and drive duty cycle.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <MissionInputsPanel disabled={isPending} />
-          <RegistryOverlayPicker />
-          <DesignForm disabled={isPending} ticks={formTicks} />
-          <Button
-            type="button"
-            onClick={handlePredict}
-            disabled={isPending}
-            className="w-full"
-            size="lg"
-          >
-            <Play className="mr-2 h-4 w-4" />
-            {isPending ? "Evaluating…" : "Predict performance"}
-          </Button>
+        <CardContent>
+          <MissionInputsPanel disabled={isPending} embedded />
         </CardContent>
       </Card>
 
-      <div className="space-y-3">
-        {evaluatorOnlyMode ? <NoPiBanner /> : null}
+      <Card>
+        <CardHeader>
+          <CardTitle>Compare with real rovers</CardTitle>
+          <CardDescription>
+            Select registry rovers to overlay their evaluator output on the
+            performance chart under the current scenario and mission inputs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RegistryOverlayPicker showHeader={false} />
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Design inputs</CardTitle>
+            <CardDescription>
+              Configure the candidate rover within the calibrated design space.
+              Coloured marks on sliders show selected real-rover values.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <DesignForm disabled={isPending} ticks={formTicks} />
+            <Button
+              type="button"
+              onClick={handlePredict}
+              disabled={isPending}
+              className="w-full"
+              size="lg"
+            >
+              <Play className="mr-2 h-4 w-4" />
+              {isPending ? "Evaluating…" : "Predict performance"}
+            </Button>
+          </CardContent>
+        </Card>
+
         <PredictionPanel
           rows={rows}
           meta={meta}
@@ -221,6 +235,7 @@ export function DesignExplorer() {
           surrogatePending={surrogatePending}
           overlays={overlays}
           overlayLoading={overlayInputs.length > 0 && overlayQueries.isPending}
+          banner={evaluatorOnlyMode ? <NoPiBanner /> : null}
         />
       </div>
     </div>

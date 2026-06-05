@@ -49,22 +49,19 @@ reports/**/*.log
 
 # Datasets / artifacts that aren't needed at runtime. The runtime
 # image only needs:
-#   - data/ (soils, scenarios, validation set, scm correction blob)
+#   - data/ (soils, scenarios, validation set)
 #   - reports/surrogate_v9/quantile_bundles.joblib
 #   - reports/pareto_fronts/
-#   - reports/rediscovery_loo_evaluator/
-#   - reports/rediscovery_loo_surrogate_v9/
 # Heavy training-time parquets and superseded surrogate versions stay
 # out so the image fits inside typical free-tier hosting limits.
 data/analytical/
-data/scm/runs_*.parquet
 reports/baselines_*
 reports/surrogate_v7_1/
 reports/surrogate_v8/
 reports/tuned_v7/
 reports/tuned_v8/
 reports/tuned_v9/
-reports/rediscovery_loo_surrogate_v8/
+reports/rediscovery_loo_*/
 reports/validation_*/
 reports/concept_study_comparison*
 reports/week*/

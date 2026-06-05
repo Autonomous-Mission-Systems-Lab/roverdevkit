@@ -1,11 +1,11 @@
-"""Layer-6 robustness sweep.
+"""Robustness sensitivity check for qualitative design conclusions.
 
 Perturbs each scenario's soil parameters and the bottom-up
 :class:`roverdevkit.mass.parametric_mers.MassModelParams` specific-mass
 coefficients by ±20 %, re-runs the cross-scenario archetype set under
 each perturbation, and reports continuous-metric drift plus the
-qualitative-ranking-stability check the §7 Layer-6 entry of
-``project_plan.md`` describes:
+qualitative-ranking-stability check cited by the paper's robustness
+paragraph:
 
     "Perturb soil parameters and ``MassModelParams`` specific-mass
     coefficients by ±20 %, re-run optimization, check if qualitative
@@ -27,7 +27,7 @@ Outputs
   plus a per-scenario flag for whether the archetype ranking
   (range / energy-margin / slope-capability winner) is preserved.
 - :func:`format_robustness_report` — markdown writer suitable for
-  ``reports/layer6_robustness.md`` and the §8.5 paper paragraph.
+  the robustness sensitivity paragraph and supporting artifacts.
 """
 
 from __future__ import annotations
@@ -205,7 +205,7 @@ class RobustnessEntry:
 
 @dataclass(frozen=True)
 class RobustnessSummary:
-    """Aggregate Layer-6 outcome across all (scenario, archetype) cells.
+    """Aggregate one perturbation across all (scenario, archetype) cells.
 
     ``median_abs_rel_drift_energy_margin`` operates on
     ``energy_margin_raw_pct`` so the metric reports real signal even
@@ -262,7 +262,7 @@ def cross_scenario_robustness_sweep(
     designs: dict[str, DesignVector] | None = None,
     scenarios: list[MissionScenario] | None = None,
 ) -> list[RobustnessSummary]:
-    """Run the Layer-6 archetype × scenario × perturbation sweep.
+    """Run the archetype × scenario × perturbation robustness sweep.
 
     Parameters
     ----------
@@ -414,7 +414,7 @@ def _fmt_pct(x: float) -> str:
 def format_robustness_report(summaries: list[RobustnessSummary]) -> str:
     """Render a :func:`cross_scenario_robustness_sweep` result as markdown."""
     lines: list[str] = []
-    lines.append("# Layer-6 robustness sweep")
+    lines.append("# Robustness sensitivity check")
     lines.append("")
     lines.append(
         "Each perturbation is applied to every canonical scenario × archetype "
@@ -473,8 +473,8 @@ def format_robustness_report(summaries: list[RobustnessSummary]) -> str:
         "Reading: a `yes` row means every archetype winner is preserved "
         "under that perturbation. A `no` cell means at least one of the "
         "three winners (range / energy-margin / slope) flipped, which is "
-        "the operational definition of 'qualitative conclusions did not "
-        "persist' from §7 Layer 6 of the project plan."
+        "the operational definition used here for a qualitative conclusion "
+        "that does not persist under coefficient uncertainty."
     )
     return "\n".join(lines) + "\n"
 

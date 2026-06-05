@@ -40,11 +40,10 @@ without a real design trade-off. The system-level evaluator still
 computes it as a diagnostic; a future mass-model upgrade that charges
 RHU/MLI mass would restore thermal as a learnable Pareto target.
 
-Engineered features (``add_engineered_features``) are deferred to
-SCM-correction: base numeric + categorical columns are sufficient for the
-baseline-surrogate XGBoost baseline and the multi-fidelity composition, and
-adding engineered features pre-baseline would confound the
-"did-features-help?" ablation.
+Engineered features (``add_engineered_features``) are deferred to a
+later phase: base numeric + categorical columns are sufficient for the
+baseline-surrogate XGBoost baseline, and adding engineered features
+pre-baseline would confound the "did-features-help?" ablation.
 """
 
 from __future__ import annotations

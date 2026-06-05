@@ -12,18 +12,28 @@
 - :mod:`.cross_scenario`    — qualitative archetype-ranking checks across
   the four scenario families and one-at-a-time design-variable sensitivity
   (real-rover validation, Layer 7).
-- :mod:`.robustness`        — Layer-6 ±20 % soil and ``MassModelParams``
-  perturbation sweep over (scenario × archetype) cells; reports
-  continuous-metric drift and ranking-preservation per scenario.
+- :mod:`.robustness`        — supporting ±20 % soil and
+  ``MassModelParams`` perturbation sweep over (scenario × archetype)
+  cells; reports continuous-metric drift and ranking-preservation per
+  scenario.
 
-Layer-3 sub-model validation against published wheel-testbed data is
-shipped as the parametric reference grid in
-``data/validation/wong_layer3_reference.csv``, exercised by
-``tests/test_terramechanics.py::test_layer3_published_reference_grid``
-(Wong 2008 §4.2 worked-example fixture, Pragyan- and Yutu-2-class
-rover-class operating points, and Iizuka & Kubota 2011 grouser-thrust
-limit cases, each row with documented tolerance bands). The
-consolidated layered error-budget that pulls Layers 1-7 into a single
+Layer-3 sub-model validation against published wheel-testbed data has two
+strands:
+
+- :mod:`.terramechanics_experiment` — experiment-vs-model harness comparing
+  the BW kernel to *measured* single-wheel
+  drawbar-pull / sinkage / torque digitised from published experiments
+  (worksheet ``data/validation/single_wheel_experiments.csv``; figure
+  ``reports/figures/fig_terramechanics_experiment.png``; tested by
+  ``tests/test_terramechanics_experiment.py``).
+- the parametric reference grid in
+  ``data/validation/wong_layer3_reference.csv``, exercised by
+  ``tests/test_terramechanics.py::test_layer3_published_reference_grid``
+  (Wong 2008 §4.2 worked-example fixture, Pragyan- and Yutu-2-class
+  rover-class operating points, and Iizuka & Kubota 2011 grouser-thrust
+  limit cases, each row with documented tolerance bands).
+
+The consolidated layered error-budget that pulls Layers 1-7 into a single
 chain lives at ``reports/error_budget.md``.
 """
 
@@ -75,6 +85,12 @@ from roverdevkit.validation.rover_registry import (
     registry_by_name,
     truth_by_rover,
 )
+from roverdevkit.validation.terramechanics_experiment import (
+    ExperimentPoint,
+    compare_to_experiment,
+    load_experiment_points,
+    summarise,
+)
 
 __all__ = [
     "CONCEPT_STUDIES",
@@ -82,6 +98,7 @@ __all__ = [
     "ConceptStudyComparison",
     "ConceptStudyEntry",
     "DEFAULT_PER_ROVER_OVERRIDES",
+    "ExperimentPoint",
     "Perturbation",
     "PublishedTruth",
     "RediscoveryResult",
@@ -95,6 +112,7 @@ __all__ = [
     "compare_all",
     "compare_concept_to_pareto",
     "compare_one",
+    "compare_to_experiment",
     "cross_scenario_robustness_sweep",
     "default_perturbations",
     "flown_registry",
@@ -102,6 +120,7 @@ __all__ = [
     "format_robustness_report",
     "get_concept_study",
     "list_concept_studies",
+    "load_experiment_points",
     "load_truth_table",
     "perturb_mass_params",
     "perturb_soil",
@@ -110,6 +129,7 @@ __all__ = [
     "registry",
     "registry_by_name",
     "run_rediscovery_loo",
+    "summarise",
     "summarize_results",
     "truth_by_rover",
     "write_loo_artifacts",

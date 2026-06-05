@@ -1,13 +1,11 @@
 """Drivetrain torque-speed envelope and cruise-speed derivation.
 
-v6 schema update (2026-04-28) overhaul. Background and design rationale:
-the version history in ``data/analytical/SCHEMA.md``. Schema v7 (v6 schema update
-follow-up) consolidated the v6 designed/operational duty-cycle split
-back into a single per-scenario ``operational_duty_cycle``: the v6
-``designed_duty_cycle`` field carried no engineering content (the v6
-mass model never actually scaled with it) so the only role of
-``δ_des`` was to upper-bound ``δ_eff``, which a user can equivalently
-express by lowering ``operational_duty_cycle``.
+Cruise speed is derived inside the evaluator rather than supplied as a
+design input; see ``data/analytical/SCHEMA.md`` for the current schema.
+Drive duty cycle is a single per-scenario ``operational_duty_cycle``:
+the only role of a separate designed duty cycle was to upper-bound
+``δ_eff``, which a user can equivalently express by lowering
+``operational_duty_cycle``.
 
 The pre-schema-v7 design vector exposed ``nominal_speed_mps`` and
 ``drive_duty_cycle`` as free design *inputs* and gated mobility on an

@@ -22,25 +22,9 @@ import type {
 import { TARGET_META } from "@/types/api";
 
 export interface PredictionPanelMeta {
-  /** Whether the SCM-corrected physics evaluator was used (vs BW-only fallback). */
-  used_scm_correction: boolean;
-  /** Mission-evaluator wall-clock in milliseconds (for the user's current design). */
-  evaluator_ms: number;
-  /**
-   * Structured constraint diagnostics from the deterministic evaluator.
-   * Used by the footer chips to show pass/fail and to back the
-   * click-for-details dialog explaining *why* a flag fired.
-   *
-   * Schema v6 (v6 schema update): the v5 ``motor_torque`` field was renamed
-   * to ``stall`` and now exposes the explicit per-wheel torque
-   * demand-vs-capacity comparison from the run-traverse stall gate.
-   */
+  /** Structured constraint diagnostics from the deterministic evaluator. */
   thermal: ThermalDiagnostic;
   stall: StallDiagnostic;
-  /** δ_eff = δ_ops (clamped to [0, 1]) the evaluator actually drove at. */
-  effective_duty_cycle: number;
-  /** Derived rover cruise speed (m/s) the time loop drove at. */
-  cruise_speed_mps: number;
 }
 
 interface PredictionPanelProps {
@@ -55,15 +39,17 @@ interface PredictionPanelProps {
   surrogatePending?: boolean;
   overlays?: OverlayPrediction[];
   overlayLoading?: boolean;
+  /** Optional banner (e.g. evaluator-only PI warning) above the chart. */
+  banner?: ReactNode;
 }
 
 /**
  * Right-hand panel: chart + numeric summary table for the latest prediction.
  *
- * The median value is the deterministic output of the corrected mission
- * evaluator (BW + wheel-level SCM correction); the q05/q95 columns and
- * the chart's blue bars are the surrogate's calibrated 90% prediction
- * interval wrapping that median.
+ * The median value is the deterministic output of the analytical mission
+ * evaluator (Bekker-Wong); the q05/q95 columns and the chart's blue bars
+ * are the surrogate's calibrated 90% prediction interval wrapping that
+ * median.
  */
 export function PredictionPanel({
   rows,
@@ -73,6 +59,7 @@ export function PredictionPanel({
   surrogatePending = false,
   overlays = [],
   overlayLoading = false,
+  banner,
 }: PredictionPanelProps) {
   return (
     <Card className="h-full">
@@ -81,17 +68,12 @@ export function PredictionPanel({
         <CardDescription>
           Median (♦) is the physics evaluator&rsquo;s deterministic output; the
           blue bar shows the surrogate&rsquo;s calibrated 90% prediction
-          interval around it.
-          {overlays.length > 0 ? (
-            <>
-              {" "}
-              Coloured circles show the same evaluator output for selected real
-              rovers run on this scenario, for comparison.
-            </>
-          ) : null}
+          interval around it. Selected real rovers appear as coloured circles on
+          the chart.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {banner}
         {isPending ? (
           <div className="flex items-center gap-2 text-sm text-[var(--color-muted-foreground)]">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -174,21 +156,12 @@ export function PredictionPanel({
 
 function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
   const thermalOk = meta.thermal.survives;
-  // Schema v6: ``stalled`` is the *infeasibility* flag (positive = bad);
-  // negate to get the OK polarity the chip expects.
   const driveOk = !meta.stall.stalled;
   const allOk = thermalOk && driveOk;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--color-muted-foreground)]">
-      <span>
-        Evaluator: {meta.evaluator_ms.toFixed(0)} ms
-        {meta.used_scm_correction ? " · SCM-corrected" : " · Bekker–Wong only"}
-        {" · "}v<sub>cruise</sub> {fmtCruiseSpeed(meta.cruise_speed_mps)}
-        {" · δ_eff "}
-        {meta.effective_duty_cycle.toFixed(2)}
-      </span>
+    <div className="flex flex-wrap items-center gap-2 text-xs">
       {allOk ? (
-        <span className="flex flex-wrap items-center gap-2">
+        <>
           <ConstraintChip
             label="thermal survival ok"
             ok
@@ -213,9 +186,9 @@ function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
               />
             }
           />
-        </span>
+        </>
       ) : (
-        <span className="flex flex-wrap items-center gap-2">
+        <>
           {!thermalOk ? (
             <ConstraintChip
               label="thermal survival fails"
@@ -244,17 +217,10 @@ function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
               }
             />
           ) : null}
-        </span>
+        </>
       )}
     </div>
   );
-}
-
-function fmtCruiseSpeed(v: number): string {
-  if (!Number.isFinite(v) || v <= 0) return "0 m/s";
-  if (v < 0.01) return `${(v * 1000).toFixed(0)} mm/s`;
-  if (v < 0.1) return `${(v * 100).toFixed(1)} cm/s`;
-  return `${v.toFixed(2)} m/s`;
 }
 
 function ConstraintChip({

@@ -69,11 +69,7 @@ export function OperationsPanel({ disabled }: { disabled?: boolean }) {
         id="operational_duty_cycle"
         label="Operational duty cycle"
         unit=""
-        description={
-          overridden
-            ? "δ_ops, drive duty ground ops would actually run. Override active — your value drives δ_eff in the evaluator."
-            : "δ_ops, drive duty ground ops would actually run. Calibrated default for this scenario; drag the slider to override."
-        }
+        description="δ_ops, drive duty cycle."
         min={0.0}
         max={0.6}
         step={0.01}
@@ -83,9 +79,9 @@ export function OperationsPanel({ disabled }: { disabled?: boolean }) {
       />
 
       <p className="text-[0.65rem] text-[var(--color-muted-foreground)]">
-        Effective duty cycle the evaluator will use:{" "}
+        δ_eff ={" "}
         <span className="font-medium tabular-nums text-[var(--color-foreground)]">
-          δ_eff = δ_ops = {value.toFixed(2)}
+          {value.toFixed(2)}
         </span>
       </p>
     </div>

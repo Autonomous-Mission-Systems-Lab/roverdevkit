@@ -10,7 +10,6 @@ const TABS: Array<{ id: AppView; label: string }> = [
   { id: "sweep", label: "Parametric Sweep" },
   { id: "pareto", label: "Optimize Design" },
   { id: "shap", label: "Explain Design" },
-  { id: "validate", label: "Rediscovery Validation" },
 ];
 
 /** Top-level layout: header with status badge + body slot. */

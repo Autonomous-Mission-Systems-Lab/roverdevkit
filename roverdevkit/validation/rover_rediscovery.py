@@ -138,9 +138,7 @@ _MAX_PANEL_TILT_DEG: float = 80.0
 def _scenario_panel_orientation(scenario: MissionScenario) -> tuple[float, float]:
     """Return ``(panel_tilt_deg, panel_azimuth_deg)`` for ``scenario``.
 
-    Implements the fixed-tilt approximation from Option A of the
-    2026-05-28 panel-tilt fix (see
-    ``reports/rediscovery_loo_comparison.md``): the rover's surface
+    Implements a fixed-tilt approximation: the rover's surface
     normal points toward the noon sun, with tilt clamped at
     :data:`_MAX_PANEL_TILT_DEG` to avoid grazing-incidence
     pathologies and azimuth set to the noon-sun side of local north.
@@ -469,7 +467,7 @@ def rediscover(
         population_size, n_generations
         NSGA-II hyperparameters. Defaults give ``60 * 16 = 960``
         evaluations - inside the evaluator's 1 000-eval cap, ~30-40 s
-        on a single core with the wheel-level correction enabled.
+        on a single core with the analytical evaluator.
         For small-rover mass budgets the population must be large
         enough that random LHS initialisation contains at least a few
         mass-feasible candidates; the default 60 has empirically
@@ -481,7 +479,7 @@ def rediscover(
         physics evaluator (~20 ms per design, single-seeded by the
         ``seed`` arg). ``"surrogate"`` routes through the calibrated
         quantile-XGB heads (~0.1 ms per design); requires ``bundles``.
-        For paper-grade ensembles the surrogate backend admits 100k+
+        For high-budget ensembles the surrogate backend admits 100k+
         evaluations comfortably; the evaluator backend is more
         accurate but practically limited to ~10k evaluations per
         seed by single-core wall time. Designs sampled below the v4
@@ -497,7 +495,7 @@ def rediscover(
     evaluator_eval_cap
         Safety cap on the evaluator-backed NSGA-II runner
         (``population_size * n_generations`` must be below this). The
-        webapp default is 1 000; for paper-grade runs raise to 10 000
+        webapp default is 1 000; for high-budget runs raise to 10 000
         or higher. Ignored when ``backend == "surrogate"``.
 
     Returns

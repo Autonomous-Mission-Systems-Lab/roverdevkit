@@ -1,10 +1,9 @@
 """Smoke tests for ``POST /sweep``.
 
-The evaluator backend has no artifact dependency beyond the SCM
-correction (already optional); the surrogate backend needs the surrogate-calibration
-step-4 quantile bundle. Tests that require the bundle skip when it
-is missing so a contributor without the artifact can still run the
-evaluator path locally.
+The evaluator backend has no artifact dependency; the surrogate
+backend needs the surrogate-calibration step-4 quantile bundle. Tests
+that require the bundle skip when it is missing so a contributor
+without the artifact can still run the evaluator path locally.
 """
 
 from __future__ import annotations
@@ -109,7 +108,6 @@ def test_sweep_surrogate_backend_when_artifact_present(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["backend_used"] == "surrogate"
-    assert body["used_scm_correction"] is False  # surrogate path
     assert len(body["z_values"]) == 8
 
 

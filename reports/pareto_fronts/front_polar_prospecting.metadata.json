@@ -1,8 +1,6 @@
 {
   "scenario_name": "polar_prospecting",
   "backend": "evaluator",
-  "correction_path": "data/scm/correction_v1.joblib",
-  "correction_enabled": true,
   "dataset_version": "v9",
   "objectives": [
     {
@@ -30,7 +28,7 @@
   "seed": 15,
   "panel_tilt_deg": 80.0,
   "panel_azimuth_deg": 0.0,
-  "elapsed_s": 69.83276370802196,
+  "elapsed_s": 43.591764832963236,
   "pareto_size": 50,
   "front_csv": "reports/pareto_fronts/front_polar_prospecting.csv"
 }

@@ -29,10 +29,10 @@ Examples
 --------
 ::
 
-    # Full 40k v4 acceptance run (current canonical dataset, BW + SCM correction)
+    # Full 40k acceptance run (current canonical dataset, analytical Bekker-Wong)
     python scripts/run_baselines.py \\
-        --dataset data/analytical/lhs_v4.parquet \\
-        --out-dir reports/baselines_v4
+        --dataset data/analytical/lhs_v9.parquet \\
+        --out-dir reports/baselines_v9
 
     # Fast pilot smoke (skip MLP, smaller forest)
     python scripts/run_baselines.py \\

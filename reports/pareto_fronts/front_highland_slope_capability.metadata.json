@@ -1,8 +1,6 @@
 {
   "scenario_name": "highland_slope_capability",
   "backend": "evaluator",
-  "correction_path": "data/scm/correction_v1.joblib",
-  "correction_enabled": true,
   "dataset_version": "v9",
   "objectives": [
     {
@@ -27,10 +25,10 @@
   ],
   "population_size": 50,
   "generations": 60,
-  "seed": 14,
+  "seed": 12,
   "panel_tilt_deg": 10.0,
   "panel_azimuth_deg": 180.0,
-  "elapsed_s": 68.3572085830092,
+  "elapsed_s": 36.285881332994904,
   "pareto_size": 50,
   "front_csv": "reports/pareto_fronts/front_highland_slope_capability.csv"
 }

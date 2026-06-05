@@ -43,7 +43,6 @@ from webapp.backend.routes import registry as registry_routes
 from webapp.backend.routes import scenarios as scenarios_routes
 from webapp.backend.routes import shap as shap_routes
 from webapp.backend.routes import sweep as sweep_routes
-from webapp.backend.routes import validate as validate_routes
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +87,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(sweep_routes.router)
     app.include_router(optimize_routes.router)
     app.include_router(shap_routes.router)
-    app.include_router(validate_routes.router)
 
     _maybe_mount_frontend(app)
 

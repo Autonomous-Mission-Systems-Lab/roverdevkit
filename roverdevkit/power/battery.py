@@ -20,8 +20,8 @@ Larson & Wertz, *SMAD* 3rd ed., Ch. 11, gives the conventional
 ``E_usable = E_nominal * (1 - DoD_floor) * eta_round_trip`` accounting
 that we follow.
 
-Validation (PyChrono integration)
--------------------
+Validation
+----------
 Confirm that the default model (``min_state_of_charge = 0.15``,
 ``charge_efficiency = discharge_efficiency = 0.95``, T = 20 C) returns
 ~85 Wh usable for a 100 Wh nominal pack; see ``tests/test_power.py``.

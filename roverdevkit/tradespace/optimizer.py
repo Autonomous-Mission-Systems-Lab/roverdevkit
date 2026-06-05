@@ -1,9 +1,8 @@
 """NSGA-II multi-objective optimization via pymoo.
 
 The optimizer is deliberately small and webapp-agnostic: callers provide
-the canonical scenario, soil parameters, optionally a set of loaded
-quantile bundles, and optionally the evaluator's wheel-level SCM
-correction artifact. The default backend is the corrected physics
+the canonical scenario, soil parameters, and optionally a set of loaded
+quantile bundles. The default backend is the analytical physics
 evaluator: at ~20 ms per design it can finish a 1,500-evaluation
 NSGA-II search in well under a minute, and using evaluator-truth as the
 fitness function avoids any surrogate-approximation error on the
@@ -35,7 +34,6 @@ from roverdevkit.surrogate.features import (
 )
 from roverdevkit.surrogate.uncertainty import QuantileHeads
 from roverdevkit.terramechanics.bekker_wong import SoilParameters
-from roverdevkit.terramechanics.correction_model import WheelLevelCorrection
 
 ObjectiveDirection = Literal["min", "max"]
 OptimizationBackend = Literal["surrogate", "evaluator"]
@@ -156,7 +154,6 @@ class NSGA2Runner:
         soil: SoilParameters,
         *,
         bundles: dict[str, QuantileHeads] | None = None,
-        correction: WheelLevelCorrection | None = None,
         backend: OptimizationBackend = "evaluator",
         objectives: tuple[OptimizationObjective, ...] = DEFAULT_OBJECTIVES,
         constraints: tuple[OptimizationConstraint, ...] = (),
@@ -196,7 +193,6 @@ class NSGA2Runner:
         self.scenario = scenario
         self.soil = soil
         self.bundles = bundles
-        self.correction = correction
         self.backend = backend
         self.objectives = objectives
         self.constraints = constraints
@@ -263,7 +259,6 @@ class NSGA2Runner:
         return _evaluator_metrics(
             designs,
             self.scenario,
-            correction=self.correction,
             panel_tilt_deg=self.panel_tilt_deg,
             panel_azimuth_deg=self.panel_azimuth_deg,
         )
@@ -416,11 +411,10 @@ def _evaluator_metrics(
     designs: list[DesignVector],
     scenario: MissionScenario,
     *,
-    correction: WheelLevelCorrection | None,
     panel_tilt_deg: float = 0.0,
     panel_azimuth_deg: float = 180.0,
 ) -> list[dict[str, float]]:
-    """Evaluate a batch of designs under the corrected evaluator.
+    """Evaluate a batch of designs under the analytical evaluator.
 
     A single evaluator failure (e.g. the Bekker-Wong slip solver
     cannot find an entry angle for a fully-buried wheel) must not
@@ -430,14 +424,11 @@ def _evaluator_metrics(
     constraint-violation magnitude, letting the GA continue.
     """
     out: list[dict[str, float]] = []
-    use_corr = correction is not None
     for design in designs:
         try:
             metrics = evaluator_evaluate(
                 design,
                 scenario,
-                use_scm_correction=use_corr,
-                correction=correction,
                 panel_tilt_deg=panel_tilt_deg,
                 panel_azimuth_deg=panel_azimuth_deg,
             )
@@ -514,7 +505,6 @@ def run_nsga2(
     soil: SoilParameters,
     *,
     bundles: dict[str, QuantileHeads] | None = None,
-    correction: WheelLevelCorrection | None = None,
     backend: OptimizationBackend = "surrogate",
     objectives: tuple[OptimizationObjective, ...] = DEFAULT_OBJECTIVES,
     constraints: tuple[OptimizationConstraint, ...] = (),
@@ -529,7 +519,6 @@ def run_nsga2(
         scenario,
         soil,
         bundles=bundles,
-        correction=correction,
         backend=backend,
         objectives=objectives,
         constraints=constraints,

@@ -1,4 +1,4 @@
-"""``POST /evaluate`` — deterministic corrected mission evaluator.
+"""``POST /evaluate`` — deterministic analytical mission evaluator.
 
 This is the *single-shot* counterpart to ``/predict``. It runs the same
 physics pipeline that produced the surrogate's training corpus, so the
@@ -7,10 +7,10 @@ against. The single-design panel uses ``/evaluate`` for the median
 value of each metric (and for real-rover overlays) and ``/predict``
 only for the surrogate's calibrated 90 % prediction-interval band.
 
-The corrected evaluator runs in ~40 ms after the BW/SCM bake-off traverse-loop
+The analytical evaluator runs in ~30 ms after the traverse-loop
 lift-out, which is imperceptible for one-click UX. The 50k+-evaluation
 inner loops (NSGA-II, feasibility heatmaps) keep using the surrogate
-because even 40 ms × 50k is ~30 minutes of wall-clock.
+because even 30 ms × 50k is ~25 minutes of wall-clock.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from roverdevkit.surrogate.features import PRIMARY_REGRESSION_TARGETS
-from webapp.backend.loaders import get_canonical_scenarios, get_correction
+from webapp.backend.loaders import get_canonical_scenarios
 from webapp.backend.services import apply_scenario_overrides
 from webapp.backend.schemas import (
     EvaluateMetric,
@@ -41,18 +41,13 @@ router = APIRouter(tags=["evaluate"])
 
 @router.post("/evaluate", response_model=EvaluateResponse)
 def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
-    """Run the corrected mission evaluator on one design × one scenario.
+    """Run the analytical mission evaluator on one design × one scenario.
 
     Pipeline
     --------
     1. Resolve the scenario from the canonical four (404 if unknown).
-    2. Load (or reuse the cached) wheel-level SCM correction artifact.
-    3. Dispatch to :func:`roverdevkit.mission.evaluator.evaluate_verbose`
-       with ``use_scm_correction=True`` whenever the artifact is present;
-       otherwise fall back to BW-only and surface that fact via
-       ``used_scm_correction=False`` in the response so the frontend
-       can flag the degraded mode.
-    4. Project ``MissionMetrics`` onto the four primary targets and
+    2. Dispatch to :func:`roverdevkit.mission.evaluator.evaluate_verbose`.
+    3. Project ``MissionMetrics`` onto the four primary targets and
        attach structured ``thermal`` / ``stall`` diagnostics (schema
        v6) plus the runtime-resolved ``effective_duty_cycle`` and
        ``cruise_speed_mps`` so the panel chip can explain *why* a
@@ -72,12 +67,10 @@ def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
         payload_mass_kg=req.payload_mass_kg,
         payload_power_w=req.payload_power_w,
     )
-    correction = get_correction()
 
     output = evaluate_design(
         req.design,
         scenario,
-        correction=correction,
         operational_duty_cycle=req.operational_duty_cycle,
     )
     primary = metrics_as_primary_dict(output.metrics)
@@ -122,6 +115,5 @@ def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
         stall=stall_out,
         effective_duty_cycle=float(output.effective_duty_cycle),
         cruise_speed_mps=float(output.cruise_speed_mps),
-        used_scm_correction=output.used_scm_correction,
         elapsed_ms=output.elapsed_ms,
     )

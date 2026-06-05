@@ -1,4 +1,4 @@
-"""Tests for the Layer-6 robustness sweep."""
+"""Tests for the robustness sensitivity check."""
 
 from __future__ import annotations
 
@@ -121,19 +121,19 @@ def test_sweep_ranking_preservation_table_covers_all_scenarios(
 
 
 # ---------------------------------------------------------------------------
-# Headline Layer-6 claim: qualitative conclusions persist under ±20 %
+# Supporting robustness check: qualitative conclusions persist under ±20 %
 # ---------------------------------------------------------------------------
 
 
-def test_layer6_qualitative_rankings_persist_under_canonical_perturbations(
+def test_qualitative_rankings_persist_under_canonical_perturbations(
     default_sweep: list[RobustnessSummary],
 ) -> None:
-    """§7 Layer 6: qualitative conclusions stable under ±20 % soil and mass moves.
+    """Qualitative conclusions stay stable under ±20 % soil and mass moves.
 
     "Stable" here means the (range / energy-margin / slope-capability)
     archetype winner per scenario does not flip under any of the
-    canonical ±20 % perturbations. This is the headline claim the
-    §8.5 paper paragraph cites.
+    canonical ±20 % perturbations. This is the supporting robustness
+    claim the paper cites.
     """
     failing: list[str] = []
     for summary in default_sweep:
@@ -148,12 +148,12 @@ def test_layer6_qualitative_rankings_persist_under_canonical_perturbations(
         for s in default_sweep
     )
     assert n_broken_cells <= 1, (
-        f"Layer-6 ranking-stability claim violated on {n_broken_cells} cells: "
+        f"robustness ranking-stability claim violated on {n_broken_cells} cells: "
         + "; ".join(failing)
     )
 
 
-def test_layer6_continuous_drift_below_30_percent_on_continuous_metrics(
+def test_continuous_drift_below_30_percent_on_continuous_metrics(
     default_sweep: list[RobustnessSummary],
 ) -> None:
     """Median absolute relative drift on continuous metrics stays below 30 %.

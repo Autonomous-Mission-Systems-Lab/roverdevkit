@@ -6,8 +6,13 @@ import numpy as np
 import pytest
 
 from roverdevkit.mission.scenarios import load_scenario
-from roverdevkit.mission.traverse_sim import TraverseLog, run_traverse
+from roverdevkit.mission.traverse_sim import (
+    TraverseLog,
+    _solve_step_wheel_forces,
+    run_traverse,
+)
 from roverdevkit.schema import DesignVector, MissionScenario
+from roverdevkit.terramechanics.bekker_wong import SoilParameters, WheelGeometry
 from roverdevkit.terramechanics.soils import get_soil_parameters
 
 
@@ -20,6 +25,21 @@ def soil_nominal():
 def equatorial(rashid_like_design: DesignVector):
     # use an easier slope so the micro-rover isn't stalled every test
     return load_scenario("equatorial_mare_traverse").model_copy(update={"max_slope_deg": 5.0})
+
+
+# ---------------------------------------------------------------------------
+# Wheel-force slip solve
+# ---------------------------------------------------------------------------
+
+
+def test_solve_step_wheel_forces_balances_drawbar_pull() -> None:
+    """The solved slip should develop ~the required drawbar pull."""
+    wheel = WheelGeometry(radius_m=0.12, width_m=0.10, grouser_height_m=0.01, grouser_count=12)
+    soil = SoilParameters(n=1.0, k_c=1.0, k_phi=800.0, cohesion_kpa=0.5, friction_angle_deg=40.0)
+
+    forces, stalled = _solve_step_wheel_forces(wheel, soil, 40.0, 5.0)
+    assert not stalled
+    assert forces.drawbar_pull_n == pytest.approx(5.0, abs=0.5)
 
 
 # ---------------------------------------------------------------------------
