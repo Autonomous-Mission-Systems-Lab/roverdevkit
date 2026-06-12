@@ -43,10 +43,15 @@ Assumptions
   c₁ = 0.4, c₂ = 0.2. These are Wong's typical empirical defaults;
   Ding 2011 reports soil-dependent fits spanning c₁ ∈ [0.18, 0.43],
   c₂ ∈ [0.09, 0.25].
-- Grousers contribute a multiplicative shear-thrust lift derived
-  from Iizuka & Kubota 2011 (see ``_grouser_shear_lift``). The term
-  is closed-form in (R, N_g, h_g) and saturates at large grouser
-  packs.
+- Grousers contribute a multiplicative shear-thrust lift (see
+  ``_grouser_shear_lift``). The functional form is our own arc-density
+  heuristic, motivated by the experimental finding that grouser height
+  relative to wheel radius is a first-order driver of tractive
+  performance (Iizuka & Kubota 2011); that study does not provide this
+  closed form. The term is closed-form in (R, N_g, h_g) and saturates at
+  large grouser packs. Its adequacy is assessed against measured
+  grousered single-wheel drawbar pull in the Layer-3 validation grid
+  below, not against the motivating study.
 
 Validation (Layer 3)
 --------------------
@@ -55,8 +60,9 @@ The Layer-3 sub-model validation grid lives at
 ``tests/test_terramechanics.py::test_layer3_published_reference_grid``.
 Each row is a published-reference operating point (Wong 2008 §4.2
 worked-example fixture, a Pragyan-class smooth wheel, and a Yutu-2-class
-grousered wheel on Apollo nominal regolith, plus Iizuka & Kubota 2011
-grouser limit cases) with per-quantity tolerance bands sized at the
+grousered wheel on Apollo nominal regolith, plus a smooth-wheel limit
+case that checks the grouser term collapses to 1.0) with per-quantity
+tolerance bands sized at the
 ±15-30 % BW model-form error reported in Ishigami (2007) and
 Ding et al. (2011). Adding new digitised rows is additive — append a
 row to the CSV and the parametrised test picks it up automatically.
@@ -82,12 +88,14 @@ _C2_THETA_M: float = 0.2
 # Bekker-Wong. Profiled at ~0.3 ms per evaluation.
 _N_QUAD: int = 100
 
-# Saturation cap for the grouser shear-thrust lift, dimensionless. Lab
-# data from Iizuka & Kubota 2011 (Fig. 7-9, GRC-1 / FJS-1) show the
-# tractive coefficient gain plateaus at ~50–60 % once the grouser pack
-# is dense enough that adjacent shear planes interfere. Capping the
-# arc-density form at 0.6 prevents the analytical lift from running
-# unphysically high for extreme N_g · h_g / R combinations.
+# Saturation cap for the grouser shear-thrust lift, dimensionless. This
+# is an engineering bound we impose, not a value taken from the
+# literature: it prevents the arc-density form from running unphysically
+# high for extreme N_g · h_g / R combinations, reflecting that once the
+# grouser pack is dense enough that adjacent shear planes interfere,
+# additional grousers contribute negligibly. The 0.6 value is consistent
+# with the diminishing-returns trend reported for grouser traction
+# (Iizuka & Kubota 2011) but is chosen by us, not read off their data.
 _GROUSER_LIFT_CAP: float = 0.6
 
 
@@ -121,8 +129,11 @@ class SoilParameters:
     shear_modulus_k_m: float = 0.018
     """Janosi-Hanamoto shear-deformation modulus K, meters.
 
-    Default 0.018 m from Wong 2008; typical lunar-simulant range is
-    0.006–0.025 m depending on density and moisture.
+    Default 0.018 m (1.78 cm) is the recommended lunar-soil value from
+    the Lunar Sourcebook (Carrier et al. 1991, Table 9.14, p. 529), not
+    from Wong; Wong is the source for the Janosi-Hanamoto law and the
+    meaning of K. Typical lunar-simulant range is 0.006–0.025 m
+    depending on density and moisture.
     """
 
 
@@ -155,7 +166,11 @@ class WheelForces:
 
 
 def _grouser_shear_lift(wheel: WheelGeometry) -> float:
-    """Engaged-grouser shear-thrust enhancement factor (Iizuka & Kubota 2011).
+    """Engaged-grouser shear-thrust enhancement factor.
+
+    Arc-density heuristic motivated by the experimental finding that
+    grouser height relative to wheel radius drives tractive performance
+    (Iizuka & Kubota 2011); the closed form below is ours, not theirs.
 
     Each grouser blade penetrating depth ``h_g`` extends the shear
     interface from the wheel rim down to ``R + h_g``. The expected
@@ -176,13 +191,12 @@ def _grouser_shear_lift(wheel: WheelGeometry) -> float:
               \\;=\\; 1 \\;+\\; \\frac{N_g\\,h_g}{2\\pi R},
 
     which is independent of ``θ_1`` (the cancellation is exact). This
-    is the closed-form arc-density limit of Iizuka & Kubota's grouser
-    correction, suitable for analytical sweeps.
+    closed-form arc-density limit is suitable for analytical sweeps.
 
     The raw lift is capped at ``_GROUSER_LIFT_CAP`` so the term saturates
     in the regime where adjacent grouser shear planes interfere — beyond
-    that, more grousers contribute negligibly (Iizuka & Kubota 2011 Fig.
-    7–9). The cap matches their reported ~50–60 % asymptote.
+    that, more grousers contribute negligibly. The cap is an engineering
+    bound we impose (see ``_GROUSER_LIFT_CAP``), not a published number.
 
     Returns ``1.0`` when ``N_g = 0`` or ``h_g = 0``; the BW kernel then
     reduces to the original grouser-blind form bit-for-bit.
@@ -323,7 +337,8 @@ def _integrate_forces(
     tau = tau_max * (1.0 - np.exp(-np.abs(j) / shear_modulus_m)) * np.sign(j)
 
     # -----------------------------------------------------------------
-    # Grouser shear-thrust lift   (Iizuka & Kubota 2011)
+    # Grouser shear-thrust lift   (arc-density heuristic; motivated by
+    # Iizuka & Kubota 2011, closed form is ours)
     # -----------------------------------------------------------------
     # Multiplicative gain on τ from grousers extending the shear plane
     # below the wheel rim. Independent of θ in this closed-form limit,

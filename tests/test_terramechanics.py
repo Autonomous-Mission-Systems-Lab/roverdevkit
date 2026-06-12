@@ -239,7 +239,7 @@ def test_rashid_class_sinkage_and_dp_are_plausible(
 
 
 # ---------------------------------------------------------------------------
-# Grouser shear-thrust lift (Iizuka & Kubota 2011)
+# Grouser shear-thrust lift (arc-density heuristic)
 # ---------------------------------------------------------------------------
 
 
@@ -395,10 +395,10 @@ def test_single_wheel_forces_runs_under_one_millisecond(
 #      Ding et al. 2011) so any kernel that lands inside the Bekker-Wong
 #      analytical band is acceptable.
 #
-#   3. ``closed_form_limit`` — Iizuka & Kubota (2011) grouser-thrust
-#      limit cases (smooth wheel ⇒ lift factor ≡ 1; saturation cap on
-#      dense grouser packs). These rows cross-check the BW kernel
-#      against the closed-form limits derivable from the textbook.
+#   3. ``closed_form_limit`` — kernel regression checks at analytic
+#      limits (e.g. smooth wheel with N_g>0 ⇒ grouser lift factor ≡ 1).
+#      Bounds are pinned at the v1 kernel output, not digitised from
+#      published experiments.
 #
 # Tolerance bands tighten when literature digitised values become
 # available; appending rows is additive and the test picks them up

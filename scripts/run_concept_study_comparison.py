@@ -389,7 +389,7 @@ def _markdown_report(c: ConceptStudyComparison) -> str:
             f" produces 0 here)",
             f"- Nearest Pareto point design-space distance "
             f"(normalised L2): **{c.nearest_pareto_design_space_distance:.3f}** "
-            f"(uniform-random-pair baseline ≈ 1.22)",
+            f"(uniform-random-pair baseline ≈ 1.20)",
             "",
             "## Cited vs predicted metrics for the concept design",
             "",

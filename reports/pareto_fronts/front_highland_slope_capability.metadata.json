@@ -10,10 +10,6 @@
     {
       "target": "total_mass_kg",
       "direction": "min"
-    },
-    {
-      "target": "slope_capability_deg",
-      "direction": "max"
     }
   ],
   "constraints": [
@@ -21,14 +17,20 @@
       "target": "range_km",
       "sense": "min",
       "value": 0.1
+    },
+    {
+      "target": "slope_capability_deg",
+      "sense": "min",
+      "value": 15.0
     }
   ],
+  "traverse_distance_m": 120000.0,
   "population_size": 50,
   "generations": 60,
-  "seed": 12,
+  "seed": 14,
   "panel_tilt_deg": 10.0,
   "panel_azimuth_deg": 180.0,
-  "elapsed_s": 36.285881332994904,
+  "elapsed_s": 32.234466542024165,
   "pareto_size": 50,
   "front_csv": "reports/pareto_fronts/front_highland_slope_capability.csv"
 }

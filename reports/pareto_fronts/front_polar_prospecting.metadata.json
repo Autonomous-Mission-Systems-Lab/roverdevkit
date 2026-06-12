@@ -23,12 +23,13 @@
       "value": 0.1
     }
   ],
+  "traverse_distance_m": 30000.0,
   "population_size": 50,
   "generations": 60,
   "seed": 15,
   "panel_tilt_deg": 80.0,
   "panel_azimuth_deg": 0.0,
-  "elapsed_s": 43.591764832963236,
+  "elapsed_s": 41.1206740840571,
   "pareto_size": 50,
   "front_csv": "reports/pareto_fronts/front_polar_prospecting.csv"
 }

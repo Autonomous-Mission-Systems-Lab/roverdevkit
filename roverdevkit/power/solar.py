@@ -307,9 +307,8 @@ def solar_power_timeseries(
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Generate a power-vs-time profile over one or more lunar diurnal cycles.
 
-    Useful for plotting (see paper/paper_figures.ipynb) and as a
-    reference implementation against which the traverse simulator can be
-    sanity-checked.
+    Useful for plotting and as a reference implementation against which the
+    traverse simulator can be sanity-checked.
 
     The default ``noon_hour`` places sunrise at t=0, so the first quarter of
     the synodic day climbs from horizon to zenith. Override it to align with

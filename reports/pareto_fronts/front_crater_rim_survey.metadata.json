@@ -23,12 +23,13 @@
       "value": 0.1
     }
   ],
+  "traverse_distance_m": 25000.0,
   "population_size": 50,
   "generations": 60,
   "seed": 12,
   "panel_tilt_deg": 0.0,
   "panel_azimuth_deg": 180.0,
-  "elapsed_s": 34.0084458750207,
+  "elapsed_s": 32.589310958981514,
   "pareto_size": 50,
   "front_csv": "reports/pareto_fronts/front_crater_rim_survey.csv"
 }

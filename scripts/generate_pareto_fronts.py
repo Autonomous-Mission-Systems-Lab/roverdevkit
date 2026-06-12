@@ -35,6 +35,7 @@ import json
 import os
 import sys
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,7 @@ from roverdevkit.tradespace.optimizer import (
     DEFAULT_OBJECTIVES,
     NSGA2Runner,
     OptimizationConstraint,
+    OptimizationObjective,
 )
 # Single source of truth for the fixed-tilt panel approximation so the
 # canonical fronts use the *same* polar insolation physics as the
@@ -77,6 +79,46 @@ DEFAULT_EVALUATOR_EVAL_CAP = 50_000
 # only filters the binary stall failure, not slow-but-feasible
 # designs — and matches the live Optimize tab's default constraint.
 DEFAULT_RANGE_FLOOR_KM = 0.1
+
+
+@dataclass(frozen=True)
+class ScenarioOverride:
+    """Per-scenario optimization structure that departs from the generic trade.
+
+    Most canonical scenarios use the generic three-objective trade
+    (max range, min mass, max slope) with a single range-floor constraint.
+    A scenario listed here instead supplies its own objectives, extra
+    constraints, and/or traverse budget.
+    """
+
+    objectives: tuple[OptimizationObjective, ...]
+    extra_constraints: tuple[OptimizationConstraint, ...] = ()
+    traverse_distance_m: float | None = None
+
+
+# The highland slope-capability scenario does not fit the generic trade.
+# On loose regolith the slope objective is grouser-limited and nearly
+# mass-independent (it even decreases slightly with mass), so *maximising*
+# slope pins every Pareto design at the same ~19.6 deg traction ceiling and
+# collapses the front to a near-degenerate point. We instead encode the
+# scenario's documented design intent -- minimise mass / maximise range
+# *subject to* a slope-capability floor (``max_slope_deg`` = 15 deg) -- and
+# lift the otherwise trivially-met 20 km traverse budget so that energy- and
+# duty-limited range is a live objective rather than a saturated cap. The
+# 120 km budget is non-binding (above the in-class capability ceiling), so
+# ``range_km`` reports true mission-window capability across the front.
+SCENARIO_OVERRIDES: dict[str, ScenarioOverride] = {
+    "highland_slope_capability": ScenarioOverride(
+        objectives=(
+            OptimizationObjective("range_km", "max"),
+            OptimizationObjective("total_mass_kg", "min"),
+        ),
+        extra_constraints=(
+            OptimizationConstraint(target="slope_capability_deg", sense="min", value=15.0),
+        ),
+        traverse_distance_m=120_000.0,
+    ),
+}
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -120,13 +162,26 @@ def main(argv: list[str] | None = None) -> int:
 
     scenarios = _scenario_names(args.scenarios)
 
-    constraints = (
-        OptimizationConstraint(target="range_km", sense="min", value=DEFAULT_RANGE_FLOOR_KM),
+    range_floor = OptimizationConstraint(
+        target="range_km", sense="min", value=DEFAULT_RANGE_FLOOR_KM
     )
 
     manifest: list[dict[str, Any]] = []
     for i, scenario_name in enumerate(scenarios):
         scenario = load_scenario(scenario_name)
+        override = SCENARIO_OVERRIDES.get(scenario_name)
+
+        if override is None:
+            objectives = DEFAULT_OBJECTIVES
+            constraints: tuple[OptimizationConstraint, ...] = (range_floor,)
+        else:
+            objectives = override.objectives
+            constraints = (range_floor, *override.extra_constraints)
+            if override.traverse_distance_m is not None:
+                scenario = scenario.model_copy(
+                    update={"traverse_distance_m": override.traverse_distance_m}
+                )
+
         soil = get_soil_parameters(scenario.soil_simulant)
         panel_tilt_deg, panel_azimuth_deg = _scenario_panel_orientation(scenario)
         seed = args.seed + i
@@ -135,6 +190,7 @@ def main(argv: list[str] | None = None) -> int:
             scenario,
             soil,
             backend="evaluator",
+            objectives=objectives,
             constraints=constraints,
             population_size=args.population_size,
             n_generations=args.generations,
@@ -156,12 +212,13 @@ def main(argv: list[str] | None = None) -> int:
             "dataset_version": os.environ.get("ROVERDEVKIT_DATASET_VERSION", "v9"),
             "objectives": [
                 {"target": obj.target, "direction": obj.direction}
-                for obj in DEFAULT_OBJECTIVES
+                for obj in objectives
             ],
             "constraints": [
                 {"target": c.target, "sense": c.sense, "value": c.value}
                 for c in constraints
             ],
+            "traverse_distance_m": scenario.traverse_distance_m,
             "population_size": args.population_size,
             "generations": args.generations,
             "seed": seed,

@@ -21,8 +21,9 @@ validate the evaluator; never used for training the surrogate.
        grousered Yutu-2-class wheel (R=0.165 m, b=0.150 m, h_g=0.012 m,
        N_g=14, W=36.4 N). Bounds sized at the published Bekker-Wong
        model-form error (Ishigami 2007; Ding et al. 2011).
-    3. **`closed_form_limit`** — Iizuka & Kubota (2011) grouser-thrust
-       limit cases (smooth wheel ⇒ lift factor ≡ 1).
+    3. **`closed_form_limit`** — kernel regression checks at analytic
+       limits (e.g. smooth wheel with N_g>0 ⇒ grouser lift factor ≡ 1;
+       bounds pinned at the v1 kernel output, not digitised experiments).
 
   Appending rows is additive — the test reads the CSV with
   `csv.DictReader` and parametrises one case per row.
@@ -39,8 +40,9 @@ validate the evaluator; never used for training the surrogate.
   (`compare_to_experiment`, `summarise`) and
   `tests/test_terramechanics_experiment.py`. The harness runs the
   analytical Bekker-Wong kernel at every operating point and reports
-  residuals + percentage errors against the measured columns. Notebook
-  `paper/paper_figures.ipynb` renders the terramechanics-experiment figure
+  residuals + percentage errors against the measured columns.
+  `scripts/make_terramechanics_experiment_figure.py` renders the
+  terramechanics-experiment figure
   (`reports/figures/fig_terramechanics_experiment.png`) from it.
 
 ## Sources
@@ -70,8 +72,9 @@ validate the evaluator; never used for training the surrogate.
   pressure-sinkage proxied from catalogue FJS-1. **Most application-relevant
   case** (in-scope micro-rover wheel + load); BW lands within band on both DP
   (~24 % median) and sinkage (~28 %).
-- **Iizuka & Kubota 2011** — grousered wheel experiments (shear-thrust gain
-  vs grouser packing density).
+- **Iizuka & Kubota 2011** — grousered-wheel experiments motivating the
+  arc-density grouser correction (not digitised into this grid; empirical
+  grousered-wheel checks live in `single_wheel_experiments.csv`).
 - **Wong** — datasets from *Theory of Ground Vehicles* (4th ed.) ch. 4.
 
 Keep raw digitised traces in `raw/` (git-ignored, re-downloadable from the

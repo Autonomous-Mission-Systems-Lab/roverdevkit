@@ -23,12 +23,13 @@
       "value": 0.1
     }
   ],
+  "traverse_distance_m": 80000.0,
   "population_size": 50,
   "generations": 60,
   "seed": 13,
   "panel_tilt_deg": 20.2,
   "panel_azimuth_deg": 180.0,
-  "elapsed_s": 40.88463783398038,
+  "elapsed_s": 36.020679499953985,
   "pareto_size": 50,
   "front_csv": "reports/pareto_fronts/front_equatorial_mare_traverse.csv"
 }
