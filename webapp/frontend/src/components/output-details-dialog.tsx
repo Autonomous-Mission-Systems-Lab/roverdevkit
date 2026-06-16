@@ -88,9 +88,11 @@ function TargetCalculation({ target }: { target: PrimaryTarget }) {
         <Equation>E_used = ∫ (P_avionics + P_mobility / η_motor) dt</Equation>
         <Equation>energy_margin_raw_pct = 100 · (E_gen - E_used) / E_used</Equation>
         <p className="text-[var(--color-muted-foreground)]">
-          Solar power depends on scenario latitude / sun geometry, panel area,
+          Solar power depends on scenario latitude, mission duration, panel area,
           panel efficiency, and dust factor. Mobility load comes from the same
-          Bekker-Wong wheel-force path used by range.
+          Bekker-Wong wheel-force path used by range. Runs assume a fixed mission
+          start at local sunrise (zero solar declination); mission start phase
+          and season are held constant rather than swept.
         </p>
       </section>
     );

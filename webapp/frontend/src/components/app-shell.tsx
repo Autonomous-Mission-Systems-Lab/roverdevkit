@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 
-import { AboutModelDialog } from "@/components/about-model-dialog";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useViewStore, type AppView } from "@/store/view-store";
 
@@ -29,15 +27,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               Interactive design tradespace explorer for lunar micro-rovers.
             </p>
           </div>
-          <AboutModelDialog>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2.5 text-xs font-normal"
-            >
-              About the tool
-            </Button>
-          </AboutModelDialog>
         </div>
         <nav className="mx-auto flex max-w-6xl gap-1 px-6 pb-2 text-sm">
           {TABS.map((tab) => (

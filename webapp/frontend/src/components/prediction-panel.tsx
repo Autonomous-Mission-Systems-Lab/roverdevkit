@@ -62,7 +62,7 @@ export function PredictionPanel({
   banner,
 }: PredictionPanelProps) {
   return (
-    <Card className="h-full">
+    <Card>
       <CardHeader>
         <CardTitle>Predicted performance</CardTitle>
         <CardDescription>

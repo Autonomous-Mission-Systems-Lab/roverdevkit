@@ -18,7 +18,7 @@ The "leave-one-out" terminology is honoured by construction rather
 than by refitting the model per rover. The bottom-up mass model's
 specific-mass coefficients live in :class:`MassModelParams` and are
 cited from external space-hardware sources (SMAD, AIAA S-120A,
-Heverly & Matthews 2011, Nohmi 2003, vendor catalogues) -
+vendor catalogues) -
 **none** of them are regressed against the rover registry. The
 registry is used downstream as a cross-check, not as training data.
 
@@ -493,7 +493,7 @@ def _markdown_for_summary(
         "",
         "The bottom-up mass model's specific-mass coefficients in",
         "`MassModelParams` are cited from external space-hardware sources",
-        "(SMAD, AIAA S-120A, Heverly & Matthews 2011, Nohmi 2003, vendor",
+        "(SMAD, AIAA S-120A, vendor",
         "catalogues) - none are regressed against the registry - so the",
         "LOO is structurally already in place at the rediscover() level:",
         "no per-rover refit is needed.",

@@ -5,8 +5,8 @@ full-up total masses** of real rovers
 (:func:`roverdevkit.mass.validation.validate_against_published_rovers`,
 data in ``data/mass_validation_set.csv``). This is a genuine two-sided
 accuracy check: the model's specific-mass coefficients are cited from
-external space-hardware sources (SMAD, AIAA S-120A, Heverly and Matthews
-2011, vendor catalogues) and are **never regressed on these rovers**, so
+external space-hardware sources (SMAD, AIAA S-120A, vendor catalogues) and
+are **never regressed on these rovers**, so
 the comparison is out-of-sample. Together with the single-wheel
 terramechanics validation (sec. 5.1) it is one of the two component-level
 empirical validations the paper rests on.
@@ -89,14 +89,16 @@ def _markdown(df: pd.DataFrame, summary: ValidationSummary) -> str:
         "",
         "Bottom-up parametric mass model vs **published full-up total mass**",
         "for real rovers (`data/mass_validation_set.csv`). The specific-mass",
-        "coefficients are cited from SMAD / AIAA S-120A / Heverly & Matthews",
-        "2011 / vendor catalogues and are **never regressed on these rovers**,",
+        "budget structure and housekeeping fractions follow SMAD / AIAA S-120A;",
+        "solar, battery, and avionics MERs use SMAD bands; mobility terms use",
+        "vendor catalogues and engineering defaults (see Table in §3.3).",
+        "Defaults are **never regressed on these rovers**,",
         "so this is an out-of-sample, two-sided accuracy check \u2014 the mass",
         "counterpart to the single-wheel terramechanics validation (\u00a75.1).",
         "",
         "The primary statistic is the **median absolute percent error on",
-        "in-class (5\u201350 kg) rovers**; the bottom-up model's specific-mass",
-        "coefficients are calibrated for that regime. Out-of-regime rovers",
+        "in-class (5\u201350 kg) rovers**; the mobility defaults are intended for",
+        "that regime. Out-of-regime rovers",
         "(ultra-micro < 5 kg, and > 50 kg) are reported but excluded from the",
         "primary statistic and flagged `in_class = False`.",
         "",

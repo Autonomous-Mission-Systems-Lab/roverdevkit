@@ -153,6 +153,8 @@ export interface PredictRequest {
    */
   payload_mass_kg?: number | null;
   payload_power_w?: number | null;
+  /** Optional override for `MissionScenario.mission_duration_earth_days`. */
+  mission_duration_earth_days?: number | null;
   repair_crossings?: boolean;
 }
 
@@ -198,6 +200,8 @@ export interface EvaluateRequest {
    */
   payload_mass_kg?: number | null;
   payload_power_w?: number | null;
+  /** Optional override for `MissionScenario.mission_duration_earth_days`. */
+  mission_duration_earth_days?: number | null;
 }
 
 export interface EvaluateMetric {
@@ -354,6 +358,7 @@ export interface SweepRequest {
    */
   payload_mass_kg?: number | null;
   payload_power_w?: number | null;
+  mission_duration_earth_days?: number | null;
 }
 
 export interface SweepResponse {
@@ -426,6 +431,7 @@ export interface OptimizeRequest {
    */
   payload_mass_kg?: number | null;
   payload_power_w?: number | null;
+  mission_duration_earth_days?: number | null;
 }
 
 export interface OptimizeJobResponse {
@@ -474,6 +480,7 @@ export interface ShapExplainRequest {
   operational_duty_cycle?: number | null;
   payload_mass_kg?: number | null;
   payload_power_w?: number | null;
+  mission_duration_earth_days?: number | null;
 }
 
 export interface ShapLocalResponse {

@@ -4,8 +4,8 @@ Approach
 --------
 Each subsystem mass
 is computed from a **physics-grounded specific mass or a standard
-spacecraft-sizing fraction** with a cited source. The n=10 rovers in
-``data/published_rovers.csv`` are then used as a **validation set**
+spacecraft-sizing fraction** with a cited source. The rows in
+``data/mass_validation_set.csv`` are then used as a **validation set**
 (see :mod:`roverdevkit.mass.validation`) - "does the bottom-up model
 reproduce total mass within ~30 % for each real rover?".
 
@@ -53,12 +53,6 @@ Larson, W. J. & Wertz, J. R. *Space Mission Analysis and Design (SMAD)*,
 Larson, W. J. & Pranke, L. K. *Human Spaceflight: Mission Analysis and
 Design*, McGraw-Hill, 2000. Surface-system sizing.
 
-Heverly, M. & Matthews, J. *A wheel-on-limb rover for lunar operations*.
-i-SAIRAS, 2011. Wheel specific-mass benchmarks.
-
-Nohmi, M., Miyahara, A., Fujii, K. *Lunar Rover Development for On-Orbit
-Servicing*. J. Space Eng., 2003. Rim-and-hub wheel area-density data.
-
 AIAA S-120A-2015 *Mass Properties Control for Space Systems*, dry-mass
 growth allowances.
 """
@@ -88,11 +82,9 @@ class MassModelParams:
     """Mass per unit of wheel-side area (2*pi*R*W), kg/m^2.
 
     Covers rim, hub, spokes, and fastener hardware for aluminium/CFRP rigid
-    wheels in the 0.05-0.25 m radius class. Low end of the 6-18 kg/m^2
-    range in Nohmi 2003 (Lunar Rover Development) and Heverly & Matthews
-    2011; appropriate for the micro-rover mass class where thin-gauge
-    aluminium or composite wheels dominate. Tune upward toward 15 kg/m^2
-    for MER/MSL-style stiff-rim wheels.
+    wheels in the 0.05-0.25 m radius class. Default chosen for the
+    micro-rover mass class where thin-gauge aluminium or composite wheels
+    dominate. Tune upward toward 15 kg/m^2 for MER/MSL-style stiff-rim wheels.
     """
 
     grouser_plate_thickness_m: float = 0.002

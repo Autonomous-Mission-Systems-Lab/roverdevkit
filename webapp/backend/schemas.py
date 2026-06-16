@@ -51,6 +51,24 @@ def _payload_mass_field() -> Any:
     )
 
 
+def _mission_duration_field() -> Any:
+    return Field(
+        default=None,
+        ge=0.5,
+        le=90.0,
+        description=(
+            "Optional per-query override for "
+            "``MissionScenario.mission_duration_earth_days``. Sets the "
+            "simulation window for solar averaging, energy budgeting, "
+            "and thermal exposure. ``None`` uses the scenario's calibrated "
+            "default. ``scenario_mission_duration_earth_days`` is an "
+            "LHS-sampled surrogate input (family-specific ranges, roughly "
+            "3–35 d), so in-bounds overrides stay on the surrogate path "
+            "with calibrated PIs."
+        ),
+    )
+
+
 def _payload_power_field() -> Any:
     return Field(
         default=None,
@@ -280,6 +298,7 @@ class PredictRequest(BaseModel):
     )
     payload_mass_kg: float | None = _payload_mass_field()
     payload_power_w: float | None = _payload_power_field()
+    mission_duration_earth_days: float | None = _mission_duration_field()
     repair_crossings: bool = Field(
         default=True,
         description=(
@@ -370,6 +389,7 @@ class EvaluateRequest(BaseModel):
     )
     payload_mass_kg: float | None = _payload_mass_field()
     payload_power_w: float | None = _payload_power_field()
+    mission_duration_earth_days: float | None = _mission_duration_field()
 
 
 class EvaluateMetric(BaseModel):
@@ -519,6 +539,7 @@ class SweepRequest(BaseModel):
     )
     payload_mass_kg: float | None = _payload_mass_field()
     payload_power_w: float | None = _payload_power_field()
+    mission_duration_earth_days: float | None = _mission_duration_field()
 
 
 class SweepSensitivityOut(BaseModel):
@@ -628,6 +649,7 @@ class OptimizeRequest(BaseModel):
     )
     payload_mass_kg: float | None = _payload_mass_field()
     payload_power_w: float | None = _payload_power_field()
+    mission_duration_earth_days: float | None = _mission_duration_field()
 
 
 class OptimizeJobResponse(BaseModel):
@@ -704,6 +726,7 @@ class ShapExplainRequest(BaseModel):
     operational_duty_cycle: float | None = Field(default=None, ge=0.0, le=0.6)
     payload_mass_kg: float | None = _payload_mass_field()
     payload_power_w: float | None = _payload_power_field()
+    mission_duration_earth_days: float | None = _mission_duration_field()
 
 
 class ShapLocalResponse(BaseModel):

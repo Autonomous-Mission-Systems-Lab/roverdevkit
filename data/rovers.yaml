@@ -1,0 +1,202 @@
+# Canonical published-facts reference for the rovers used in verification.
+#
+# Purpose
+# -------
+# Single source of truth for the *published, citable facts* about each real
+# (or reference) rover. The mass-model validation set
+# (``data/mass_validation_set.csv``), the flown-rover truth table
+# (``data/published_traverse_data.csv``), and the executable design registry
+# (``roverdevkit/validation/rover_registry.py``) all describe these same
+# rovers; this file is where the underlying facts live so the three consumers
+# cannot silently drift apart. ``tests/test_rover_facts.py`` enforces that the
+# consumers agree with the published/derived facts recorded here.
+#
+# Facts vs modeling values
+# ------------------------
+# This file holds ONLY published facts. It deliberately does NOT hold
+# modeling-derived quantities that legitimately differ per consumer:
+#   - chassis_mass_kg          (back-solved differently by the mass model and
+#                               the evaluator registry)
+#   - avionics_power_w         (steady-state vs peak, model-specific)
+#   - peak_wheel_torque_nm     (sizing anchor)
+#   - panel_efficiency / panel_dust_factor / thermal architecture
+#   - scenario duty cycles, slopes, soil simulants
+# Those stay in their respective consumers.
+#
+# Per-field provenance
+# --------------------
+# Every leaf is ``{value, provenance, source}``:
+#   - provenance: published  -> taken directly from the cited source
+#                 derived    -> computed from other published values
+#                 imputed    -> estimated (class heritage / back-solve); the
+#                               source field explains the basis
+# Only ``published`` and ``derived`` fields are consistency-enforced against
+# the consumers; ``imputed`` fields may differ per model.
+#
+# Latitude sign convention: positive = lunar north, negative = lunar south.
+
+schema_version: 1
+
+rovers:
+  - name: Pragyan
+    aliases: []
+    status: { value: flown, provenance: published, source: "ISRO Chandrayaan-3 mission updates (Aug-Sep 2023)" }
+    agency: { value: ISRO, provenance: published, source: "ISRO Chandrayaan-3 press materials" }
+    launch_year: { value: 2023, provenance: published, source: "ISRO Chandrayaan-3 (launch Jul 2023, landing 23 Aug 2023)" }
+    landing_latitude_deg: { value: -69.4, provenance: published, source: "ISRO Chandrayaan-3 press materials (~69.37 S, Shiv Shakti point)" }
+    landing_site: { value: "South polar highlands", provenance: published, source: "ISRO Chandrayaan-3 press materials" }
+    mass_total_kg: { value: 26.0, provenance: published, source: "ISRO Chandrayaan-3 press kit" }
+    n_wheels: { value: 6, provenance: published, source: "ISRO Chandrayaan-3 press kit" }
+    wheel_radius_m: { value: 0.085, provenance: published, source: "ISRO Chandrayaan-3 press materials (~170 mm wheel dia.)" }
+    wheel_width_m: { value: 0.07, provenance: imputed, source: "scaled from 6-wheel geometry (not published)" }
+    grouser_height_m: { value: 0.008, provenance: imputed, source: "class heritage (Yutu/Rashid-style 8 mm grousers)" }
+    grouser_count: { value: 12, provenance: imputed, source: "class heritage" }
+    wheelbase_m: { value: 0.5, provenance: imputed, source: "estimated from published rover imagery" }
+    solar_area_m2: { value: 0.5, provenance: imputed, source: "power-budget back-solve (single lunar-day ops)" }
+    battery_capacity_wh: { value: 60.0, provenance: imputed, source: "scaled from mass class and mission duration" }
+    payload_mass_kg: { value: 3.5, provenance: published, source: "Chandrayaan-3 Pragyan instrument suite (APXS + LIBS)" }
+    truth:
+      scenario_name: { value: chandrayaan3_pragyan, provenance: derived, source: "validation scenario key" }
+      traverse_m: { value: 101.4, low: 80.0, high: 140.0, provenance: published, source: "ISRO Chandrayaan-3 mission updates (Aug-Sep 2023); Nature SR 14:24178 (2024)" }
+      peak_solar_power_w: { value: 50.0, low: 40.0, high: 70.0, provenance: published, source: "ISRO Chandrayaan-3 power-system reporting" }
+      thermal_survival: { value: false, provenance: published, source: "No RHUs; rover did not survive lunar night" }
+      mission_duration_days: { value: 10.0, provenance: published, source: "Lunar Day 1 operations only" }
+
+  - name: Yutu-2
+    aliases: []
+    status: { value: flown, provenance: published, source: "CNSA Chang'e-4 mission dispatches" }
+    agency: { value: CNSA, provenance: published, source: "CNSA Chang'e-4 program" }
+    launch_year: { value: 2018, provenance: published, source: "Chang'e-4 launched 7 Dec 2018 (landing 3 Jan 2019)" }
+    landing_latitude_deg: { value: -45.5, provenance: published, source: "Di et al. 2020 Icarus (45.44 S, Von Karman crater, SPA basin)" }
+    landing_site: { value: "Von Karman crater, South Pole-Aitken basin (farside)", provenance: published, source: "Di et al. 2020 Icarus" }
+    mass_total_kg: { value: 135.0, provenance: published, source: "Di et al. 2020 Icarus; Ding et al. 2022 Acta Astronautica" }
+    n_wheels: { value: 6, provenance: published, source: "Di et al. 2020 Icarus" }
+    wheel_radius_m: { value: 0.15, provenance: published, source: "Di et al. 2020 Icarus (~300 mm wheel dia.)" }
+    wheel_width_m: { value: 0.15, provenance: published, source: "Di et al. 2020 Icarus" }
+    grouser_height_m: { value: 0.012, provenance: imputed, source: "Yutu-class grousered wheels (estimated from imagery)" }
+    grouser_count: { value: 18, provenance: imputed, source: "estimated from published wheel imagery" }
+    wheelbase_m: { value: 1.0, provenance: imputed, source: "estimated from published rover imagery" }
+    solar_area_m2: { value: 1.3, provenance: imputed, source: "two-wing deployable array (estimated)" }
+    battery_capacity_wh: { value: 130.0, provenance: imputed, source: "Li-ion pack (estimated from class)" }
+    payload_mass_kg: { value: 25.0, provenance: published, source: "Chang'e-4 Yutu-2 payload manifest (LPR + VNIS + APXS + cameras)" }
+    truth:
+      scenario_name: { value: change4_yutu2_per_lunar_day, provenance: derived, source: "validation scenario key" }
+      traverse_m: { value: 25.0, low: 10.0, high: 60.0, provenance: published, source: "Di et al. 2020 Icarus; CNSA dispatches (per-lunar-day drive)" }
+      peak_solar_power_w: { value: 135.0, low: 110.0, high: 160.0, provenance: published, source: "Chang'e-4 Yutu-2 power-system reporting" }
+      thermal_survival: { value: true, provenance: published, source: "Pu-238 RHUs; survived 60+ lunar days" }
+      mission_duration_days: { value: 5.0, provenance: imputed, source: "active-ops window per lunar day (not full 14 days)" }
+
+  - name: Rashid
+    aliases: [Rashid-1]
+    status: { value: lost_on_landing, provenance: published, source: "Lost on Hakuto-R Mission 1 lander failure (Apr 2023)" }
+    agency: { value: MBRSC/UAE, provenance: published, source: "MBRSC Emirates Lunar Mission" }
+    launch_year: { value: 2022, provenance: published, source: "Launched Dec 2022 on Hakuto-R Mission 1" }
+    landing_latitude_deg: { value: 47.5, provenance: published, source: "MBRSC Emirates Lunar Mission (Atlas Crater, 47.5 N 44.4 E, Mare Frigoris)" }
+    landing_site: { value: "Atlas Crater, Mare Frigoris", provenance: published, source: "MBRSC Emirates Lunar Mission" }
+    mass_total_kg: { value: 10.0, provenance: published, source: "Hurrell et al. 2025 Space Science Reviews 221:37" }
+    n_wheels: { value: 4, provenance: published, source: "Hurrell et al. 2025 SSR 221:37" }
+    wheel_radius_m: { value: 0.10, provenance: published, source: "Hurrell et al. 2025 SSR 221:37 (radius 100 mm)" }
+    wheel_width_m: { value: 0.08, provenance: published, source: "Hurrell et al. 2025 SSR 221:37 (width 80 mm)" }
+    grouser_height_m: { value: 0.015, provenance: published, source: "Hurrell et al. 2025 SSR 221:37 (15 mm flight grouser)" }
+    grouser_count: { value: 14, provenance: published, source: "Hurrell et al. 2025 SSR 221:37" }
+    wheelbase_m: { value: 0.50, provenance: published, source: "Els et al. LPSC 2021 #1905 (footprint 0.535 x 0.539 m)" }
+    solar_area_m2: { value: 0.25, provenance: imputed, source: "power-budget back-solve (0.5 x 0.5 m chassis)" }
+    battery_capacity_wh: { value: 50.0, provenance: imputed, source: "class-typical for 10 kg rover" }
+    payload_mass_kg: { value: 1.5, provenance: published, source: "Els et al. LPSC 2021 #1905 (2 cameras + CAM-M + CAM-T + Langmuir probes)" }
+
+  - name: Tenacious
+    aliases: [Resilience-Tenacious]
+    status: { value: lost_on_landing, provenance: published, source: "Resilience lander hard landing (Jun 2025)" }
+    agency: { value: ispace, provenance: published, source: "ispace HAKUTO-R Mission 2" }
+    launch_year: { value: 2025, provenance: published, source: "Launched 15 Jan 2025 on Falcon 9" }
+    landing_latitude_deg: { value: 60.5, provenance: published, source: "ispace Mission 2 target (Mare Frigoris, 60.5 N 4.6 W)" }
+    landing_site: { value: "Mare Frigoris", provenance: published, source: "ispace Mission 2 landing-zone announcement" }
+    mass_total_kg: { value: 5.0, provenance: published, source: "ispace HAKUTO-R Mission 2 mission overview" }
+    n_wheels: { value: 4, provenance: published, source: "ispace HAKUTO-R Mission 2 mission overview" }
+    wheel_radius_m: { value: 0.06, provenance: imputed, source: "estimated from ispace press imagery (scaled from Rashid by mass)" }
+    wheel_width_m: { value: 0.04, provenance: imputed, source: "estimated from ispace press imagery" }
+    grouser_height_m: { value: 0.005, provenance: imputed, source: "small grousers visible in ispace imagery" }
+    grouser_count: { value: 12, provenance: imputed, source: "class-typical 12-tooth pattern" }
+    wheelbase_m: { value: 0.30, provenance: imputed, source: "small-chassis class typical" }
+    solar_area_m2: { value: 0.15, provenance: imputed, source: "small body-mounted array (estimated)" }
+    battery_capacity_wh: { value: 25.0, provenance: imputed, source: "class-typical for 5 kg day-1 demo rover" }
+    payload_mass_kg: { value: 0.3, provenance: published, source: "ispace Mission 2 (HD camera + scoop sample demo)" }
+
+  - name: CADRE-unit
+    aliases: []
+    status: { value: design_target, provenance: published, source: "NASA/JPL CADRE (per-unit; no published surface-mission report at registry snapshot)" }
+    agency: { value: NASA/JPL, provenance: published, source: "Rothenbuchner et al. 2023 IEEE Aerospace #2300" }
+    launch_year: { value: 2025, provenance: imputed, source: "2024-2025 launch / deployment window (NASA/JPL CADRE)" }
+    landing_latitude_deg: { value: -85.0, provenance: imputed, source: "lunar south polar region target (design scenario)" }
+    landing_site: { value: "Lunar south pole region", provenance: published, source: "NASA/JPL CADRE project materials" }
+    mass_total_kg: { value: 2.0, provenance: published, source: "Rothenbuchner et al. 2023 IEEE Aerospace #2300 (per-unit ~2 kg)" }
+    n_wheels: { value: 4, provenance: published, source: "Rothenbuchner et al. 2023 IEEE Aerospace #2300" }
+    wheel_radius_m: { value: 0.08, provenance: published, source: "Rothenbuchner et al. 2023 IEEE Aerospace #2300" }
+    wheel_width_m: { value: 0.04, provenance: imputed, source: "class-typical aspect ratio for ultra-micro wire-spoke wheel" }
+    grouser_height_m: { value: 0.0, provenance: published, source: "smooth wire-spoke rims (JPL flotilla imagery)" }
+    grouser_count: { value: 0, provenance: published, source: "smooth wire-spoke rims (JPL flotilla imagery)" }
+    wheelbase_m: { value: 0.30, provenance: published, source: "Rothenbuchner et al. 2023 IEEE Aerospace #2300" }
+    solar_area_m2: { value: 0.10, provenance: published, source: "Rothenbuchner et al. 2023 IEEE Aerospace #2300 (small body-mounted array)" }
+    battery_capacity_wh: { value: 10.0, provenance: imputed, source: "power-budget back-solve (short coordinated drives)" }
+    payload_mass_kg: { value: 0.3, provenance: imputed, source: "stereo camera + small comms-ranging payload (estimated)" }
+
+  - name: MoonRanger
+    aliases: []
+    status: { value: design_target, provenance: published, source: "CMU/Astrobotic (in development)" }
+    agency: { value: CMU/Astrobotic, provenance: published, source: "Kumar et al. i-SAIRAS 2020 #5068" }
+    landing_latitude_deg: { value: -85.0, provenance: imputed, source: "south-polar demo target (design scenario)" }
+    landing_site: { value: "Lunar south pole region", provenance: published, source: "Kumar et al. i-SAIRAS 2020 #5068" }
+    mass_total_kg: { value: 13.0, provenance: published, source: "Kumar et al. i-SAIRAS 2020 #5068 (13 kg full-up)" }
+    n_wheels: { value: 4, provenance: published, source: "Kumar et al. i-SAIRAS 2020 #5068" }
+    wheel_radius_m: { value: 0.10, provenance: imputed, source: "class-match to Rashid-1" }
+    wheel_width_m: { value: 0.08, provenance: imputed, source: "class-match to Rashid-1" }
+    grouser_height_m: { value: 0.012, provenance: imputed, source: "class-typical for ~0.10 m radius lunar wheel" }
+    grouser_count: { value: 12, provenance: imputed, source: "class-typical" }
+    wheelbase_m: { value: 0.40, provenance: imputed, source: "body length ~0.65 m minus wheel diameter" }
+    solar_area_m2: { value: 0.30, provenance: imputed, source: "polar power-budget back-solve" }
+    battery_capacity_wh: { value: 100.0, provenance: imputed, source: "class-typical for 13 kg polar rover" }
+
+  - name: Sojourner
+    aliases: []
+    status: { value: flown_mars, provenance: published, source: "NASA Mars Pathfinder / Sojourner (Mars-gravity proxy, not lunar)" }
+    agency: { value: NASA/JPL, provenance: published, source: "Wilcox & Nguyen 1998" }
+    launch_year: { value: 1996, provenance: published, source: "Mars Pathfinder launched Dec 1996, landed Jul 1997" }
+    mass_total_kg: { value: 10.6, provenance: published, source: "Wilcox & Nguyen 1998" }
+    n_wheels: { value: 6, provenance: published, source: "Wilcox & Nguyen 1998" }
+    wheel_radius_m: { value: 0.065, provenance: published, source: "Wilcox & Nguyen 1998" }
+    wheel_width_m: { value: 0.08, provenance: imputed, source: "estimated" }
+    grouser_height_m: { value: 0.010, provenance: imputed, source: "estimated" }
+    grouser_count: { value: 12, provenance: imputed, source: "estimated" }
+    solar_area_m2: { value: 0.22, provenance: published, source: "Mars Pathfinder / Sojourner solar panel" }
+    battery_capacity_wh: { value: 40.0, provenance: imputed, source: "primary battery (estimated)" }
+    payload_mass_kg: { value: 1.5, provenance: published, source: "APXS (~0.55 kg) + 3 cameras + electronics" }
+
+  - name: ExoMy
+    aliases: []
+    status: { value: educational_concept, provenance: published, source: "ESA ExoMy open-hardware documentation" }
+    agency: { value: ESA/ESTEC, provenance: published, source: "ESA ExoMy open-hardware documentation" }
+    launch_year: { value: 2020, provenance: published, source: "ESA ExoMy open-hardware release" }
+    mass_total_kg: { value: 8.0, provenance: imputed, source: "approximate per ESA ExoMy docs (educational platform)" }
+    n_wheels: { value: 6, provenance: published, source: "ESA ExoMy open-hardware documentation" }
+    wheel_radius_m: { value: 0.055, provenance: published, source: "ESA ExoMy open-hardware documentation" }
+    wheel_width_m: { value: 0.06, provenance: imputed, source: "approximate per ESA ExoMy docs" }
+    grouser_height_m: { value: 0.008, provenance: imputed, source: "approximate per ESA ExoMy docs" }
+    grouser_count: { value: 12, provenance: imputed, source: "approximate per ESA ExoMy docs" }
+    solar_area_m2: { value: 0.10, provenance: imputed, source: "nominal (educational platform)" }
+    battery_capacity_wh: { value: 30.0, provenance: imputed, source: "nominal (educational platform)" }
+    payload_mass_kg: { value: 0.0, provenance: published, source: "educational platform, no dedicated science instrument" }
+
+  - name: MARSOKHOD-proto
+    aliases: []
+    status: { value: prototype, provenance: published, source: "Kemurjian et al. 1993 (historical reference)" }
+    agency: { value: IKI, provenance: published, source: "Kemurjian et al. 1993" }
+    launch_year: { value: 1992, provenance: published, source: "Kemurjian et al. 1993 (prototype)" }
+    mass_total_kg: { value: 70.0, provenance: published, source: "Kemurjian et al. 1993" }
+    n_wheels: { value: 6, provenance: published, source: "Kemurjian et al. 1993" }
+    wheel_radius_m: { value: 0.17, provenance: published, source: "Kemurjian et al. 1993" }
+    wheel_width_m: { value: 0.13, provenance: published, source: "Kemurjian et al. 1993" }
+    grouser_height_m: { value: 0.015, provenance: imputed, source: "estimated from prototype specs" }
+    grouser_count: { value: 12, provenance: imputed, source: "estimated" }
+    solar_area_m2: { value: 0.5, provenance: imputed, source: "estimated" }
+    battery_capacity_wh: { value: 100.0, provenance: imputed, source: "estimated" }
+    payload_mass_kg: { value: 8.0, provenance: imputed, source: "instrument mast + manipulator/sampling proto payload (estimated)" }

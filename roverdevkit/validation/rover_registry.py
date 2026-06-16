@@ -104,9 +104,8 @@ Rashid-1        3.5 kg              10 kg               35 %  (back-solved 2026-
 The MoonRanger and Rashid-1 chassis values were incorrectly set to
 their published full-up totals before the 2026-05-27 audit. That
 inflated the bottom-up sum by ~2× for those two rovers and biased
-their Layer-4 / Layer-5 / Layer-6 validation outputs (Layer-4
-predicted-vs-published mass error, Layer-5 mass-budget constraint,
-Layer-6 dominance count under inflated mass). Back-solved values
+their Layer-4 / Layer-5 validation outputs (Layer-4 predicted-vs-published
+mass error, Layer-5 mass-budget constraint). Back-solved values
 now land within the 35-40 % class band.
 
 Payload as a mission requirement (schema v9)
@@ -535,7 +534,7 @@ def _rashid1_entry() -> RoverRegistryEntry:
     #   distinguishes from the 20 mm closed-side test wheel)
     # - grouser_count: 14
     # - wheelbase_m: 0.50 (footprint 0.535 x 0.539 m per LPSC 2021)
-    # - landing site: Atlas crater, Mare Frigoris (~47 N, 44 E)
+    # - landing site: Atlas crater, Mare Frigoris (~47.5 N, 44.4 E)
     # - mission duration: 1 lunar day (~14 Earth days), no RHU.
     # - Hurrell 2025 used 0.02 m/s as the experimental drive velocity;
     #   that is now scenario-side context rather than a design input
@@ -554,7 +553,7 @@ def _rashid1_entry() -> RoverRegistryEntry:
     #   registry-wide audit note in the :func:`registry` docstring.
     # - solar_area_m2 = 0.25: 0.5 x 0.5 m chassis with deployable mast;
     #   flat array bound ~0.25 m^2. Power back-solve: at lunar noon
-    #   ~ 47 N, 0.20 eff x 0.25 m^2 x 0.85 dust ~ 32 W peak, sufficient
+    #   ~47.5 N, 0.20 eff x 0.25 m^2 x 0.85 dust ~32 W peak, sufficient
     #   for the science-heavy ~15 W avionics with battery buffering.
     # - battery_capacity_wh = 50: class-typical for 10 kg rover with
     #   14-day target; supports overnight Wi-Fi data return to lander.
@@ -619,7 +618,7 @@ def _tenacious_entry() -> RoverRegistryEntry:
     # - n_wheels: 4
     # - mission target: Mare Frigoris area, mid-northern latitude
     # - mission duration: ~1 lunar day (~14 Earth days), no RHU
-    # - landing site lat ~60 N
+    # - landing site lat ~60.5 N
     # - status: lander failed on descent (June 2025); rover never
     #   operated on the lunar surface (parallel to Rashid-1 on
     #   Hakuto-R M1)
@@ -678,7 +677,7 @@ def _tenacious_entry() -> RoverRegistryEntry:
         imputation_notes=(
             "Cited (iSpace HAKUTO-R M2 mission overview, June 2025 "
             "lander-loss reporting): total mass (5 kg), n_wheels (4), "
-            "mission target (Mare Frigoris, mid-northern latitude), "
+            "mission target (Mare Frigoris, ~60.5 N), "
             "no RHU, 1 lunar day target. Imputed: wheel radius / "
             "width / grousers (class-match to Rashid-1 scaled by "
             "mass ratio); wheelbase from small-chassis class typical; "
@@ -698,7 +697,7 @@ def _cadre_unit_entry() -> RoverRegistryEntry:
     # NASA/JPL CADRE project page; CADRE flotilla press materials):
     # - per-unit total mass: ~2 kg
     # - n_wheels: 4
-    # - wheel_radius_m: 0.08 (per data/published_rovers.csv)
+    # - wheel_radius_m: 0.08 (Rothenbuchner 2023 / NASA-JPL CADRE press materials)
     # - wheelbase_m: 0.30
     # - solar_area_m2: 0.10 (small body-mounted array)
     # - mission target: lunar south pole region; multi-rover

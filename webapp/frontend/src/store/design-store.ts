@@ -66,6 +66,14 @@ interface DesignState {
    */
   payloadMassOverride: number | null;
   payloadPowerOverride: number | null;
+  /**
+   * Optional per-query override for `MissionScenario.mission_duration_earth_days`.
+   *
+   * Sets the simulation window (solar averaging, energy budget, thermal
+   * exposure). Reset to `null` on scenario change so a polar 30 d window
+   * doesn't carry onto a mare traverse without realising it.
+   */
+  missionDurationOverride: number | null;
   /** Names of registry rovers whose predictions should be overlaid on the chart. */
   overlayRovers: string[];
   setDesignField: <K extends keyof DesignVector>(
@@ -79,6 +87,8 @@ interface DesignState {
   setPayloadMassOverride: (value: number | null) => void;
   setPayloadPowerOverride: (value: number | null) => void;
   clearPayloadOverrides: () => void;
+  setMissionDurationOverride: (value: number | null) => void;
+  clearMissionDurationOverride: () => void;
   resetDesign: () => void;
   toggleOverlayRover: (name: string) => void;
   clearOverlayRovers: () => void;
@@ -90,6 +100,7 @@ export const useDesignStore = create<DesignState>()((set) => ({
   opsDutyOverride: null,
   payloadMassOverride: null,
   payloadPowerOverride: null,
+  missionDurationOverride: null,
   overlayRovers: [],
   setDesignField: (key, value) =>
     set((state) => ({ design: { ...state.design, [key]: value } })),
@@ -100,6 +111,7 @@ export const useDesignStore = create<DesignState>()((set) => ({
       opsDutyOverride: null,
       payloadMassOverride: null,
       payloadPowerOverride: null,
+      missionDurationOverride: null,
     }),
   setOpsDutyOverride: (value) => set({ opsDutyOverride: value }),
   clearOpsDutyOverride: () => set({ opsDutyOverride: null }),
@@ -107,12 +119,15 @@ export const useDesignStore = create<DesignState>()((set) => ({
   setPayloadPowerOverride: (value) => set({ payloadPowerOverride: value }),
   clearPayloadOverrides: () =>
     set({ payloadMassOverride: null, payloadPowerOverride: null }),
+  setMissionDurationOverride: (value) => set({ missionDurationOverride: value }),
+  clearMissionDurationOverride: () => set({ missionDurationOverride: null }),
   resetDesign: () =>
     set({
       design: DEFAULT_DESIGN,
       opsDutyOverride: null,
       payloadMassOverride: null,
       payloadPowerOverride: null,
+      missionDurationOverride: null,
     }),
   toggleOverlayRover: (name) =>
     set((state) => ({

@@ -57,12 +57,14 @@ validate the evaluator; never used for training the surrogate.
 - **Wang & Han 2016**, *J. Korean Geotech. Soc.* 32(11):97-108 (open access) —
   KLS-1 single-wheel testbed (R=85 mm, b=80 mm, 59 N), smooth vs grousered
   (h=10 mm), slip 0.1-0.5. Digitised from Fig. 14. The paper publishes only
-  shear strength (Table 2: C=1.716 kPa, φ=40.6°), so the pressure-sinkage
-  terms in `KLS-1` (`../soil_simulants.csv`) are proxied from PSD-matched
-  JSC-1A. This is a deliberate **stress case**: BW over-predicts smooth-wheel
-  DP and sinkage and cannot capture the measured DP collapse at s≈0.5, so its
-  accuracy band in the test is intentionally loose (it is not a validation
-  claim).
+  shear strength (Table 2: C=1.716 kPa, φ=40.6°); the pressure-sinkage moduli
+  in `KLS-1` (`../soil_simulants.csv`) are KLS-1's own bevameter-measured Bekker
+  values (Lim et al. 2021, *J. Astron. Space Sci.* 38(4):237; n=1.2594,
+  k_c=-44.06, k_phi=3581.8). This is a deliberate **stress case at the edge of
+  the rigid-wheel kernel's regime**: the smallest/most-lightly-loaded wheel on a
+  firm, dense, fines-rich simulant that barely sinks (1-14 mm), so BW's
+  force-balance sinkage solve over-predicts DP and sinkage (~135 % / ~385 %
+  median |error|) and cannot capture the measured DP collapse at s≈0.5. 
 - **Hurrell et al. 2025**, *Space Sci. Rev.* 221 art. 37 (open access, CC-BY) —
   Rashid-1 micro-rover wheel (R=100 mm, b=80 mm, 14 grousers h=20 mm, 24.5 N)
   on FJS-1, slip 0.1-0.5. Digitised from Figs. 5/6:

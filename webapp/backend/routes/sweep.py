@@ -99,6 +99,7 @@ def _cached_sweep(_request_key: str, req_json: str) -> SweepResponse:
         operational_duty_cycle=req.operational_duty_cycle,
         payload_mass_kg=req.payload_mass_kg,
         payload_power_w=req.payload_power_w,
+        mission_duration_earth_days=req.mission_duration_earth_days,
     )
 
     for ax in (req.x_axis, req.y_axis):

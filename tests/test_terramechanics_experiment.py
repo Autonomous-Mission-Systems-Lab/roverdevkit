@@ -30,14 +30,15 @@ from roverdevkit.validation.terramechanics_experiment import (
 # rather than over-fitting to a particular digitisation.
 BW_MODEL_FORM_BAND_PCT = 40.0
 
-# Per-source acceptance bands. Sources whose ORIGINAL paper reports the full
-# Bekker pressure-sinkage set (n, k_c, k_phi) are held to the tight model-form
-# band. Wang & Han 2016 publishes only shear strength (C, phi) for KLS-1, so
-# its pressure-sinkage terms are proxied from PSD-matched JSC-1A; BW is then a
-# documented stress case (over-predicts smooth DP, cannot capture the s=0.5
-# soil-disturbance DP collapse). Its band only guards against unit/sign bugs,
-# it is NOT a validation claim -- tighten it only if real KLS-1 pressure-sinkage
-# parameters are digitised.
+# Per-source acceptance bands. Ding and Hurrell are held to the tight model-form
+# band. Wang & Han 2016 (KLS-1) is a documented stress case at the edge of the
+# rigid-wheel kernel's regime: the smallest/most-lightly-loaded wheel (R=85 mm,
+# 59 N) on a firm, dense, fines-rich simulant that barely sinks, so the
+# force-balance sinkage solve over-predicts DP/sinkage and cannot capture the
+# s~0.5 soil-disturbance DP collapse. This is a MODEL-FORM limit, not a soil
+# mis-specification: KLS-1's pressure-sinkage moduli are its OWN bevameter-fit
+# values (Lim et al. 2021), yet the error persists. Its loose band guards
+# against unit/sign bugs only -- it is NOT a validation claim.
 SOURCE_BAND_PCT = {
     "ding2011": BW_MODEL_FORM_BAND_PCT,
     "hurrell2025_rashid1": BW_MODEL_FORM_BAND_PCT,

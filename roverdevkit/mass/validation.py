@@ -6,12 +6,8 @@ best-effort full design vector for a published rover, with an
 published and how it was estimated.
 
 The ``in_class`` flag (True/False) marks whether the rover is inside the
-**bottom-up mass model's specific-mass calibration regime (5-50 kg
-lunar micro-rovers)**, *not* the design-space schema bounds. The two
-concepts diverged on 2026-05-27 when the schema floors were lowered
-(``chassis_mass_kg`` 3.0 -> 0.5, ``peak_wheel_torque_nm`` 0.3 -> 0.05,
-``battery_capacity_wh`` 20 -> 5) to admit ultra-micro rovers (CADRE,
-Tenacious) as registry entries. At sub-5-kg total mass the bottom-up
+bottom-up mass model's specific-mass calibration regime (5-50 kg
+lunar micro-rovers). At sub-5-kg total mass the bottom-up
 model's fixed-cost terms (per-wheel motor base mass, avionics base
 mass, harness / thermal / margin fractions) come to dominate, and the
 model systematically over-predicts total mass relative to ultra-micro
@@ -53,7 +49,7 @@ class RoverValidationRow:
 
     ``in_class`` marks whether the rover sits inside the bottom-up
     mass model's specific-mass calibration regime (5-50 kg lunar
-    micro-rovers), *not* the schema's design-space bounds. See the
+    micro-rovers). See the
     module docstring for why the two diverged on 2026-05-27.
     """
 
@@ -69,14 +65,15 @@ class RoverValidationRow:
     grouser_height_m: float
     grouser_count: int
     payload_mass_kg: float
-    """Scientific-payload mass, kg (schema v9).
+    """Scientific-payload mass, kg.
 
     Separated out of the back-solved ``chassis_mass_kg`` bucket so the
     bottom-up model sizes only the *bus* and adds payload as a flat,
     ungrown line item — matching how payload enters the live evaluator.
-    See ``data/mass_validation_set.csv`` ``imputation_notes`` for the
-    per-rover literature source."""
+    See ``data/mass_validation_set.csv`` ``citation`` and
+    ``imputation_notes`` for the per-rover literature source."""
     in_class: bool
+    citation: str
     imputation_notes: str
 
 
@@ -151,6 +148,7 @@ def load_validation_set(csv_path: Path | str | None = None) -> list[RoverValidat
                     grouser_count=int(row["grouser_count"]),
                     payload_mass_kg=float(row.get("payload_mass_kg", 0.0) or 0.0),
                     in_class=_parse_bool(row["in_class"]),
+                    citation=row.get("citation", ""),
                     imputation_notes=row["imputation_notes"],
                 )
             )
@@ -167,24 +165,6 @@ def predict_row(
     params: MassModelParams | None = None,
 ) -> RoverValidationResult:
     """Run ``estimate_mass`` on a single validation row.
-
-    Schema v6 (v6 schema update) note. The validation CSV does not carry
-    ``peak_wheel_torque_nm`` — it pre-dates the schema bump and the
-    published rovers it covers don't all expose hub-torque numbers.
-    For the layered mass cross-check, we feed the v5-implicit
-    sizing-anchor torque (computed from the published *total* mass via
-    :func:`sizing_peak_torque_anchor_nm`) so the v6 motor mass matches
-    what the pre-v6 fixed-point loop would have produced for the same
-    rover. This keeps the historical 10-rover cross-check apples-to-
-    apples; for design-vector-driven estimates,
-    :func:`estimate_mass_from_design` uses ``DesignVector
-    .peak_wheel_torque_nm`` directly.
-
-    Schema v9 note. ``payload_mass_kg`` is now a separate column on the
-    validation set rather than being folded into the back-solved
-    ``chassis_mass_kg`` bucket. It is forwarded to ``estimate_mass`` so
-    the bottom-up model sizes only the bus and adds payload as a flat,
-    ungrown line item — exactly how payload enters the live evaluator.
     """
     peak_wheel_torque_nm = sizing_peak_torque_anchor_nm(
         total_mass_kg=row.mass_total_kg,

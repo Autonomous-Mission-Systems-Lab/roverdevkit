@@ -1,10 +1,8 @@
 """Shared pytest fixtures.
 
 Session-scoped fixtures cache expensive evaluator runs across modules so
-the integration suites (cross-scenario sensitivity, real-rover
-validation) don't re-run the same physics dozens of times. The
-non-cached version of the suite was ~580 s; with these fixtures it
-drops to under 60 s on a typical developer laptop.
+the integration suites (real-rover validation) don't re-run the same
+physics dozens of times.
 """
 
 from __future__ import annotations
@@ -12,12 +10,6 @@ from __future__ import annotations
 import pytest
 
 from roverdevkit.schema import DesignVector, MissionScenario
-from roverdevkit.validation.cross_scenario import (
-    ArchetypeRanking,
-    SensitivityEntry,
-    one_at_a_time_sensitivity,
-    rank_archetypes,
-)
 from roverdevkit.validation.rover_comparison import (
     ComparisonSummary,
     RoverComparisonResult,
@@ -32,7 +24,8 @@ def rashid_like_design() -> DesignVector:
     """A Rashid-like design vector for tests and worked examples.
 
     Numbers chosen to match published Rashid specs where available
-    (see data/published_rovers.csv) and reasonable defaults otherwise.
+    (see the Rashid registry entry and data/mass_validation_set.csv)
+    and reasonable defaults otherwise.
     """
     return DesignVector(
         wheel_radius_m=0.1,
@@ -72,26 +65,6 @@ def equatorial_scenario() -> MissionScenario:
 # (no test-induced state); reusing them across tests is safe because the
 # evaluator is deterministic. If a test needs a *different* evaluator
 # call, it should not depend on these fixtures and pay its own cost.
-
-
-@pytest.fixture(scope="session")
-def cross_scenario_rankings() -> dict[str, ArchetypeRanking]:
-    """Cached :func:`rank_archetypes` output (12 evaluator runs)."""
-    return rank_archetypes()
-
-
-@pytest.fixture(scope="session")
-def cross_scenario_sensitivity() -> list[SensitivityEntry]:
-    """Cached :func:`one_at_a_time_sensitivity` output (~24 evaluator runs)."""
-    return one_at_a_time_sensitivity()
-
-
-@pytest.fixture(scope="session")
-def cross_scenario_sensitivity_by_var(
-    cross_scenario_sensitivity: list[SensitivityEntry],
-) -> dict[str, SensitivityEntry]:
-    """Sensitivity entries keyed by variable name."""
-    return {e.variable: e for e in cross_scenario_sensitivity}
 
 
 @pytest.fixture(scope="session")

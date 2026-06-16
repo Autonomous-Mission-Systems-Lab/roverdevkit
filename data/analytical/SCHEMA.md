@@ -68,12 +68,12 @@ All `design_*` columns mirror the `DesignVector` pydantic schema.
 | `design_grouser_height_m` | float64 | [0.0, 0.020] | Grouser height |
 | `design_grouser_count` | int64 | [0, 24] | Number of grousers per wheel |
 | `design_n_wheels` | int64 | {4, 6} | Wheel count |
-| `design_chassis_mass_kg` | float64 | [3.0, 50.0] | Dry chassis mass (structural chassis only) |
+| `design_chassis_mass_kg` | float64 | [0.5, 50.0] | Dry chassis mass (structural chassis only) |
 | `design_wheelbase_m` | float64 | [0.3, 1.2] | Wheelbase |
 | `design_solar_area_m2` | float64 | [0.1, 1.5] | Solar array area |
-| `design_battery_capacity_wh` | float64 | [20.0, 500.0] | Usable battery energy |
+| `design_battery_capacity_wh` | float64 | [5.0, 500.0] | Usable battery energy |
 | `design_avionics_power_w` | float64 | [5.0, 40.0] | Continuous avionics draw |
-| `design_peak_wheel_torque_nm` | float64 | [0.3, 20.0] | Per-wheel hub torque capacity. Cruise speed is derived inside the evaluator from torque + slip + power balance (see `roverdevkit/drivetrain/motor.py::cruise_speed`). LHS is log-uniform around a per-row anchor rather than uniform on these bounds — see `roverdevkit/surrogate/sampling.py::_peak_wheel_torque_anchor_for_row`. |
+| `design_peak_wheel_torque_nm` | float64 | [0.05, 20.0] | Per-wheel hub torque capacity. Cruise speed is derived inside the evaluator from torque + slip + power balance (see `roverdevkit/drivetrain/motor.py::cruise_speed`). LHS is log-uniform around a per-row anchor rather than uniform on these bounds — see `roverdevkit/surrogate/sampling.py::_peak_wheel_torque_anchor_for_row`. |
 
 ### Scenario inputs (18 columns)
 

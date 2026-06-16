@@ -45,7 +45,6 @@ export function ScenarioPicker() {
       {selected ? (
         <p className="text-xs text-[var(--color-muted-foreground)]">
           {selected.scenario.latitude_deg.toFixed(1)}° lat ·{" "}
-          {selected.scenario.mission_duration_earth_days.toFixed(0)} d ·{" "}
           {humanText(selected.scenario.terrain_class)} · soil{" "}
           {humanText(selected.soil.simulant)}
         </p>

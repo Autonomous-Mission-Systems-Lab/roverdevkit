@@ -38,7 +38,7 @@ the synodic vs sidereal day distinction and the Moon's small obliquity).
 
 Validation
 -------------------
-Cross-check noon power for Yutu-2 (45.5 deg N selenographic latitude)
+Cross-check noon power for Yutu-2 (45.5 deg S selenographic latitude)
 against published Yutu-2 power-profile numbers; see ``tests/test_power.py``.
 """
 

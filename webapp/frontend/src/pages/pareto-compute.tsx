@@ -86,6 +86,7 @@ export function ParetoCompute() {
   const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
   const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
   const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
+  const missionDurationOverride = useDesignStore((s) => s.missionDurationOverride);
 
   const [populationSize, setPopulationSize] = useState(32);
   const [nGenerations, setNGenerations] = useState(50);
@@ -168,6 +169,7 @@ export function ParetoCompute() {
         // mass budget instead of floating chassis to the LHS floor.
         payload_mass_kg: payloadMassOverride,
         payload_power_w: payloadPowerOverride,
+        mission_duration_earth_days: missionDurationOverride,
       });
       setJob(queued);
       openStream(queued, objectivePayload);

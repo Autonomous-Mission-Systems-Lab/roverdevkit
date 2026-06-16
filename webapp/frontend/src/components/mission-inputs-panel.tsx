@@ -1,6 +1,7 @@
 import { RotateCcw } from "lucide-react";
 
 import { DesignSliderField } from "@/components/design-slider-field";
+import { MissionDurationPanel } from "@/components/mission-duration-panel";
 import { OperationsPanel } from "@/components/operations-panel";
 import { ScenarioPicker } from "@/components/scenario-picker";
 import { Button } from "@/components/ui/button";
@@ -8,11 +9,10 @@ import { Label } from "@/components/ui/label";
 import { useScenarios } from "@/hooks/use-scenarios";
 import { useDesignStore } from "@/store/design-store";
 import { PAYLOAD_BOUNDS } from "@/types/api";
-import { cn } from "@/lib/utils";
 
 interface MissionInputsPanelProps {
   disabled?: boolean;
-  /** When true, omit the section header and use a horizontal layout on wide screens. */
+  /** When true, omit the in-panel section header (page supplies Card title). */
   embedded?: boolean;
   /** When false, omit the helper line under the section title. */
   showDescription?: boolean;
@@ -22,16 +22,6 @@ interface MissionInputsPanelProps {
  * Mission Inputs: the requirements a mission *sets* (scenario, scientific
  * payload, operational duty cycle) rather than the design variables a
  * rover engineer *trades* (wheels, mass, power, …).
- *
- * Schema v9 promoted scientific payload from a per-rover `chassis_mass_kg`
- * convention to two explicit mission requirements carried on
- * `MissionScenario` (`payload_mass_kg` / `payload_power_w`). Each canonical
- * scenario ships a class-typical default; this panel lets the user override
- * both for a single round-trip without editing the scenario catalogue.
- * Payload mass is added to total vehicle mass as a top-level line item
- * outside the dry-mass growth margin; payload power adds to the continuous
- * electrical load. Both are LHS-sampled surrogate inputs over [0, 30], so
- * any in-bounds override stays on the surrogate path with calibrated PIs.
  */
 export function MissionInputsPanel({
   disabled,
@@ -39,13 +29,19 @@ export function MissionInputsPanel({
   showDescription = true,
 }: MissionInputsPanelProps) {
   const scenarioName = useDesignStore((s) => s.scenarioName);
+  const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
   const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
   const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
+  const missionDurationOverride = useDesignStore((s) => s.missionDurationOverride);
   const setPayloadMassOverride = useDesignStore((s) => s.setPayloadMassOverride);
   const setPayloadPowerOverride = useDesignStore(
     (s) => s.setPayloadPowerOverride,
   );
+  const clearOpsDutyOverride = useDesignStore((s) => s.clearOpsDutyOverride);
   const clearPayloadOverrides = useDesignStore((s) => s.clearPayloadOverrides);
+  const clearMissionDurationOverride = useDesignStore(
+    (s) => s.clearMissionDurationOverride,
+  );
 
   const { data, isLoading } = useScenarios();
   const scenario = data?.scenarios.find(
@@ -56,25 +52,29 @@ export function MissionInputsPanel({
 
   const massValue = payloadMassOverride ?? massDefault;
   const powerValue = payloadPowerOverride ?? powerDefault;
-  const overridden =
-    payloadMassOverride !== null || payloadPowerOverride !== null;
+  const hasOverrides =
+    opsDutyOverride !== null ||
+    payloadMassOverride !== null ||
+    payloadPowerOverride !== null ||
+    missionDurationOverride !== null;
 
   const massBounds = PAYLOAD_BOUNDS.payload_mass_kg;
   const powerBounds = PAYLOAD_BOUNDS.payload_power_w;
 
+  const clearAllOverrides = () => {
+    clearOpsDutyOverride();
+    clearPayloadOverrides();
+    clearMissionDurationOverride();
+  };
+
   return (
-    <div
-      className={cn(
-        "space-y-4",
-        embedded && "lg:grid lg:grid-cols-3 lg:items-start lg:gap-6 lg:space-y-0",
-      )}
-    >
+    <div className="space-y-5">
       {!embedded ? (
         <div>
           <Label className="text-sm font-semibold">Mission inputs</Label>
           {showDescription ? (
             <p className="text-[0.65rem] text-[var(--color-muted-foreground)]">
-              Scenario, payload, and drive duty cycle.
+              Scenario, duration, payload, and drive duty cycle.
             </p>
           ) : null}
         </div>
@@ -82,27 +82,9 @@ export function MissionInputsPanel({
 
       <ScenarioPicker />
 
-      <div className="space-y-3 rounded-md border border-[var(--color-border)] p-3">
-        <div className="flex items-center justify-between gap-2">
-          <Label className="text-sm font-medium">Scientific payload</Label>
-          {overridden ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={disabled}
-              onClick={() => clearPayloadOverrides()}
-              className="h-7 px-2 text-xs"
-            >
-              <RotateCcw className="mr-1 h-3 w-3" /> Reset to scenario default
-            </Button>
-          ) : (
-            <span className="text-[0.65rem] text-[var(--color-muted-foreground)]">
-              using scenario defaults ({massDefault.toFixed(1)} kg ·{" "}
-              {powerDefault.toFixed(1)} W)
-            </span>
-          )}
-        </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <MissionDurationPanel disabled={disabled} />
+        <OperationsPanel disabled={disabled} />
 
         <DesignSliderField
           id="payload_mass_kg"
@@ -131,7 +113,19 @@ export function MissionInputsPanel({
         />
       </div>
 
-      <OperationsPanel disabled={disabled} />
+      {hasOverrides ? (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            onClick={clearAllOverrides}
+          >
+            <RotateCcw className="mr-1 h-3 w-3" /> Reset to scenario defaults
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

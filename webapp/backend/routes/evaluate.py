@@ -66,6 +66,7 @@ def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
         scenarios[req.scenario_name],
         payload_mass_kg=req.payload_mass_kg,
         payload_power_w=req.payload_power_w,
+        mission_duration_earth_days=req.mission_duration_earth_days,
     )
 
     output = evaluate_design(

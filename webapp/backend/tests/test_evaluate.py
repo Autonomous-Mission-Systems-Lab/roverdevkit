@@ -158,6 +158,48 @@ def test_evaluate_rejects_out_of_bounds_payload(
     assert response.status_code == 422
 
 
+def test_evaluate_mission_duration_override_increases_range(
+    client: TestClient,
+    sample_design: dict[str, float | int],
+) -> None:
+    """Longer ``mission_duration_earth_days`` extends the simulation window,
+    so range_km should not decrease when duration doubles on a non-binding
+    mare traverse (energy-limited, not cap-limited).
+    """
+    base = {"design": sample_design, "scenario_name": "equatorial_mare_traverse"}
+    short_resp = client.post(
+        "/evaluate", json={**base, "mission_duration_earth_days": 7.0}
+    )
+    long_resp = client.post(
+        "/evaluate", json={**base, "mission_duration_earth_days": 28.0}
+    )
+    assert short_resp.status_code == 200, short_resp.text
+    assert long_resp.status_code == 200, long_resp.text
+    short_range = {m["target"]: m["value"] for m in short_resp.json()["metrics"]}[
+        "range_km"
+    ]
+    long_range = {m["target"]: m["value"] for m in long_resp.json()["metrics"]}[
+        "range_km"
+    ]
+    assert long_range > short_range + 1e-9
+
+
+def test_evaluate_rejects_out_of_bounds_mission_duration(
+    client: TestClient,
+    sample_design: dict[str, float | int],
+) -> None:
+    """Mission-duration overrides are bounded ``[0.5, 90]`` at the HTTP boundary."""
+    response = client.post(
+        "/evaluate",
+        json={
+            "design": sample_design,
+            "scenario_name": "equatorial_mare_traverse",
+            "mission_duration_earth_days": 0.1,
+        },
+    )
+    assert response.status_code == 422
+
+
 def test_evaluate_unknown_scenario_returns_404(
     client: TestClient,
     sample_design: dict[str, float | int],

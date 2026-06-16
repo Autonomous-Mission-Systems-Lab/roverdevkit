@@ -46,6 +46,7 @@ def shap_explain(req: ShapExplainRequest) -> ShapLocalResponse:
         operational_duty_cycle=req.operational_duty_cycle,
         payload_mass_kg=req.payload_mass_kg,
         payload_power_w=req.payload_power_w,
+        mission_duration_earth_days=req.mission_duration_earth_days,
     )
     soil = get_soil_for_simulant(scenario.soil_simulant)
     X = build_feature_row(req.design, scenario, soil)

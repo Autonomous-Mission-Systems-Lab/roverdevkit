@@ -7,15 +7,6 @@
 - :mod:`.rover_rediscovery` — the headline validation (Layer 5, rediscovery-validation).
 - :mod:`.rediscovery_report` — LOO orchestration + report writer on
   top of :mod:`.rover_rediscovery` (Layer 5, paper-figure pipeline).
-- :mod:`.concept_study_comparison` — head-to-head against published
-  pre-Phase-A concept-study design points (Layer 6).
-- :mod:`.cross_scenario`    — qualitative archetype-ranking checks across
-  the four scenario families and one-at-a-time design-variable sensitivity
-  (real-rover validation, Layer 7).
-- :mod:`.robustness`        — supporting ±20 % soil and
-  ``MassModelParams`` perturbation sweep over (scenario × archetype)
-  cells; reports continuous-metric drift and ranking-preservation per
-  scenario.
 
 Layer-3 sub-model validation against published wheel-testbed data has two
 strands:
@@ -33,34 +24,16 @@ strands:
   rover-class operating points, and Iizuka & Kubota 2011 grouser-thrust
   limit cases, each row with documented tolerance bands).
 
-The consolidated layered error-budget that pulls Layers 1-7 into a single
+The consolidated layered error-budget that pulls Layers 1-5 into a single
 chain lives at ``reports/error_budget.md``.
 """
 
-from roverdevkit.validation.concept_study_comparison import (
-    CONCEPT_STUDIES,
-    ConceptStudyComparison,
-    ConceptStudyEntry,
-    compare_concept_to_pareto,
-    get_concept_study,
-    list_concept_studies,
-)
 from roverdevkit.validation.rediscovery_report import (
     DEFAULT_PER_ROVER_OVERRIDES,
     RediscoveryRunSummary,
     run_rediscovery_loo,
     summarize_results,
     write_loo_artifacts,
-)
-from roverdevkit.validation.robustness import (
-    Perturbation,
-    RobustnessEntry,
-    RobustnessSummary,
-    cross_scenario_robustness_sweep,
-    default_perturbations,
-    format_robustness_report,
-    perturb_mass_params,
-    perturb_soil,
 )
 from roverdevkit.validation.rover_comparison import (
     ComparisonSummary,
@@ -93,37 +66,23 @@ from roverdevkit.validation.terramechanics_experiment import (
 )
 
 __all__ = [
-    "CONCEPT_STUDIES",
     "ComparisonSummary",
-    "ConceptStudyComparison",
-    "ConceptStudyEntry",
     "DEFAULT_PER_ROVER_OVERRIDES",
     "ExperimentPoint",
-    "Perturbation",
     "PublishedTruth",
     "RediscoveryResult",
     "RediscoveryRunSummary",
-    "RobustnessEntry",
-    "RobustnessSummary",
     "RoverComparisonResult",
     "RoverRegistryEntry",
     "acceptance_gate",
     "class_generic_scenario_for",
     "compare_all",
-    "compare_concept_to_pareto",
     "compare_one",
     "compare_to_experiment",
-    "cross_scenario_robustness_sweep",
-    "default_perturbations",
     "flown_registry",
     "format_report",
-    "format_robustness_report",
-    "get_concept_study",
-    "list_concept_studies",
     "load_experiment_points",
     "load_truth_table",
-    "perturb_mass_params",
-    "perturb_soil",
     "rediscover",
     "rediscover_all",
     "registry",

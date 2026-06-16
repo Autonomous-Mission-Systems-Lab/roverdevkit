@@ -36,10 +36,12 @@ export function useRegistryEvaluations(
   overrides?: {
     payload_mass_kg?: number | null;
     payload_power_w?: number | null;
+    mission_duration_earth_days?: number | null;
   },
 ) {
   const payloadMass = overrides?.payload_mass_kg ?? null;
   const payloadPower = overrides?.payload_power_w ?? null;
+  const missionDuration = overrides?.mission_duration_earth_days ?? null;
   return useQueries({
     queries: rovers.map((r) => ({
       queryKey: [
@@ -49,6 +51,7 @@ export function useRegistryEvaluations(
         JSON.stringify(r.design),
         payloadMass,
         payloadPower,
+        missionDuration,
       ] as const,
       queryFn: (): Promise<EvaluateResponse> =>
         api.evaluate({
@@ -56,6 +59,7 @@ export function useRegistryEvaluations(
           scenario_name: scenarioName,
           payload_mass_kg: payloadMass,
           payload_power_w: payloadPower,
+          mission_duration_earth_days: missionDuration,
         }),
       staleTime: Infinity,
       gcTime: 60 * 60 * 1000,

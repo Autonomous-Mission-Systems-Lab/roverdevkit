@@ -32,9 +32,9 @@ import {
 } from "@/types/api";
 
 /**
- * Single-design panel: mission inputs and rover comparison across the
- * top, then design inputs on the left and predicted performance on the
- * right.
+ * Single-design panel: mission inputs and design inputs stacked full
+ * width, predicted performance below, and registry overlays above the
+ * chart.
  *
  * The chart's median diamond is the corrected mission evaluator's
  * deterministic output; the surrogate's quantile heads supply the
@@ -48,6 +48,7 @@ export function DesignExplorer() {
   const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
   const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
   const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
+  const missionDurationOverride = useDesignStore((s) => s.missionDurationOverride);
   const overlayRovers = useDesignStore((s) => s.overlayRovers);
 
   const evaluate = useEvaluate();
@@ -78,6 +79,7 @@ export function DesignExplorer() {
   const overlayQueries = useRegistryEvaluations(overlayInputs, scenarioName, {
     payload_mass_kg: payloadMassOverride,
     payload_power_w: payloadPowerOverride,
+    mission_duration_earth_days: missionDurationOverride,
   });
 
   const overlays: OverlayPrediction[] = overlayInputs
@@ -162,6 +164,7 @@ export function DesignExplorer() {
       operational_duty_cycle: opsDuty,
       payload_mass_kg: payloadMassOverride,
       payload_power_w: payloadPowerOverride,
+      mission_duration_earth_days: missionDurationOverride,
     };
     evaluate.mutate(shared);
     predict.mutate(shared);
@@ -182,11 +185,34 @@ export function DesignExplorer() {
         <CardHeader>
           <CardTitle>Mission inputs</CardTitle>
           <CardDescription>
-            Scenario, scientific payload, and drive duty cycle.
+            Scenario, mission duration, scientific payload, and drive duty cycle.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <MissionInputsPanel disabled={isPending} embedded />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Design inputs</CardTitle>
+          <CardDescription>
+            Configure the candidate rover within the calibrated design space.
+            Coloured marks on sliders show selected real-rover values.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <DesignForm disabled={isPending} ticks={formTicks} />
+          <Button
+            type="button"
+            onClick={handlePredict}
+            disabled={isPending}
+            className="w-full sm:w-auto"
+            size="lg"
+          >
+            <Play className="mr-2 h-4 w-4" />
+            {isPending ? "Evaluating…" : "Predict performance"}
+          </Button>
         </CardContent>
       </Card>
 
@@ -203,41 +229,16 @@ export function DesignExplorer() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Design inputs</CardTitle>
-            <CardDescription>
-              Configure the candidate rover within the calibrated design space.
-              Coloured marks on sliders show selected real-rover values.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <DesignForm disabled={isPending} ticks={formTicks} />
-            <Button
-              type="button"
-              onClick={handlePredict}
-              disabled={isPending}
-              className="w-full"
-              size="lg"
-            >
-              <Play className="mr-2 h-4 w-4" />
-              {isPending ? "Evaluating…" : "Predict performance"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <PredictionPanel
-          rows={rows}
-          meta={meta}
-          isPending={isPending}
-          error={error}
-          surrogatePending={surrogatePending}
-          overlays={overlays}
-          overlayLoading={overlayInputs.length > 0 && overlayQueries.isPending}
-          banner={evaluatorOnlyMode ? <NoPiBanner /> : null}
-        />
-      </div>
+      <PredictionPanel
+        rows={rows}
+        meta={meta}
+        isPending={isPending}
+        error={error}
+        surrogatePending={surrogatePending}
+        overlays={overlays}
+        overlayLoading={overlayInputs.length > 0 && overlayQueries.isPending}
+        banner={evaluatorOnlyMode ? <NoPiBanner /> : null}
+      />
     </div>
   );
 }

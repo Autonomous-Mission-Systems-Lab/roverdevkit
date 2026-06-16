@@ -93,6 +93,23 @@ def test_predict_payload_override_reaches_feature_row(
     assert row["values"][power_idx] == pytest.approx(7.0)
 
 
+def test_predict_mission_duration_override_reaches_feature_row(
+    client: TestClient,
+    sample_design: dict[str, float | int],
+) -> None:
+    """A per-call duration override must land in the echoed feature row."""
+    payload = {
+        "design": sample_design,
+        "scenario_name": "equatorial_mare_traverse",
+        "mission_duration_earth_days": 21.0,
+    }
+    response = client.post("/predict", json=payload)
+    assert response.status_code == 200, response.text
+    row = response.json()["feature_row"]
+    duration_idx = row["columns"].index("scenario_mission_duration_earth_days")
+    assert row["values"][duration_idx] == pytest.approx(21.0)
+
+
 def test_predict_rejects_out_of_bounds_payload(
     client: TestClient,
     sample_design: dict[str, float | int],

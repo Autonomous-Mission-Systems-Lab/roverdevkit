@@ -4,7 +4,7 @@
 # cross-check.
 #
 # Source: Di et al. 2020, Icarus; Ding et al. 2022, Acta Astronautica;
-# CNSA mission dispatches. Yutu-2 landed 2019-01-03 at 45.5 N on the
+# CNSA mission dispatches. Yutu-2 landed 2019-01-03 at 45.5 S on the
 # lunar far side (Von Karman crater) and has driven ~1.6 km cumulatively
 # over 60+ lunar days. Published per-lunar-day drive distances from
 # the first year range ~20-30 m; we treat that as the truth number the
@@ -16,7 +16,7 @@
 # ops we approximate the drive schedule without needing a proper
 # hibernation model (that is v2 work per traverse_sim.py docstring).
 name: change4_yutu2_per_lunar_day
-latitude_deg: 45.5
+latitude_deg: -45.5
 traverse_distance_m: 200.0
 terrain_class: mare_nominal
 soil_simulant: Apollo_regolith_nominal

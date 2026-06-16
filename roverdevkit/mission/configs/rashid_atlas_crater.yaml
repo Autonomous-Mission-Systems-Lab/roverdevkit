@@ -9,7 +9,7 @@
 # (DOI 10.1007/s11214-025-01164-8) for wheel + mass + speed; Els et al.
 # LPSC 2021 #1905 for science payload + dimensions; ESA + Wikipedia
 # Emirates Lunar Mission for landing site (Atlas crater, Mare Frigoris,
-# ~47.0 N, 44.4 E) and 1 lunar-day mission target.
+# ~47.5 N, 44.4 E) and 1 lunar-day mission target.
 #
 # Soil simulant FJS-1 chosen explicitly because Hurrell et al. 2025
 # calibrated the Rashid-1 wheel terramechanics against FJS-1 in their
@@ -17,10 +17,10 @@
 # for sanity-checking the Rashid surrogate prediction.
 #
 # sun_geometry "diurnal" rather than "polar_intermittent" because the
-# Atlas crater landing site is mid-latitude (47 N), not polar, and the
+# Atlas crater landing site is mid-latitude (47.5 N), not polar, and the
 # scenario sees a normal day/night terminator pattern.
 name: rashid_atlas_crater
-latitude_deg: 47.0
+latitude_deg: 47.5
 traverse_distance_m: 1000.0
 terrain_class: mare_nominal
 soil_simulant: FJS-1

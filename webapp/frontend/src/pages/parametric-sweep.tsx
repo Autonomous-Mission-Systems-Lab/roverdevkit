@@ -40,6 +40,7 @@ export function ParametricSweep() {
   const opsDutyOverride = useDesignStore((s) => s.opsDutyOverride);
   const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
   const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
+  const missionDurationOverride = useDesignStore((s) => s.missionDurationOverride);
 
   const target = useSweepStore((s) => s.target);
   const xAxis = useSweepStore((s) => s.xAxis);
@@ -76,6 +77,7 @@ export function ParametricSweep() {
       // override the Single design tab used.
       payload_mass_kg: payloadMassOverride,
       payload_power_w: payloadPowerOverride,
+      mission_duration_earth_days: missionDurationOverride,
     });
   };
 
