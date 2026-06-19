@@ -28,20 +28,23 @@ The tool is aimed at conceptual design questions such as:
   engineer trades; the chassis-mass input is the structural chassis only. It
   couples several physics sub-models:
   - **Terramechanics:** Bekker-Wong wheel-soil mechanics with an
-    engaged-grouser shear-thrust term (Iizuka & Kubota 2011).
+    engaged-grouser shear-thrust term.
   - **Drivetrain:** motor torque, stall, and cruise-speed limits.
   - **Power:** solar generation, battery storage, and thermal survival.
   - **Mass:** parametric mass-estimating relationships for the rover subsystems.
-- **Surrogate + uncertainty:** quantile XGBoost models that provide
-  calibrated 90% prediction intervals around the evaluator's
-  deterministic output and power TreeSHAP feature attributions on the
-  Explain Design tab. The analytical physics evaluator is the
-  reference output and the objective evaluated inside NSGA-II; the
-  surrogate sits on top of it as the uncertainty-quantification and
-  explainability layer.
-- **Interactive web app:** current-design analysis, parametric sweeps,
-  multi-objective optimization, Pareto-front visualization, and SHAP-style
-  explanations for the active design.
+- **Surrogate + uncertainty:** quantile XGBoost models trained on the LHS
+  corpus that provide fast, calibrated 90% prediction intervals around the
+  evaluator outputs — the layer that makes interactive Current Design
+  predictions practical without re-running the full physics stack on every
+  slider move.
+- **Multi-objective design optimization:** NSGA-II searches over the design
+  variables with the physics evaluator as the objective function, producing
+  Pareto fronts for range, slope capability, energy margin, and total mass.
+- **Design explanations:** TreeSHAP feature attributions on the surrogate
+  models, showing which design inputs drive predicted range, mass, slope
+  capability, and energy margin for a candidate design.
+- **Interactive web app:** browser interface for current-design analysis,
+  parametric sweeps, optimization, and explanations.
 - **Validation data and registry:** published lunar micro-rover design points,
   mission scenarios, soil simulants, and validation harnesses.
 
@@ -203,58 +206,6 @@ make webapp-backend   # backend only
 make webapp-frontend  # frontend only
 make webapp-test      # backend tests + frontend lint/build
 ```
-
-## Validation snapshot
-
-The toolkit ships with a layered validation chain. Summary numbers
-(full reports under `reports/`):
-
-- **Layer 1 — surrogate vs analytical evaluator.** R² ≥ 0.92 on every
-  primary regression target on the canonical 10 % LHS test split
-  (range 0.922, energy margin 0.968, slope 0.979, total mass 0.999);
-  AUC 0.993 on the feasibility classifier; ≈83–96 % empirical coverage
-  on the calibrated 90 % prediction intervals. The training corpus
-  includes scientific payload (mass and power) as two explicit
-  mission-requirement inputs sampled over [0, 30], and six-wheel
-  samples carry the updated rocker-bogie suspension mass in the
-  evaluator labels. Training metrics live under `reports/surrogate_v9/`;
-  the shipped runtime bundle is `models/surrogate_v9/quantile_bundles.joblib`
-  (published automatically by `scripts/calibrate_intervals.py` on a full run).
-- **Layer 3 — sub-model checks against published references.**
-  Parametric tolerance grid in
-  `data/validation/wong_layer3_reference.csv` exercising a Wong (2008)
-  §4.2 worked-example fixture, Pragyan- and Yutu-2-class operating
-  points on Apollo regolith, and Iizuka & Kubota (2011) grouser-thrust
-  limit cases; assertions in
-  `tests/test_terramechanics.py::test_layer3_published_reference_grid`.
-- **Layer 5 — rover rediscovery.** Leakage-free NSGA-II rediscovery
-  sweep over the registry (no model coefficient is fit to the
-  registry, so this is a rediscovery comparison rather than
-  leave-one-out cross-validation) with a class-neutral
-  operational-duty-cycle anchor, scenario-driven panel-tilt
-  orientation, and each rover's published scientific payload injected
-  as a mission requirement (schema v9), so the optimiser carries the
-  same instrument mass and power the real rover flew. Across the five
-  in-scope (< 50 kg) micro-rovers the median evaluator-backed
-  design-space distance is **0.49** (≈ 41 % of the ≈1.20 random-pair
-  baseline in the 9-D unit cube — the mean pairwise separation between
-  random designs). Per-rover distances: Tenacious 0.12, Rashid-1 0.34,
-  CADRE-unit 0.49, Pragyan 0.52, MoonRanger 0.59 — all
-  five between 10 % and 49 % of the random-pair baseline. Yutu-2
-  (~135 kg) sits above the micro-rover scope and is reported separately
-  at 1.01 (≈ the random baseline): the optimiser does not spuriously
-  place an out-of-class rover near its front. Distances are reported
-  relative to the random-pair baseline rather than any fixed pass/fail
-  cutoff. (CADRE-unit at 2 kg sits below the ~5–50 kg mass-model
-  calibration band and is flagged out-of-regime — the evaluator still
-  rediscovers it; the surrogate backend cannot reach its mass.)
-  Most published designs are Pareto-dominated
-  by the optimiser front under the class-neutral anchor; this reflects
-  design constraints the conceptual model does not carry (radiation,
-  deployability, integration and redundancy margins), not a claim that
-  flight designs are sub-optimal. Full results and per-rover JSON
-  artefacts are in
-  `reports/rediscovery_loo_evaluator/rediscovery_loo_report.md`.
 
 ## Reproducibility
 
