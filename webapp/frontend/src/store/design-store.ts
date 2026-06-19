@@ -20,6 +20,7 @@ import type { DesignVector, ScenarioName } from "@/types/api";
  * in-distribution input on first render.
  */
 export const DEFAULT_DESIGN: DesignVector = {
+  mobility_architecture: "rocker_bogie_6wheel",
   wheel_radius_m: 0.1,
   wheel_width_m: 0.1,
   grouser_height_m: 0.012,
@@ -74,6 +75,7 @@ interface DesignState {
    * doesn't carry onto a mare traverse without realising it.
    */
   missionDurationOverride: number | null;
+  requiredObstacleOverride: number | null;
   /** Names of registry rovers whose predictions should be overlaid on the chart. */
   overlayRovers: string[];
   setDesignField: <K extends keyof DesignVector>(
@@ -89,6 +91,8 @@ interface DesignState {
   clearPayloadOverrides: () => void;
   setMissionDurationOverride: (value: number | null) => void;
   clearMissionDurationOverride: () => void;
+  setRequiredObstacleOverride: (value: number | null) => void;
+  clearRequiredObstacleOverride: () => void;
   resetDesign: () => void;
   toggleOverlayRover: (name: string) => void;
   clearOverlayRovers: () => void;
@@ -101,9 +105,16 @@ export const useDesignStore = create<DesignState>()((set) => ({
   payloadMassOverride: null,
   payloadPowerOverride: null,
   missionDurationOverride: null,
+  requiredObstacleOverride: null,
   overlayRovers: [],
   setDesignField: (key, value) =>
-    set((state) => ({ design: { ...state.design, [key]: value } })),
+    set((state) => {
+      const next = { ...state.design, [key]: value };
+      if (key === "mobility_architecture") {
+        next.n_wheels = value === "rocker_bogie_6wheel" ? 6 : 4;
+      }
+      return { design: next };
+    }),
   setDesign: (design) => set({ design }),
   setScenario: (name) =>
     set({
@@ -112,6 +123,7 @@ export const useDesignStore = create<DesignState>()((set) => ({
       payloadMassOverride: null,
       payloadPowerOverride: null,
       missionDurationOverride: null,
+      requiredObstacleOverride: null,
     }),
   setOpsDutyOverride: (value) => set({ opsDutyOverride: value }),
   clearOpsDutyOverride: () => set({ opsDutyOverride: null }),
@@ -121,6 +133,8 @@ export const useDesignStore = create<DesignState>()((set) => ({
     set({ payloadMassOverride: null, payloadPowerOverride: null }),
   setMissionDurationOverride: (value) => set({ missionDurationOverride: value }),
   clearMissionDurationOverride: () => set({ missionDurationOverride: null }),
+  setRequiredObstacleOverride: (value) => set({ requiredObstacleOverride: value }),
+  clearRequiredObstacleOverride: () => set({ requiredObstacleOverride: null }),
   resetDesign: () =>
     set({
       design: DEFAULT_DESIGN,
@@ -128,6 +142,7 @@ export const useDesignStore = create<DesignState>()((set) => ({
       payloadMassOverride: null,
       payloadPowerOverride: null,
       missionDurationOverride: null,
+      requiredObstacleOverride: null,
     }),
   toggleOverlayRover: (name) =>
     set((state) => ({

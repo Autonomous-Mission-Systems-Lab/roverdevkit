@@ -67,7 +67,8 @@ All `design_*` columns mirror the `DesignVector` pydantic schema.
 | `design_wheel_width_m` | float64 | [0.03, 0.20] | Wheel width W |
 | `design_grouser_height_m` | float64 | [0.0, 0.020] | Grouser height |
 | `design_grouser_count` | int64 | [0, 24] | Number of grousers per wheel |
-| `design_n_wheels` | int64 | {4, 6} | Wheel count |
+| `design_n_wheels` | int64 | {4, 6} | Wheel count (kept in sync with architecture) |
+| `design_mobility_architecture` | category | `rigid_4wheel`, `rocker_bogie_6wheel` | Primary mobility-architecture trade in the evaluator/optimizer. Not yet present in the shipped `lhs_v9.parquet` surrogate training set; the surrogate still keys off `design_n_wheels` until the dataset is rebuilt. |
 | `design_chassis_mass_kg` | float64 | [0.5, 50.0] | Dry chassis mass (structural chassis only) |
 | `design_wheelbase_m` | float64 | [0.3, 1.2] | Wheelbase |
 | `design_solar_area_m2` | float64 | [0.1, 1.5] | Solar array area |
@@ -102,6 +103,7 @@ family. The remaining columns are jittered per sample.
 | `scenario_soil_shear_modulus_k_m` | float64 | Janosi-Hanamoto K, [0.010, 0.025] m. |
 | `scenario_payload_mass_kg` | float64 | Scientific-payload mass (mission requirement). Per-row LHS feature uniform on `[0, 30]` independently of family. Added to total vehicle mass as a line item outside the dry-mass growth margin; the per-scenario default is kept on the YAML / `ScenarioFamily` for canonical webapp slider position. |
 | `scenario_payload_power_w` | float64 | Scientific-payload continuous ops-time power (mission requirement). Per-row LHS feature uniform on `[0, 30]`. Added to the continuous electrical load (alongside avionics) in the traverse budget and to the hot-case thermal dissipation. |
+| `scenario_required_obstacle_height_m` | float64 | Minimum traversable obstacle/step height (m). Defaults to 0 on the canonical smooth-regolith scenarios. Evaluator-only today: obstacle metrics (`obstacle_capability_m`, `obstacle_margin_m`) are computed from `mobility_architecture` and wheel radius; the surrogate does not yet predict them. |
 
 ### Mission-metric targets (8 columns)
 
@@ -123,6 +125,15 @@ design trade-off and the surrogate does not consume or predict it.
 | `peak_motor_torque_nm` | float64 | Observed peak wheel torque during traverse. |
 | `sinkage_max_m` | float64 | Observed peak sinkage during traverse. |
 | `stalled` | bool | Single feasibility classifier target (1 = infeasible). Captures whether the rover failed the slip-balance solve at any traverse step (Brent solver could not find a slip that satisfied force balance under the available drawbar pull and torque envelope). |
+
+Evaluator-only architecture metrics (present on live `/evaluate` and optimizer outputs, not in the shipped `lhs_v9.parquet` targets):
+
+| Column | dtype | Notes |
+| --- | --- | --- |
+| `obstacle_capability_m` | float64 | Estimated max traversable obstacle height from architecture proxy ($h_{\mathrm{obs}} = k_{\mathrm{arch}} R$). |
+| `obstacle_margin_m` | float64 | Capability minus `scenario_required_obstacle_height_m`. |
+| `obstacle_requirement_met` | bool | Whether `obstacle_margin_m \ge 0`. |
+| `architecture_mass_kg` | float64 | Rocker-bogie suspension/linkage mass charged in the bottom-up mass model. |
 
 ### Traverse-log aggregate statistics (≥24 columns)
 

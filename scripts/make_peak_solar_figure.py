@@ -1,6 +1,6 @@
 """Render the §5.3 de-tuned peak-solar prediction figure.
 
-Reproduces ``reports/figures/fig_validation_peak_solar.png`` from the committed
+Reproduces ``paper/figures/fig_validation_peak_solar.png`` from the committed
 ``reports/power_prediction/summary.csv`` artifact (written by
 ``scripts/run_power_prediction.py``) so the paper figure is regenerable rather
 than a hand-made PNG.
@@ -50,7 +50,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--out",
         type=Path,
-        default=Path("reports/figures/fig_validation_peak_solar.png"),
+        default=Path("paper/figures/fig_validation_peak_solar.png"),
     )
     return p.parse_args(argv)
 

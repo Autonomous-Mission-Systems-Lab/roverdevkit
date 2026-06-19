@@ -83,6 +83,7 @@ def evaluate_design(
     scenario: MissionScenario,
     *,
     operational_duty_cycle: float | None = None,
+    required_obstacle_height_m: float | None = None,
 ) -> EvaluatorOutput:
     """Run the analytical mission evaluator on one design × one scenario.
 
@@ -111,6 +112,7 @@ def evaluate_design(
         design,
         scenario,
         operational_duty_cycle=operational_duty_cycle,
+        required_obstacle_height_m=required_obstacle_height_m,
     )
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
 

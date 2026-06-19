@@ -1,8 +1,7 @@
 """Backend configuration: artifact paths, CORS origins, dataset version.
 
-All paths default to the in-repo surrogate-training artifacts so the backend works
-out of the box from a fresh clone after running the surrogate-training pipeline.
-Each value can be overridden via environment variable so the same
+All paths default to in-repo runtime artifacts so the backend works
+out of the box from a fresh clone. Each value can be overridden via environment variable so the same
 container image can be repointed at a remote object store / mounted
 volume in deployment without code changes.
 
@@ -10,7 +9,7 @@ Environment variables
 ---------------------
 ``ROVERDEVKIT_QUANTILE_BUNDLES``
     Path to ``quantile_bundles.joblib`` (calibrated quantile XGB heads).
-    Default: ``reports/surrogate_v9/quantile_bundles.joblib`` — the v9
+    Default: ``models/surrogate_v9/quantile_bundles.joblib`` — the v9
     recalibration on lhs_v9.parquet after scientific payload was
     promoted from a per-rover ``chassis_mass_kg`` convention to two
     explicit mission-requirement inputs (``payload_mass_kg`` /
@@ -78,7 +77,7 @@ def get_settings() -> Settings:
     return Settings(
         quantile_bundles_path=_env_path(
             "ROVERDEVKIT_QUANTILE_BUNDLES",
-            REPO_ROOT / "reports" / "surrogate_v9" / "quantile_bundles.joblib",
+            REPO_ROOT / "models" / "surrogate_v9" / "quantile_bundles.joblib",
         ),
         tuned_params_path=_env_path(
             "ROVERDEVKIT_TUNED_PARAMS",

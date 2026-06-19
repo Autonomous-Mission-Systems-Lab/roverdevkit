@@ -71,7 +71,9 @@ row to the CSV and the parametrised test picks it up automatically.
 
 from __future__ import annotations
 
+import contextlib
 import math
+from collections.abc import Iterator
 from dataclasses import dataclass
 
 import numpy as np
@@ -97,6 +99,59 @@ _N_QUAD: int = 100
 # with the diminishing-returns trend reported for grouser traction
 # (Iizuka & Kubota 2011) but is chosen by us, not read off their data.
 _GROUSER_LIFT_CAP: float = 0.6
+
+# Multiplicative model-form perturbation applied to the mobilised shear
+# stress τ(θ) inside the contact integrals (default 1.0 = no
+# perturbation, so the kernel reproduces its unperturbed output
+# bit-for-bit). It is the single physical knob used to propagate the
+# kernel's measured drawbar-pull model-form error (the ±20-30 % band of
+# Section "Terramechanics validation") into downstream mission metrics:
+# scaling τ scales the gross tractive effort, and the net drawbar pull,
+# driving torque, and (through the implicit vertical force balance)
+# sinkage all respond self-consistently. Set via
+# :func:`traction_perturbation`; never assign it directly so the value
+# is always restored. pymoo's NSGA-II evaluates the population in-process
+# (no worker fork), so a process-global multiplier propagates cleanly to
+# every fitness evaluation inside a ``with`` block.
+_TRACTION_SCALE: float = 1.0
+
+
+@contextlib.contextmanager
+def traction_perturbation(scale: float) -> Iterator[None]:
+    """Temporarily scale the mobilised shear stress τ by ``scale``.
+
+    Used to propagate the Bekker-Wong kernel's measured drawbar-pull
+    model-form error into the mission evaluator, slope-capability, and
+    NSGA-II Pareto fronts. ``scale = 1.0`` is a no-op that leaves every
+    output bit-for-bit identical to the unperturbed kernel.
+
+    Parameters
+    ----------
+    scale
+        Positive multiplier on τ(θ). ``scale > 1`` makes the soil
+        generate more tractive shear than the nominal kernel predicts
+        (optimistic traction); ``scale < 1`` is pessimistic.
+
+    Examples
+    --------
+    >>> with traction_perturbation(0.75):
+    ...     forces = single_wheel_forces(wheel, soil, load_n, slip)
+
+    Notes
+    -----
+    Re-entrant: nested blocks restore the enclosing value on exit. Not
+    thread-safe (the perturbation is a process global); this is intended
+    for sequential offline sensitivity sweeps, not concurrent use.
+    """
+    global _TRACTION_SCALE
+    if scale <= 0.0:
+        raise ValueError(f"traction scale must be positive, got {scale!r}")
+    previous = _TRACTION_SCALE
+    _TRACTION_SCALE = float(scale)
+    try:
+        yield
+    finally:
+        _TRACTION_SCALE = previous
 
 
 # ---------------------------------------------------------------------------
@@ -346,6 +401,11 @@ def _integrate_forces(
     # has no grousers; saturates at _GROUSER_LIFT_CAP for very dense
     # grouser packs. See ``_grouser_shear_lift`` for the derivation.
     tau = tau * _grouser_shear_lift(wheel)
+
+    # Model-form perturbation on the constitutive shear (default 1.0 =
+    # identity). Applied here so it scales the gross tractive shear and
+    # propagates through W, DP, and T together; see _TRACTION_SCALE.
+    tau = tau * _TRACTION_SCALE
 
     # -----------------------------------------------------------------
     # Force integrals   (Wong 2008 §4.2)

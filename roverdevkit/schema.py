@@ -10,9 +10,15 @@ Design-variable ranges are chosen to cover the 5-50 kg lunar micro-rover class a
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from roverdevkit.architecture import (
+    MobilityArchitecture,
+    architecture_for_wheel_count,
+    wheel_count_for_architecture,
+)
 
 # ---------------------------------------------------------------------------
 # Design vector
@@ -20,13 +26,29 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class DesignVector(BaseModel):
-    """A single point in the 11-dimensional rover design space.
+    """A single point in the rover design space.
+
+    The model has 12 fields but only 11 independent design freedoms:
+    ``mobility_architecture`` and ``n_wheels`` are constrained to agree
+    (rigid ↔ 4, rocker ↔ 6), so they encode a single architecture trade.
 
     Units are SI unless otherwise noted.
+
+    ``mobility_architecture`` is the primary mobility-architecture trade;
+    ``n_wheels`` is kept for backward compatibility and must agree with it.
 
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+    mobility_architecture: MobilityArchitecture = Field(
+        default="rigid_4wheel",
+        description=(
+            "Mobility architecture proxy: rigid four-wheel skid/rigid layout "
+            "vs. six-wheel rocker-bogie. Drives wheel count, obstacle "
+            "capability, and suspension mass penalty."
+        ),
+    )
 
     # Mobility
     wheel_radius_m: float = Field(ge=0.05, le=0.20, description="Wheel radius R")
@@ -104,6 +126,31 @@ class DesignVector(BaseModel):
             "direct-drive concepts at the top of the design space. "
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _default_architecture_from_legacy(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        if "mobility_architecture" not in data and "n_wheels" in data:
+            data = dict(data)
+            data["mobility_architecture"] = architecture_for_wheel_count(
+                int(data["n_wheels"])
+            )
+        elif "mobility_architecture" in data and "n_wheels" not in data:
+            data = dict(data)
+            data["n_wheels"] = wheel_count_for_architecture(data["mobility_architecture"])
+        return data
+
+    @model_validator(mode="after")
+    def _architecture_matches_wheel_count(self) -> Self:
+        expected = wheel_count_for_architecture(self.mobility_architecture)
+        if self.n_wheels != expected:
+            raise ValueError(
+                f"mobility_architecture={self.mobility_architecture!r} requires "
+                f"n_wheels={expected}, got {self.n_wheels}."
+            )
+        return self
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +246,18 @@ class MissionScenario(BaseModel):
             "API parameter; trained as an LHS feature (v9)."
         ),
     )
+    required_obstacle_height_m: float = Field(
+        ge=0.0,
+        le=0.30,
+        default=0.0,
+        description=(
+            "Minimum traversable obstacle height required by the mission "
+            "profile, m. Compared against the architecture proxy "
+            "``obstacle_capability_m`` derived from wheel radius and "
+            "``mobility_architecture``. Defaults to 0 for smooth-regolith "
+            "canonical scenarios."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -239,10 +298,14 @@ class MissionMetrics(BaseModel):
     total_mass_kg: float
     peak_motor_torque_nm: float
     sinkage_max_m: float
+    obstacle_capability_m: float = 0.0
+    obstacle_margin_m: float = 0.0
+    architecture_mass_kg: float = 0.0
 
     # Constraint flags
     thermal_survival: bool
     stalled: bool  # mirrors run_traverse(...).rover_stalled; replaces
+    obstacle_requirement_met: bool = True
     # the v5 ``motor_torque_ok`` field which was redundant with the
     # explicit torque-ceiling stall gate introduced in v6.
 

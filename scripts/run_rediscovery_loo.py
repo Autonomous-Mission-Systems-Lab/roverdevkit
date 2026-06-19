@@ -1,4 +1,4 @@
-"""Run the Layer-5 rediscovery LOO sweep and write the paper artifacts.
+"""Run the Layer-5 rediscovery sweep and write the paper artifacts.
 
 Drives
 :func:`roverdevkit.validation.rediscovery_report.run_rediscovery_loo`
@@ -87,7 +87,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--quantile-bundles",
         type=Path,
-        default=Path("reports/surrogate_v9/quantile_bundles.joblib"),
+        default=Path("models/surrogate_v9/quantile_bundles.joblib"),
         help="Path to quantile bundles joblib; required when --backend=surrogate.",
     )
     p.add_argument(

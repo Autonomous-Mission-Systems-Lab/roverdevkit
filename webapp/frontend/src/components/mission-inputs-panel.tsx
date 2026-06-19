@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useScenarios } from "@/hooks/use-scenarios";
 import { useDesignStore } from "@/store/design-store";
-import { PAYLOAD_BOUNDS } from "@/types/api";
+import { OBSTACLE_BOUNDS, PAYLOAD_BOUNDS } from "@/types/api";
 
 interface MissionInputsPanelProps {
   disabled?: boolean;
@@ -33,6 +33,10 @@ export function MissionInputsPanel({
   const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
   const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
   const missionDurationOverride = useDesignStore((s) => s.missionDurationOverride);
+  const requiredObstacleOverride = useDesignStore((s) => s.requiredObstacleOverride);
+  const setRequiredObstacleOverride = useDesignStore(
+    (s) => s.setRequiredObstacleOverride,
+  );
   const setPayloadMassOverride = useDesignStore((s) => s.setPayloadMassOverride);
   const setPayloadPowerOverride = useDesignStore(
     (s) => s.setPayloadPowerOverride,
@@ -42,6 +46,9 @@ export function MissionInputsPanel({
   const clearMissionDurationOverride = useDesignStore(
     (s) => s.clearMissionDurationOverride,
   );
+  const clearRequiredObstacleOverride = useDesignStore(
+    (s) => s.clearRequiredObstacleOverride,
+  );
 
   const { data, isLoading } = useScenarios();
   const scenario = data?.scenarios.find(
@@ -50,21 +57,26 @@ export function MissionInputsPanel({
   const massDefault = scenario?.payload_mass_kg ?? 0;
   const powerDefault = scenario?.payload_power_w ?? 0;
 
+  const obstacleDefault = scenario?.required_obstacle_height_m ?? 0;
   const massValue = payloadMassOverride ?? massDefault;
   const powerValue = payloadPowerOverride ?? powerDefault;
+  const obstacleValue = requiredObstacleOverride ?? obstacleDefault;
   const hasOverrides =
     opsDutyOverride !== null ||
     payloadMassOverride !== null ||
     payloadPowerOverride !== null ||
-    missionDurationOverride !== null;
+    missionDurationOverride !== null ||
+    requiredObstacleOverride !== null;
 
   const massBounds = PAYLOAD_BOUNDS.payload_mass_kg;
   const powerBounds = PAYLOAD_BOUNDS.payload_power_w;
+  const obstacleBounds = OBSTACLE_BOUNDS.required_obstacle_height_m;
 
   const clearAllOverrides = () => {
     clearOpsDutyOverride();
     clearPayloadOverrides();
     clearMissionDurationOverride();
+    clearRequiredObstacleOverride();
   };
 
   return (
@@ -110,6 +122,19 @@ export function MissionInputsPanel({
           value={powerValue}
           disabled={disabled || isLoading}
           onChange={(v) => setPayloadPowerOverride(v)}
+        />
+
+        <DesignSliderField
+          id="required_obstacle_height_m"
+          label={obstacleBounds.label}
+          unit={obstacleBounds.unit}
+          description={obstacleBounds.description}
+          min={obstacleBounds.min}
+          max={obstacleBounds.max}
+          step={obstacleBounds.step}
+          value={obstacleValue}
+          disabled={disabled || isLoading}
+          onChange={(v) => setRequiredObstacleOverride(v)}
         />
       </div>
 

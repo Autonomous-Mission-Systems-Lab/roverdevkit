@@ -62,6 +62,7 @@ import numpy as np
 from scipy.stats import qmc
 
 from roverdevkit.drivetrain.motor import sizing_peak_torque_anchor_nm
+from roverdevkit.architecture import architecture_for_wheel_count
 from roverdevkit.schema import DesignVector, MissionScenario, TerrainClass
 from roverdevkit.terramechanics.bekker_wong import SoilParameters
 
@@ -396,6 +397,7 @@ def _build_design_from_lhs_row(
     g_lo, g_hi = _GROUSER_COUNT_BOUNDS
     kwargs["grouser_count"] = int(round(g_lo + u_grouser * (g_hi - g_lo)))
     kwargs["n_wheels"] = n_wheels
+    kwargs["mobility_architecture"] = architecture_for_wheel_count(n_wheels)
 
     assert peak_torque_u is not None, (
         "peak_wheel_torque_nm must be present in _CONTINUOUS_DESIGN_BOUNDS; "

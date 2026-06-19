@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type {
+  ArchitectureDiagnostic,
   PredictionRow,
   StallDiagnostic,
   ThermalDiagnostic,
@@ -25,6 +26,7 @@ export interface PredictionPanelMeta {
   /** Structured constraint diagnostics from the deterministic evaluator. */
   thermal: ThermalDiagnostic;
   stall: StallDiagnostic;
+  architecture: ArchitectureDiagnostic;
 }
 
 interface PredictionPanelProps {
@@ -157,7 +159,8 @@ export function PredictionPanel({
 function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
   const thermalOk = meta.thermal.survives;
   const driveOk = !meta.stall.stalled;
-  const allOk = thermalOk && driveOk;
+  const obstacleOk = meta.architecture.obstacle_requirement_met;
+  const allOk = thermalOk && driveOk && obstacleOk;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
       {allOk ? (
@@ -185,6 +188,11 @@ function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
                 failed={false}
               />
             }
+          />
+          <ConstraintChip
+            label={`obstacle margin ${(meta.architecture.obstacle_margin_m * 100).toFixed(0)} cm`}
+            ok
+            details={null}
           />
         </>
       ) : (
@@ -215,6 +223,13 @@ function PanelFooter({ meta }: { meta: PredictionPanelMeta }) {
                   failed
                 />
               }
+            />
+          ) : null}
+          {!obstacleOk ? (
+            <ConstraintChip
+              label="obstacle requirement fails"
+              ok={false}
+              details={null}
             />
           ) : null}
         </>

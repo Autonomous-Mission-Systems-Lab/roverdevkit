@@ -79,7 +79,15 @@ data/validation/raw/*
 # globals still catch large binaries inside any unignored subtree.
 reports/*
 !reports/pareto_fronts/
+
+# Shipped ML model artifacts (runtime bundle for webapp / scripts).
+models/*
+!models/README.md
+!models/surrogate_v9/
+models/surrogate_v9/*
+!models/surrogate_v9/quantile_bundles.joblib
 *.joblib
+!models/surrogate_v9/quantile_bundles.joblib
 *.parquet
 
 # Internal planning notes
@@ -97,6 +105,7 @@ logs/
 # Project-specific scratch
 scratch/
 tmp/
+.tmp_*_venv/
 /package-lock.json
 
 # webapp webapp build / install artifacts

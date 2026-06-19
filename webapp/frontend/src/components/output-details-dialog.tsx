@@ -11,14 +11,15 @@ import {
 import type { PrimaryTarget } from "@/types/api";
 import { TARGET_META } from "@/types/api";
 
+/** Held-out test metrics from reports/surrogate_v9 training run (τ=0.5 head, sorted PI repair). */
 const SURROGATE_METRICS: Record<
   PrimaryTarget,
   { medianR2: string; coverage: string }
 > = {
-  range_km: { medianR2: "0.980", coverage: "97.3%" },
-  energy_margin_raw_pct: { medianR2: "0.960", coverage: "93.1%" },
-  slope_capability_deg: { medianR2: "0.988", coverage: "93.4%" },
-  total_mass_kg: { medianR2: "1.000", coverage: "91.5%" },
+  range_km: { medianR2: "0.922", coverage: "96.3%" },
+  energy_margin_raw_pct: { medianR2: "0.968", coverage: "88.7%" },
+  slope_capability_deg: { medianR2: "0.979", coverage: "95.0%" },
+  total_mass_kg: { medianR2: "0.999", coverage: "93.8%" },
 };
 
 export function OutputDetailsButton({ target }: { target: PrimaryTarget }) {
@@ -85,14 +86,17 @@ function TargetCalculation({ target }: { target: PrimaryTarget }) {
           values indicate surplus generation.
         </p>
         <Equation>E_gen = ∫ P_solar(t) dt</Equation>
-        <Equation>E_used = ∫ (P_avionics + P_mobility / η_motor) dt</Equation>
+        <Equation>
+          E_used = ∫ (P_avionics + P_payload + P_mobility / η_motor) dt
+        </Equation>
         <Equation>energy_margin_raw_pct = 100 · (E_gen - E_used) / E_used</Equation>
         <p className="text-[var(--color-muted-foreground)]">
           Solar power depends on scenario latitude, mission duration, panel area,
           panel efficiency, and dust factor. Mobility load comes from the same
-          Bekker-Wong wheel-force path used by range. Runs assume a fixed mission
-          start at local sunrise (zero solar declination); mission start phase
-          and season are held constant rather than swept.
+          Bekker-Wong wheel-force path used by range; payload power adds to the
+          continuous base load. Runs assume a fixed mission start at local
+          sunrise (zero solar declination); mission start phase and season are
+          held constant rather than swept.
         </p>
       </section>
     );
@@ -107,15 +111,17 @@ function TargetCalculation({ target }: { target: PrimaryTarget }) {
           downslope component of rover weight without exceeding available wheel
           torque.
         </p>
-        <Equation>required_drawbar_pull = m_total · g_moon · sin(θ)</Equation>
         <Equation>
-          feasible if Σ F_drawbar(slip, wheel, soil, load) ≥
-          required_drawbar_pull
+          DP* = m_total · g · sin(θ) / N_w (per wheel)
         </Equation>
-        <Equation>slope_capability_deg = max feasible θ</Equation>
+        <Equation>
+          feasible if F_drawbar(slip, wheel, soil, load) ≥ DP*
+        </Equation>
+        <Equation>slope_capability_deg = max feasible θ (capped at 35°)</Equation>
         <p className="text-[var(--color-muted-foreground)]">
-          Grousers increase shear thrust through the engaged-grouser term, with a
-          saturation cap (Iizuka &amp; Kubota 2011).
+          Grousers increase shear thrust through an engaged-grouser prefactor
+          γ_g = 1 + min(N_g h_g / (2πr), 0.6) applied to the contact shear
+          stress.
         </p>
       </section>
     );
@@ -124,22 +130,27 @@ function TargetCalculation({ target }: { target: PrimaryTarget }) {
     <section className="space-y-2">
       <h3 className="font-medium">How total mass is calculated</h3>
       <p className="text-[var(--color-muted-foreground)]">
-        Total mass is a parametric subsystem buildup. The user-provided chassis
-        mass anchors the rover bus, then the model adds wheel, drivetrain, solar,
-        battery, avionics, and structural-margin terms.
+        Total mass is a bottom-up subsystem buildup. The user-provided chassis
+        mass anchors the rover bus; wheels, drivetrain, solar, battery, and
+        avionics are sized from design inputs, then harness, thermal-control,
+        and dry-mass growth fractions are applied. Scientific payload mass from
+        the mission scenario is added afterward.
       </p>
       <Equation>
-        m_total = m_chassis + m_wheels + m_motors + m_solar + m_battery +
-        m_avionics + m_structure_margin
+        m_sub = m_chassis + m_wheels + m_motors + m_solar + m_battery + m_avionics
       </Equation>
+      <Equation>
+        m_dry = m_sub + f_h m_sub + f_t (m_sub + f_h m_sub)
+      </Equation>
+      <Equation>m_total = m_dry + f_g m_dry + m_payload</Equation>
       <Equation>m_battery = battery_capacity_wh / specific_energy_wh_per_kg</Equation>
       <Equation>
-        m_motors scales with n_wheels and peak_wheel_torque_nm
+        m_motors = N_w (m_m0 + k_τ · peak_wheel_torque_nm)
       </Equation>
       <p className="text-[var(--color-muted-foreground)]">
-        Total mass does not use the wheel-force model directly, but it
-        feeds back into mobility because heavier designs increase normal load,
-        sinkage, and required drawbar pull.
+        Total mass does not use the wheel-force model directly, but it feeds
+        back into mobility because heavier designs increase normal load, sinkage,
+        and required drawbar pull.
       </p>
     </section>
   );
@@ -151,12 +162,15 @@ function SurrogatePerformance({ target }: { target: PrimaryTarget }) {
     <section>
       <h3 className="font-medium">Prediction interval model performance</h3>
       <p className="text-[var(--color-muted-foreground)]">
-        The displayed q05-q95 interval comes from quantile XGBoost heads trained
-        on evaluator-generated data. The median shown in the table is the
+        The displayed q05–q95 interval comes from quantile gradient-boosted
+        heads trained on a 40,000-row stratified Latin-hypercube sample over
+        the joint design × scenario space. The median shown in the table is the
         deterministic evaluator output; the surrogate supplies the uncertainty
         envelope around it (and the SHAP attributions on the Explain Design
-        tab). The Optimize Design tab's NSGA-II search uses the analytical
-        physics evaluator directly as its fitness function.
+        tab). These metrics measure emulator fidelity to the analytical
+        evaluator, not physical accuracy. The Optimize Design tab&apos;s NSGA-II
+        search uses the analytical physics evaluator directly as its fitness
+        function.
       </p>
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
         <Metric label="Median R²" value={perf.medianR2} />

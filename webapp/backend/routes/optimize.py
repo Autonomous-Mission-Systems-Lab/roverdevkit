@@ -117,6 +117,7 @@ def optimize(req: OptimizeRequest) -> OptimizeJobResponse:
         payload_mass_kg=req.payload_mass_kg,
         payload_power_w=req.payload_power_w,
         mission_duration_earth_days=req.mission_duration_earth_days,
+        required_obstacle_height_m=req.required_obstacle_height_m,
     )
 
     soil = get_soil_for_simulant(scenario.soil_simulant)

@@ -90,11 +90,12 @@ def sample_design() -> dict[str, float | int]:
     work even if the registry export ever changes.
     """
     return {
+        "mobility_architecture": "rigid_4wheel",
         "wheel_radius_m": 0.10,
         "wheel_width_m": 0.10,
         "grouser_height_m": 0.012,
         "grouser_count": 14,
-        "n_wheels": 6,
+        "n_wheels": 4,
         "chassis_mass_kg": 20.0,
         "wheelbase_m": 0.6,
         "solar_area_m2": 0.5,

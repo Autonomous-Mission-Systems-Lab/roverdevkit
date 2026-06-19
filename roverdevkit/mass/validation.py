@@ -31,6 +31,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from statistics import mean, median
 
+from roverdevkit.architecture import architecture_for_wheel_count
 from roverdevkit.drivetrain.motor import sizing_peak_torque_anchor_nm
 from roverdevkit.mass.parametric_mers import (
     MassBreakdown,
@@ -183,6 +184,7 @@ def predict_row(
         grouser_height_m=row.grouser_height_m,
         grouser_count=row.grouser_count,
         payload_mass_kg=row.payload_mass_kg,
+        mobility_architecture=architecture_for_wheel_count(row.n_wheels),
         params=params,
     )
     return RoverValidationResult(

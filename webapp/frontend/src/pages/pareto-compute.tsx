@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -87,6 +86,7 @@ export function ParetoCompute() {
   const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
   const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
   const missionDurationOverride = useDesignStore((s) => s.missionDurationOverride);
+  const requiredObstacleOverride = useDesignStore((s) => s.requiredObstacleOverride);
 
   const [populationSize, setPopulationSize] = useState(32);
   const [nGenerations, setNGenerations] = useState(50);
@@ -170,6 +170,7 @@ export function ParetoCompute() {
         payload_mass_kg: payloadMassOverride,
         payload_power_w: payloadPowerOverride,
         mission_duration_earth_days: missionDurationOverride,
+        required_obstacle_height_m: requiredObstacleOverride,
       });
       setJob(queued);
       openStream(queued, objectivePayload);

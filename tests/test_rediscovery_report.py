@@ -1,4 +1,4 @@
-"""Tests for the rediscovery LOO orchestration and artifact writer.
+"""Tests for the rediscovery orchestration and artifact writer.
 
 Three groups:
 
@@ -33,7 +33,7 @@ from roverdevkit.validation.rover_rediscovery import (
 
 
 # ---------------------------------------------------------------------------
-# A smoke-budget LOO sweep cached once for the whole module.
+# A smoke-budget rediscovery sweep cached once for the whole module.
 #
 # Only Pragyan is included (subset via per_rover_overrides on every
 # *other* rover... actually we just restrict via flown_only and the

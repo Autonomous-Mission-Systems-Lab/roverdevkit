@@ -43,7 +43,7 @@ DESIGN_VARIABLES: tuple[str, ...] = (
     "wheel_width_m",
     "grouser_height_m",
     "grouser_count",
-    "n_wheels",
+    "mobility_architecture",
     "chassis_mass_kg",
     "wheelbase_m",
     "solar_area_m2",
@@ -58,7 +58,7 @@ DESIGN_BOUNDS: dict[str, tuple[float, float]] = {
     "wheel_width_m": (0.03, 0.20),
     "grouser_height_m": (0.0, 0.020),
     "grouser_count": (0.0, 24.0),
-    "n_wheels": (4.0, 6.0),
+    "mobility_architecture": (0.0, 1.0),
     "chassis_mass_kg": (0.5, 50.0),
     "wheelbase_m": (0.3, 1.2),
     "solar_area_m2": (0.1, 1.5),
@@ -75,6 +75,15 @@ Tenacious. The v4 LHS surrogate was trained on the narrower
 on designs below those points extrapolates outside training support
 until the v5 regeneration."""
 
+OPTIMIZER_METRIC_TARGETS: tuple[str, ...] = tuple(PRIMARY_REGRESSION_TARGETS) + (
+    "obstacle_capability_m",
+    "obstacle_margin_m",
+)
+"""Mission metrics the evaluator-backed optimiser may target or constrain.
+
+Architecture/obstacle metrics are evaluator-only; the surrogate was not
+retrained on them (schema v10 follow-on)."""
+
 
 @dataclass(frozen=True)
 class OptimizationObjective:
@@ -84,10 +93,10 @@ class OptimizationObjective:
     direction: ObjectiveDirection
 
     def __post_init__(self) -> None:
-        if self.target not in PRIMARY_REGRESSION_TARGETS:
+        if self.target not in OPTIMIZER_METRIC_TARGETS:
             raise ValueError(
                 f"target {self.target!r} is not optimizable; "
-                f"allowed: {PRIMARY_REGRESSION_TARGETS}."
+                f"allowed: {OPTIMIZER_METRIC_TARGETS}."
             )
 
 
@@ -100,10 +109,10 @@ class OptimizationConstraint:
     value: float
 
     def __post_init__(self) -> None:
-        if self.target not in PRIMARY_REGRESSION_TARGETS:
+        if self.target not in OPTIMIZER_METRIC_TARGETS:
             raise ValueError(
                 f"constraint target {self.target!r} is not supported; "
-                f"allowed: {PRIMARY_REGRESSION_TARGETS}."
+                f"allowed: {OPTIMIZER_METRIC_TARGETS}."
             )
 
 
@@ -190,6 +199,20 @@ class NSGA2Runner:
                 f"evaluator backend is capped at {evaluator_eval_cap} evaluations "
                 f"(requested {population_size * n_generations})."
             )
+        arch_targets = {"obstacle_capability_m", "obstacle_margin_m"}
+        if backend == "surrogate":
+            for obj in objectives:
+                if obj.target in arch_targets:
+                    raise ValueError(
+                        "surrogate backend cannot optimize architecture metrics; "
+                        "use backend='evaluator'."
+                    )
+            for constraint in constraints:
+                if constraint.target in arch_targets:
+                    raise ValueError(
+                        "surrogate backend cannot constrain architecture metrics; "
+                        "use backend='evaluator'."
+                    )
         self.scenario = scenario
         self.soil = soil
         self.bundles = bundles
@@ -339,8 +362,28 @@ class _CheckpointCallback(Callback):
 def _vector_to_design(x: np.ndarray) -> DesignVector:
     values = {name: float(value) for name, value in zip(DESIGN_VARIABLES, x, strict=True)}
     values["grouser_count"] = int(np.clip(round(values["grouser_count"]), 0, 24))
-    values["n_wheels"] = 4 if values["n_wheels"] < 5.0 else 6
-    return DesignVector(**values)
+    arch_code = values["mobility_architecture"]
+    mobility_architecture = (
+        "rigid_4wheel" if arch_code < 0.5 else "rocker_bogie_6wheel"
+    )
+    n_wheels = 4 if mobility_architecture == "rigid_4wheel" else 6
+    values["mobility_architecture"] = mobility_architecture  # type: ignore[assignment]
+    values["n_wheels"] = n_wheels
+    del values["mobility_architecture"]  # set explicitly below
+    return DesignVector(
+        mobility_architecture=mobility_architecture,
+        n_wheels=n_wheels,  # type: ignore[arg-type]
+        wheel_radius_m=values["wheel_radius_m"],
+        wheel_width_m=values["wheel_width_m"],
+        grouser_height_m=values["grouser_height_m"],
+        grouser_count=values["grouser_count"],
+        chassis_mass_kg=values["chassis_mass_kg"],
+        wheelbase_m=values["wheelbase_m"],
+        solar_area_m2=values["solar_area_m2"],
+        battery_capacity_wh=values["battery_capacity_wh"],
+        avionics_power_w=values["avionics_power_w"],
+        peak_wheel_torque_nm=values["peak_wheel_torque_nm"],
+    )
 
 
 def _feature_frame(
@@ -438,6 +481,8 @@ def _evaluator_metrics(
                     "energy_margin_raw_pct": float(metrics.energy_margin_raw_pct),
                     "slope_capability_deg": float(metrics.slope_capability_deg),
                     "total_mass_kg": float(metrics.total_mass_kg),
+                    "obstacle_capability_m": float(metrics.obstacle_capability_m),
+                    "obstacle_margin_m": float(metrics.obstacle_margin_m),
                 }
             )
         except Exception:  # noqa: BLE001 -- broad-except is intentional
@@ -451,6 +496,8 @@ def _evaluator_metrics(
                     "energy_margin_raw_pct": -100.0,
                     "slope_capability_deg": 0.0,
                     "total_mass_kg": 1e6,
+                    "obstacle_capability_m": 0.0,
+                    "obstacle_margin_m": -1e6,
                 }
             )
     return out
@@ -536,6 +583,7 @@ __all__ = [
     "DESIGN_BOUNDS",
     "DESIGN_VARIABLES",
     "NSGA2Runner",
+    "OPTIMIZER_METRIC_TARGETS",
     "OptimizationBackend",
     "OptimizationCheckpoint",
     "OptimizationConstraint",

@@ -49,6 +49,7 @@ export function DesignExplorer() {
   const payloadMassOverride = useDesignStore((s) => s.payloadMassOverride);
   const payloadPowerOverride = useDesignStore((s) => s.payloadPowerOverride);
   const missionDurationOverride = useDesignStore((s) => s.missionDurationOverride);
+  const requiredObstacleOverride = useDesignStore((s) => s.requiredObstacleOverride);
   const overlayRovers = useDesignStore((s) => s.overlayRovers);
 
   const evaluate = useEvaluate();
@@ -146,6 +147,7 @@ export function DesignExplorer() {
     ? {
         thermal: evaluate.data.thermal,
         stall: evaluate.data.stall,
+        architecture: evaluate.data.architecture,
       }
     : undefined;
 
@@ -165,6 +167,7 @@ export function DesignExplorer() {
       payload_mass_kg: payloadMassOverride,
       payload_power_w: payloadPowerOverride,
       mission_duration_earth_days: missionDurationOverride,
+      required_obstacle_height_m: requiredObstacleOverride,
     };
     evaluate.mutate(shared);
     predict.mutate(shared);

@@ -110,6 +110,20 @@ def test_predict_mission_duration_override_reaches_feature_row(
     assert row["values"][duration_idx] == pytest.approx(21.0)
 
 
+def test_predict_accepts_required_obstacle_height_override(
+    client: TestClient,
+    sample_design: dict[str, float | int],
+) -> None:
+    """Per-call obstacle requirement must not 422 on the surrogate route."""
+    payload = {
+        "design": sample_design,
+        "scenario_name": "equatorial_mare_traverse",
+        "required_obstacle_height_m": 0.12,
+    }
+    response = client.post("/predict", json=payload)
+    assert response.status_code == 200, response.text
+
+
 def test_predict_rejects_out_of_bounds_payload(
     client: TestClient,
     sample_design: dict[str, float | int],

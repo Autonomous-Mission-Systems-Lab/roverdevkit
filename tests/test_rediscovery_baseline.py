@@ -40,10 +40,14 @@ def test_sample_designs_within_bounds() -> None:
     assert len(designs) == 200
     for d in designs:
         for name in DESIGN_VARIABLES:
+            if name == "mobility_architecture":
+                assert d.mobility_architecture in ("rigid_4wheel", "rocker_bogie_6wheel")
+                continue
             lo, hi = DESIGN_BOUNDS[name]
             assert lo - 1e-9 <= float(getattr(d, name)) <= hi + 1e-9
-        # Integer repair: n_wheels is snapped to 4 or 6.
         assert int(d.n_wheels) in (4, 6)
+        expected_wheels = 6 if d.mobility_architecture == "rocker_bogie_6wheel" else 4
+        assert int(d.n_wheels) == expected_wheels
 
 
 def _metrics(*, stalled=False, energy=10.0, rng_km=1.0, mass=5.0, thermal=False):

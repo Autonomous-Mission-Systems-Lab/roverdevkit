@@ -25,9 +25,10 @@ export type TerrainClass =
 
 export type SunGeometry = "continuous" | "diurnal" | "polar_intermittent";
 
+export type MobilityArchitecture = "rigid_4wheel" | "rocker_bogie_6wheel";
+
 /**
- * Mirror of `roverdevkit.schema.DesignVector` (schema v7, v6 schema update
- * follow-up).
+ * Mirror of `roverdevkit.schema.DesignVector` (schema v10 architecture proxy).
  *
  * v6 changes: `nominal_speed_mps` removed (cruise speed is derived in
  * the evaluator from drivetrain torque + slip-balance + energy-balance
@@ -41,6 +42,7 @@ export type SunGeometry = "continuous" | "diurnal" | "polar_intermittent";
  * override at inference time.
  */
 export interface DesignVector {
+  mobility_architecture: MobilityArchitecture;
   wheel_radius_m: number;
   wheel_width_m: number;
   grouser_height_m: number;
@@ -83,6 +85,7 @@ export interface MissionScenario {
    */
   payload_mass_kg: number;
   payload_power_w: number;
+  required_obstacle_height_m: number;
 }
 
 export interface SoilParametersOut {
@@ -155,6 +158,8 @@ export interface PredictRequest {
   payload_power_w?: number | null;
   /** Optional override for `MissionScenario.mission_duration_earth_days`. */
   mission_duration_earth_days?: number | null;
+  /** Optional override for `MissionScenario.required_obstacle_height_m`. */
+  required_obstacle_height_m?: number | null;
   repair_crossings?: boolean;
 }
 
@@ -202,6 +207,8 @@ export interface EvaluateRequest {
   payload_power_w?: number | null;
   /** Optional override for `MissionScenario.mission_duration_earth_days`. */
   mission_duration_earth_days?: number | null;
+  /** Optional override for `MissionScenario.required_obstacle_height_m`. */
+  required_obstacle_height_m?: number | null;
 }
 
 export interface EvaluateMetric {
@@ -260,7 +267,17 @@ export interface EvaluateResponse {
    * `DesignVector.nominal_speed_mps` design input.
    */
   cruise_speed_mps: number;
+  architecture: ArchitectureDiagnostic;
   elapsed_ms: number;
+}
+
+export interface ArchitectureDiagnostic {
+  mobility_architecture: MobilityArchitecture;
+  obstacle_capability_m: number;
+  required_obstacle_height_m: number;
+  obstacle_margin_m: number;
+  obstacle_requirement_met: boolean;
+  architecture_mass_kg: number;
 }
 
 /**
@@ -432,6 +449,8 @@ export interface OptimizeRequest {
   payload_mass_kg?: number | null;
   payload_power_w?: number | null;
   mission_duration_earth_days?: number | null;
+  /** Optional override for `MissionScenario.required_obstacle_height_m`. */
+  required_obstacle_height_m?: number | null;
 }
 
 export interface OptimizeJobResponse {
@@ -524,7 +543,10 @@ export interface FieldBounds {
   description: string;
 }
 
-export const DESIGN_BOUNDS: Record<keyof DesignVector, FieldBounds> = {
+export const DESIGN_BOUNDS: Record<
+  Exclude<keyof DesignVector, "mobility_architecture">,
+  FieldBounds
+> = {
   wheel_radius_m: {
     min: 0.05,
     max: 0.2,
@@ -643,6 +665,18 @@ export const PAYLOAD_BOUNDS: Record<
   },
 };
 
+export const OBSTACLE_BOUNDS: Record<"required_obstacle_height_m", FieldBounds> =
+  {
+    required_obstacle_height_m: {
+      min: 0,
+      max: 0.3,
+      step: 0.005,
+      unit: "m",
+      label: "Required obstacle height",
+      description: "Minimum traversable step/obstacle height for the mission.",
+    },
+  };
+
 /** User-facing display metadata for the four predicted performance metrics. */
 export const TARGET_META: Record<
   PrimaryTarget,
@@ -666,6 +700,6 @@ export const TARGET_META: Record<
   total_mass_kg: {
     label: "Total mass",
     unit: "kg",
-    description: "Rover dry mass.",
+    description: "Total vehicle mass including payload.",
   },
 };

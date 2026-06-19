@@ -19,6 +19,7 @@ def apply_scenario_overrides(
     payload_mass_kg: float | None = None,
     payload_power_w: float | None = None,
     mission_duration_earth_days: float | None = None,
+    required_obstacle_height_m: float | None = None,
 ) -> MissionScenario:
     """Return a scenario copy with any provided per-call overrides applied.
 
@@ -39,4 +40,6 @@ def apply_scenario_overrides(
         update["payload_power_w"] = payload_power_w
     if mission_duration_earth_days is not None:
         update["mission_duration_earth_days"] = mission_duration_earth_days
+    if required_obstacle_height_m is not None:
+        update["required_obstacle_height_m"] = required_obstacle_height_m
     return scenario.model_copy(update=update) if update else scenario

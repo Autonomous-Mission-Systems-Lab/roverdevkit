@@ -1,6 +1,6 @@
 """Render the §5.4 rediscovery distance bar chart (Fig. 4).
 
-Reproduces ``reports/figures/fig_rediscovery_distance.png`` from the two
+Reproduces ``paper/figures/fig_rediscovery_distance.png`` from the two
 committed CSV artifacts so the paper figure is regenerable rather than a
 hand-made PNG:
 
@@ -63,7 +63,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--out",
         type=Path,
-        default=Path("reports/figures/fig_rediscovery_distance.png"),
+        default=Path("paper/figures/fig_rediscovery_distance.png"),
     )
     return p.parse_args(argv)
 

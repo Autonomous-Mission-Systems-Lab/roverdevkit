@@ -50,7 +50,7 @@ reports/**/*.log
 # Datasets / artifacts that aren't needed at runtime. The runtime
 # image only needs:
 #   - data/ (soils, scenarios, validation set)
-#   - reports/surrogate_v9/quantile_bundles.joblib
+#   - models/surrogate_v9/quantile_bundles.joblib
 #   - reports/pareto_fronts/
 # Heavy training-time parquets and superseded surrogate versions stay
 # out so the image fits inside typical free-tier hosting limits.

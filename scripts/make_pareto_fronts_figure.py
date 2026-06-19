@@ -1,6 +1,6 @@
 """Render the four-scenario Pareto-front panel (Fig. 3).
 
-Reproduces ``reports/figures/fig_pareto_fronts.png`` from the committed
+Reproduces ``paper/figures/fig_pareto_fronts.png`` from the committed
 evaluator-truth Pareto fronts under ``reports/pareto_fronts/`` (regenerate
 those first with ``make pareto-fronts``). The plotting logic itself lives in
 :func:`roverdevkit.tradespace.visualize.plot_pareto_fronts`. Part of the
@@ -35,7 +35,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--out",
         type=Path,
-        default=Path("reports/figures/fig_pareto_fronts.png"),
+        default=Path("paper/figures/fig_pareto_fronts.png"),
     )
     return p.parse_args(argv)
 

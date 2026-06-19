@@ -23,6 +23,7 @@ from roverdevkit.surrogate.features import PRIMARY_REGRESSION_TARGETS
 from webapp.backend.loaders import get_canonical_scenarios
 from webapp.backend.services import apply_scenario_overrides
 from webapp.backend.schemas import (
+    ArchitectureDiagnosticOut,
     EvaluateMetric,
     EvaluateRequest,
     EvaluateResponse,
@@ -67,12 +68,14 @@ def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
         payload_mass_kg=req.payload_mass_kg,
         payload_power_w=req.payload_power_w,
         mission_duration_earth_days=req.mission_duration_earth_days,
+        required_obstacle_height_m=req.required_obstacle_height_m,
     )
 
     output = evaluate_design(
         req.design,
         scenario,
         operational_duty_cycle=req.operational_duty_cycle,
+        required_obstacle_height_m=req.required_obstacle_height_m,
     )
     primary = metrics_as_primary_dict(output.metrics)
 
@@ -114,6 +117,18 @@ def evaluate_route(req: EvaluateRequest) -> EvaluateResponse:
         metrics=metrics,
         thermal=thermal_out,
         stall=stall_out,
+        architecture=ArchitectureDiagnosticOut(
+            mobility_architecture=req.design.mobility_architecture,
+            obstacle_capability_m=float(output.metrics.obstacle_capability_m),
+            required_obstacle_height_m=float(
+                req.required_obstacle_height_m
+                if req.required_obstacle_height_m is not None
+                else scenario.required_obstacle_height_m
+            ),
+            obstacle_margin_m=float(output.metrics.obstacle_margin_m),
+            obstacle_requirement_met=bool(output.metrics.obstacle_requirement_met),
+            architecture_mass_kg=float(output.metrics.architecture_mass_kg),
+        ),
         effective_duty_cycle=float(output.effective_duty_cycle),
         cruise_speed_mps=float(output.cruise_speed_mps),
         elapsed_ms=output.elapsed_ms,

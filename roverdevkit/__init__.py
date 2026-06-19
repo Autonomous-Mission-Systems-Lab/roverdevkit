@@ -17,6 +17,8 @@ Top-level package. Most public API lives in submodules:
 
 from __future__ import annotations
 
+from roverdevkit.architecture import MobilityArchitecture
+
 __version__ = "0.1.0"
 
-__all__ = ["__version__"]
+__all__ = ["MobilityArchitecture", "__version__"]

@@ -127,7 +127,17 @@ print(metrics.range_km)
 print(metrics.energy_margin_raw_pct)
 print(metrics.slope_capability_deg)
 print(metrics.total_mass_kg)
+print(metrics.obstacle_capability_m)
+print(metrics.obstacle_margin_m)
 ```
+
+The design vector trades `mobility_architecture` (`rigid_4wheel` vs.
+`rocker_bogie_6wheel`) alongside wheel geometry. Missions may specify
+`required_obstacle_height_m` on the scenario; rocker-bogie carries a
+suspension mass penalty but negotiates taller obstacles via the
+architecture proxy in `roverdevkit/architecture.py`. Run
+`make architecture-crossover` to regenerate the manuscript crossover
+figure from evaluator-backed NSGA-II sweeps.
 
 ## Installation Notes
 
@@ -142,8 +152,8 @@ pytest -q
 
 The conda environment uses Python 3.12.
 
-The web app expects the trained surrogate bundle to be present at the
-configured path under `reports/` or supplied through the
+The web app expects the trained surrogate bundle at
+`models/surrogate_v9/quantile_bundles.joblib` or supplied through the
 `ROVERDEVKIT_QUANTILE_BUNDLES` environment variable. The evaluator routes
 (current-design evaluation, parametric sweeps, NSGA-II in the Optimize
 Design tab) work without it; the surrogate is needed only for the 90%
@@ -154,6 +164,7 @@ on the Explain Design tab.
 
 ```text
 roverdevkit/
+├── models/               # Shipped trained surrogate bundles (runtime artifacts)
 ├── data/                 # Soil parameters, analytical data, published rover data
 ├── roverdevkit/          # Python package
 │   ├── drivetrain/       # Motor and cruise-speed helpers
@@ -198,14 +209,17 @@ make webapp-test      # backend tests + frontend lint/build
 The toolkit ships with a layered validation chain. Summary numbers
 (full reports under `reports/`):
 
-- **Layer 1 — surrogate vs analytical evaluator.** R² ≥ 0.95 on every
+- **Layer 1 — surrogate vs analytical evaluator.** R² ≥ 0.92 on every
   primary regression target on the canonical 10 % LHS test split
-  (range 0.952, energy margin 0.983, slope 0.977, total mass 0.999);
-  AUC 0.992 on the feasibility classifier; ≈89–96 % empirical coverage
+  (range 0.922, energy margin 0.968, slope 0.979, total mass 0.999);
+  AUC 0.993 on the feasibility classifier; ≈83–96 % empirical coverage
   on the calibrated 90 % prediction intervals. The training corpus
   includes scientific payload (mass and power) as two explicit
-  mission-requirement inputs sampled over [0, 30]. See
-  `reports/surrogate_v9/`.
+  mission-requirement inputs sampled over [0, 30], and six-wheel
+  samples carry the updated rocker-bogie suspension mass in the
+  evaluator labels. Training metrics live under `reports/surrogate_v9/`;
+  the shipped runtime bundle is `models/surrogate_v9/quantile_bundles.joblib`
+  (published automatically by `scripts/calibrate_intervals.py` on a full run).
 - **Layer 3 — sub-model checks against published references.**
   Parametric tolerance grid in
   `data/validation/wong_layer3_reference.csv` exercising a Wong (2008)
@@ -213,20 +227,22 @@ The toolkit ships with a layered validation chain. Summary numbers
   points on Apollo regolith, and Iizuka & Kubota (2011) grouser-thrust
   limit cases; assertions in
   `tests/test_terramechanics.py::test_layer3_published_reference_grid`.
-- **Layer 5 — rover rediscovery, leave-one-out.** Leave-one-out
-  NSGA-II sweep over the registry with a class-neutral
+- **Layer 5 — rover rediscovery.** Leakage-free NSGA-II rediscovery
+  sweep over the registry (no model coefficient is fit to the
+  registry, so this is a rediscovery comparison rather than
+  leave-one-out cross-validation) with a class-neutral
   operational-duty-cycle anchor, scenario-driven panel-tilt
   orientation, and each rover's published scientific payload injected
   as a mission requirement (schema v9), so the optimiser carries the
   same instrument mass and power the real rover flew. Across the five
   in-scope (< 50 kg) micro-rovers the median evaluator-backed
-  design-space distance is **0.36** (≈ 30 % of the ≈1.20 random-pair
+  design-space distance is **0.49** (≈ 41 % of the ≈1.20 random-pair
   baseline in the 9-D unit cube — the mean pairwise separation between
-  random designs). Per-rover distances: CADRE-unit 0.29,
-  Tenacious 0.31, Rashid-1 0.36, MoonRanger 0.58, Pragyan 0.63 — all
-  five between 24 % and 52 % of the random-pair baseline. Yutu-2
+  random designs). Per-rover distances: Tenacious 0.12, Rashid-1 0.34,
+  CADRE-unit 0.49, Pragyan 0.52, MoonRanger 0.59 — all
+  five between 10 % and 49 % of the random-pair baseline. Yutu-2
   (~135 kg) sits above the micro-rover scope and is reported separately
-  at 1.15 (≈ the random baseline): the optimiser does not spuriously
+  at 1.01 (≈ the random baseline): the optimiser does not spuriously
   place an out-of-class rover near its front. Distances are reported
   relative to the random-pair baseline rather than any fixed pass/fail
   cutoff. (CADRE-unit at 2 kg sits below the ~5–50 kg mass-model
@@ -248,13 +264,15 @@ live under `reports/` and are regenerated by these commands:
 | Command | Output | Purpose |
 | --- | --- | --- |
 | `make pareto-fronts` | `reports/pareto_fronts/` | Evaluator-driven NSGA-II Pareto fronts for the four canonical scenarios. Every point is corrected-evaluator output (no surrogate involvement). Reference artifacts for the manuscript figures; the webapp runs its own live NSGA-II on demand. |
-| `python scripts/run_rediscovery_loo.py --all` | `reports/rediscovery_loo_evaluator/` | Leave-one-out rediscovery sweep over the six-rover registry (the headline validation result). |
-| `make figures` | `reports/figures/` | Renders every manuscript figure (Pareto fronts, rediscovery distance + overlay, flown-rover peak-solar, terramechanics validation) from the artifacts above via the `scripts/make_*_figure.py` regenerators. Runs in well under a minute. |
+| `make optimizer-robustness` | `reports/optimizer_robustness/` | Multi-seed, multi-budget evaluator-backed NSGA-II sweep used to check Pareto-front repeatability and convergence for the manuscript. |
+| `make architecture-crossover` | `reports/architecture_obstacle_crossover/` | Sweeps `required_obstacle_height_m` across the four canonical scenarios and records when rocker-bogie six-wheel layouts enter the Pareto set. |
+| `python scripts/run_rediscovery_loo.py --all --n-seeds 5` | `reports/rediscovery_loo_evaluator/` | Rediscovery sweep over the six-rover registry (the headline validation result). The `--n-seeds 5` ensemble is the paper configuration; the script default (`--n-seeds 1`) runs a faster single-seed sweep whose per-rover distances are noisier. |
+| `make figures` | `paper/figures/` | Renders every manuscript figure (Pareto fronts, rediscovery distance + overlay, flown-rover peak-solar, terramechanics validation, terramechanics sensitivity, architecture crossover) from the artifacts above via the `scripts/make_*_figure.py` regenerators. Runs in well under a minute. |
 
 `make pareto-fronts` runs end-to-end in ~4 minutes on a laptop with the
 `roverdevkit` conda environment activated; the rediscovery sweep takes
 ~10 minutes. With both in place, `make figures`
-regenerates the figures into `reports/figures/`.
+regenerates the figures into `paper/figures/`.
 
 ## Research Background
 

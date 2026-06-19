@@ -1,4 +1,4 @@
-"""Layer-5 rediscovery LOO harness and artifact writer.
+"""Layer-5 rediscovery harness and artifact writer.
 
 A thin orchestration layer on top of
 :func:`roverdevkit.validation.rover_rediscovery.rediscover` that:
@@ -12,19 +12,22 @@ A thin orchestration layer on top of
    JSON detail dumps, and a markdown rollup of the paper-side
    acceptance gate.
 
-LOO semantics
--------------
-The "leave-one-out" terminology is honoured by construction rather
-than by refitting the model per rover. The bottom-up mass model's
+Leakage-free by construction (not cross-validation)
+----------------------------------------------------
+This is a rediscovery comparison, **not** leave-one-out
+cross-validation: nothing is fit to the rover registry, so there is
+no per-rover hold-out/refit loop. The bottom-up mass model's
 specific-mass coefficients live in :class:`MassModelParams` and are
 cited from external space-hardware sources (SMAD, AIAA S-120A,
 vendor catalogues) -
 **none** of them are regressed against the rover registry. The
-registry is used downstream as a cross-check, not as training data.
+registry is used downstream as a cross-check, not as training data,
+so each rover is rediscovered without any information leaking from
+the others.
 
-The only piece of rover-specific information that enters each LOO
-trial is the rover's published total mass (used as the mass-ceiling
-constraint for NSGA-II). The class-generic ``*_micro`` scenarios
+The only piece of rover-specific information that enters each
+rediscovery run is the rover's published total mass (used as the
+mass-ceiling constraint for NSGA-II). The class-generic ``*_micro`` scenarios
 break the canonical ``polar_prospecting``/etc. δ_ops anchor leakage
 (see :mod:`roverdevkit.validation.rover_rediscovery`), and the rover's
 design vector is used **only** after the optimiser returns for
@@ -107,7 +110,7 @@ DEFAULT_PER_ROVER_OVERRIDES: Mapping[str, Mapping[str, Any]] = {
 }
 """Per-rover NSGA-II hyperparameter / slop overrides for the paper run.
 
-Empty entries inherit the LOO defaults. CADRE-unit is the only entry
+Empty entries inherit the rediscovery defaults. CADRE-unit is the only entry
 today because it is the only registry rover whose modelled mass sits
 in the bottom-up model's out-of-regime zone (<5 kg). Future ultra-
 micro additions will likely need their own override entries.
@@ -121,7 +124,7 @@ micro additions will likely need their own override entries.
 
 @dataclass(frozen=True)
 class RediscoveryRunSummary:
-    """Outcome of a rediscovery LOO sweep over the registry.
+    """Outcome of a rediscovery sweep over the registry.
 
     Attributes
     ----------
@@ -180,7 +183,7 @@ def run_rediscovery_loo(
     bundles: dict[str, QuantileHeads] | None = None,
     evaluator_eval_cap: int = 1000,
 ) -> RediscoveryRunSummary:
-    """Run leave-one-out rediscovery over every registry rover.
+    """Run rediscovery over every registry rover.
 
     Wraps :func:`roverdevkit.validation.rover_rediscovery.rediscover`
     (or :func:`rediscover_ensemble` when ``n_seeds > 1``) with
@@ -464,10 +467,10 @@ def _markdown_for_summary(
     df: pd.DataFrame,
     summary: RediscoveryRunSummary,
 ) -> str:
-    """Human-readable rollup of the LOO sweep."""
+    """Human-readable rollup of the rediscovery sweep."""
     kw = summary.default_kwargs
     lines: list[str] = [
-        "# Layer-5 rediscovery validation (LOO sweep)",
+        "# Layer-5 rediscovery validation (rediscovery sweep)",
         "",
         f"- Master seed: `{summary.seed}`",
         f"- Default NSGA-II: pop={kw['population_size']}, "
@@ -494,9 +497,10 @@ def _markdown_for_summary(
         "The bottom-up mass model's specific-mass coefficients in",
         "`MassModelParams` are cited from external space-hardware sources",
         "(SMAD, AIAA S-120A, vendor",
-        "catalogues) - none are regressed against the registry - so the",
-        "LOO is structurally already in place at the rediscover() level:",
-        "no per-rover refit is needed.",
+        "catalogues) - none are regressed against the registry - so this",
+        "is a leakage-free rediscovery comparison rather than leave-one-",
+        "out cross-validation: nothing is fit to the registry, so no",
+        "per-rover hold-out or refit is needed.",
         "",
         "## Per-rover results",
         "",
@@ -578,7 +582,7 @@ def write_loo_artifacts(
     summary: RediscoveryRunSummary,
     out_dir: Path,
 ) -> dict[str, Path]:
-    """Write the LOO sweep's artifacts to ``out_dir``.
+    """Write the rediscovery sweep's artifacts to ``out_dir``.
 
     Files
     -----

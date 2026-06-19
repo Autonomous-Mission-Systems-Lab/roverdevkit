@@ -491,7 +491,7 @@ def rediscover(
         Required when ``backend == "surrogate"``. Map ``{target ->
         QuantileHeads}`` produced by
         :mod:`roverdevkit.surrogate.uncertainty`; load via
-        ``joblib.load("reports/surrogate_v9/quantile_bundles.joblib")``.
+        ``joblib.load("models/surrogate_v9/quantile_bundles.joblib")``.
     evaluator_eval_cap
         Safety cap on the evaluator-backed NSGA-II runner
         (``population_size * n_generations`` must be below this). The

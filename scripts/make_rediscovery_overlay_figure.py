@@ -1,7 +1,7 @@
 """Render the flown-rover rediscovery mass--range overlay (Fig. 5).
 
-Reproduces ``reports/figures/fig_rediscovery_overlay.png`` from the committed
-leave-one-out rediscovery artifacts under
+Reproduces ``paper/figures/fig_rediscovery_overlay.png`` from the committed
+rediscovery artifacts under
 ``reports/rediscovery_loo_evaluator/`` (regenerate those with
 ``python scripts/run_rediscovery_loo.py --all``). For each flown rover the
 panel overlays its real design point and the nearest Pareto design on the
@@ -42,12 +42,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--rediscovery-dir",
         type=Path,
         default=Path("reports/rediscovery_loo_evaluator"),
-        help="Directory holding <rover>.json leave-one-out artifacts.",
+        help="Directory holding <rover>.json rediscovery artifacts.",
     )
     p.add_argument(
         "--out",
         type=Path,
-        default=Path("reports/figures/fig_rediscovery_overlay.png"),
+        default=Path("paper/figures/fig_rediscovery_overlay.png"),
     )
     return p.parse_args(argv)
 

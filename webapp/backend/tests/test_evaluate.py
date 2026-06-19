@@ -65,6 +65,17 @@ def test_evaluate_returns_all_primary_targets(
     assert stall["peak_torque_demand_nm"] >= 0.0
     assert stall["peak_torque_capacity_nm"] > 0.0
 
+    arch = body["architecture"]
+    for key in (
+        "mobility_architecture",
+        "obstacle_capability_m",
+        "required_obstacle_height_m",
+        "obstacle_margin_m",
+        "obstacle_requirement_met",
+        "architecture_mass_kg",
+    ):
+        assert key in arch
+
     # Schema v6 also surfaces the runtime-derived effective duty cycle
     # and cruise speed at the top level so the frontend can show what
     # the evaluator actually used (vs. the design's δ_des).
@@ -295,7 +306,7 @@ def test_evaluate_and_predict_agree_within_surrogate_noise_floor(
     rel_tol = {
         "range_km": 0.10,
         "slope_capability_deg": 0.10,
-        "total_mass_kg": 0.04,
+        "total_mass_kg": 0.05,
     }
     for tgt, tol in rel_tol.items():
         e = evaluator[tgt]

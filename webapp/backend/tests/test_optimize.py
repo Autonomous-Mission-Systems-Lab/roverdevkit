@@ -47,6 +47,13 @@ def test_optimize_evaluator_job_completes_and_returns_front(client: TestClient) 
     assert "range_km" in first["metrics"]
 
 
+def test_optimize_accepts_required_obstacle_height_override(client: TestClient) -> None:
+    payload = _payload(population_size=4, n_generations=1)
+    payload["required_obstacle_height_m"] = 0.10
+    response = client.post("/optimize", json=payload)
+    assert response.status_code == 200, response.text
+
+
 def test_optimize_evaluator_budget_cap_returns_422(client: TestClient) -> None:
     # The webapp optimize route sets evaluator_eval_cap=5000 on the
     # NSGA2Runner so a worst-case live job finishes inside ~2 min wall

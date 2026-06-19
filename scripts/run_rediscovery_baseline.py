@@ -93,7 +93,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=Path("reports/rediscovery_loo_evaluator/summary.csv"),
         help=(
-            "Rediscovery LOO summary CSV used to compute both ratios. "
+            "Rediscovery summary CSV used to compute both ratios. "
             "If missing, only the null statistics are written."
         ),
     )

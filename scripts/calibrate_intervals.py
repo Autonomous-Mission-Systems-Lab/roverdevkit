@@ -2,40 +2,41 @@
 
 Companion to ``scripts/tune_baselines.py`` for calibrated interval training
 step-4. Reads the tuned-median tuned hyperparameters from
-``--tuned-params`` (default
-``reports/tuned_v4/tuned_best_params.json``), refits each
-primary regression target as three quantile heads
-(``τ ∈ {0.05, 0.50, 0.95}``) on the v4 corpus, and reports empirical
-90 % coverage and PI width on the canonical test split overall and per
-scenario family.
+``--tuned-params``, refits each primary regression target as three
+quantile heads (``τ ∈ {0.05, 0.50, 0.95}``) on the LHS corpus, and
+reports empirical 90 % coverage and PI width on the canonical test split
+overall and per scenario family.
 
-Outputs (under ``--out-dir``):
+Training metrics (under ``--out-dir``, default ``reports/surrogate_v9/``):
 
 - ``coverage.csv`` — long-format coverage / width / crossing-rate
   frame. One row per ``(target, scenario_family, repair)``.
 - ``median_sanity.csv`` — τ=0.5 head test R² vs the tuned-median tuned
   median R² as the §6.2 sanity guardrail.
-- ``quantile_bundles.joblib`` — dict ``{target: QuantileHeads}``
-  serialised together for downstream NSGA-II / Pareto-uncertainty
-  consumers.
 - ``fit_seconds.csv`` — per-target wall-clock for the three-head fit.
+
+The runtime bundle (``quantile_bundles.joblib``) is written to
+``--bundles-path`` (default ``models/surrogate_v9/quantile_bundles.joblib``)
+when all four primary regression targets are calibrated. Use
+``--no-publish-bundle`` for smoke runs that should not overwrite the
+shipped model.
 
 Examples
 --------
 ::
 
-    # Full v4 calibration (≈3-6 min on 8 cores)
+    # Full v9 calibration (≈3-6 min on 8 cores)
     python scripts/calibrate_intervals.py \\
-        --dataset data/analytical/lhs_v4.parquet \\
-        --tuned-params reports/tuned_v4/tuned_best_params.json \\
-        --out-dir reports/intervals_v4
+        --dataset data/analytical/lhs_v9.parquet \\
+        --tuned-params reports/tuned_v9/tuned_best_params.json
 
-    # Smoke (single target, no save)
+    # Smoke (single target, do not publish runtime bundle)
     python scripts/calibrate_intervals.py \\
-        --dataset data/analytical/lhs_v4.parquet \\
-        --tuned-params reports/tuned_v4/tuned_best_params.json \\
+        --dataset data/analytical/lhs_v9.parquet \\
+        --tuned-params reports/tuned_v9/tuned_best_params.json \\
         --out-dir /tmp/intervals_smoke \\
-        --targets range_km
+        --targets range_km \\
+        --no-publish-bundle
 """
 
 from __future__ import annotations
@@ -67,6 +68,10 @@ from roverdevkit.surrogate.uncertainty import (
 )
 
 
+DEFAULT_OUT_DIR = Path("reports/surrogate_v9")
+DEFAULT_BUNDLES_PATH = Path("models/surrogate_v9/quantile_bundles.joblib")
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -78,7 +83,29 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
         help="Path to tuned_best_params.json from tuned-median.",
     )
-    p.add_argument("--out-dir", type=Path, required=True)
+    p.add_argument(
+        "--out-dir",
+        type=Path,
+        default=DEFAULT_OUT_DIR,
+        help=(
+            "Directory for training metrics (coverage, sanity, fit timing). "
+            f"Default: {DEFAULT_OUT_DIR}."
+        ),
+    )
+    p.add_argument(
+        "--bundles-path",
+        type=Path,
+        default=DEFAULT_BUNDLES_PATH,
+        help=(
+            "Runtime quantile bundle path consumed by the webapp. "
+            f"Default: {DEFAULT_BUNDLES_PATH}."
+        ),
+    )
+    p.add_argument(
+        "--no-publish-bundle",
+        action="store_true",
+        help="Skip writing quantile_bundles.joblib to --bundles-path.",
+    )
     p.add_argument(
         "--targets",
         nargs="+",
@@ -255,9 +282,21 @@ def main(argv: list[str] | None = None) -> int:
     sanity_df.to_csv(sanity_path, index=False)
     log.info("wrote %s", sanity_path)
 
-    bundles_path = args.out_dir / "quantile_bundles.joblib"
-    joblib.dump(bundles, bundles_path)
-    log.info("wrote %s (%d bundles)", bundles_path, len(bundles))
+    if not bundles:
+        log.warning("no quantile bundles fit; skipping bundle publish")
+    elif args.no_publish_bundle:
+        log.info("skipping bundle publish (--no-publish-bundle)")
+    elif set(bundles) != set(PRIMARY_REGRESSION_TARGETS):
+        log.warning(
+            "partial calibration (%s); not publishing runtime bundle "
+            "(expected all of %s). Pass --no-publish-bundle to silence.",
+            sorted(bundles),
+            PRIMARY_REGRESSION_TARGETS,
+        )
+    else:
+        args.bundles_path.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(bundles, args.bundles_path)
+        log.info("published runtime bundle to %s (%d heads)", args.bundles_path, len(bundles))
 
     # ---- console summary --------------------------------------------------
     cov_all = pd.concat(coverage_frames, ignore_index=True)

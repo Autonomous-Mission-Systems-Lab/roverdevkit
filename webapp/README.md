@@ -116,7 +116,7 @@ extras on top of `python:3.12-slim` and bakes in:
 
 - the analytical Bekker-Wong mission evaluator,
 - the v9 quantile-XGB surrogate bundles
-  (`reports/surrogate_v9/quantile_bundles.joblib`),
+  (`models/surrogate_v9/quantile_bundles.joblib`),
 - the canonical Pareto fronts (`reports/pareto_fronts/`),
 - the built React frontend at `/app/static`.
 
@@ -140,7 +140,7 @@ finish in ~30 s for a code-only edit.
 
 ```bash
 # Build context must be the repo root so the Dockerfile can reach
-# pyproject.toml, roverdevkit/, data/, reports/, and webapp/.
+# pyproject.toml, roverdevkit/, data/, models/, reports/, and webapp/.
 docker build -f webapp/Dockerfile -t roverdevkit/webapp:dev .
 docker run --rm -p 8000:8000 roverdevkit/webapp:dev
 ```
@@ -168,7 +168,7 @@ through this checklist:
       HF Spaces, and most K8s pod-security policies require non-root.
 - [ ] If the deploy uses a persistent volume to mount alternate
       surrogate artefacts, point the volume at
-      `/app/reports/surrogate_v9/quantile_bundles.joblib` (or
+      `/app/models/surrogate_v9/quantile_bundles.joblib` (or
       override via `ROVERDEVKIT_QUANTILE_BUNDLES`); see
       `webapp/backend/config.py` for the full env-var surface.
 - [ ] (HF Spaces) drop a `Dockerfile` symlink or a one-line
@@ -181,7 +181,7 @@ through this checklist:
 (`data/analytical/`), the training-time reports, any superseded
 surrogate versions, and Node / Python build caches. Only the runtime
 artefacts the backend actually loads — the current surrogate bundle
-(`reports/surrogate_v9/quantile_bundles.joblib`) and the Pareto fronts
+(`models/surrogate_v9/quantile_bundles.joblib`) and the Pareto fronts
 — are baked into the image.
 
 ## Tests

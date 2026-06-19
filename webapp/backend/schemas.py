@@ -35,6 +35,20 @@ from roverdevkit.schema import DesignVector, MissionScenario
 # in-bounds override stays on the surrogate path with calibrated PIs.
 
 
+def _required_obstacle_field() -> Any:
+    return Field(
+        default=None,
+        ge=0.0,
+        le=0.30,
+        description=(
+            "Optional per-query override for "
+            "``MissionScenario.required_obstacle_height_m`` (minimum "
+            "traversable obstacle height, m). ``None`` uses the scenario "
+            "default (0 for smooth-regolith canonical scenarios)."
+        ),
+    )
+
+
 def _payload_mass_field() -> Any:
     return Field(
         default=None,
@@ -247,6 +261,13 @@ PrimaryTarget = Literal[
     "total_mass_kg",
 ]
 
+ArchitectureTarget = Literal[
+    "obstacle_capability_m",
+    "obstacle_margin_m",
+]
+
+OptimizeTarget = PrimaryTarget | ArchitectureTarget
+
 
 class FeatureRow(BaseModel):
     """The 27-D feature vector actually fed to the surrogate.
@@ -299,6 +320,7 @@ class PredictRequest(BaseModel):
     payload_mass_kg: float | None = _payload_mass_field()
     payload_power_w: float | None = _payload_power_field()
     mission_duration_earth_days: float | None = _mission_duration_field()
+    required_obstacle_height_m: float | None = _required_obstacle_field()
     repair_crossings: bool = Field(
         default=True,
         description=(
@@ -390,6 +412,7 @@ class EvaluateRequest(BaseModel):
     payload_mass_kg: float | None = _payload_mass_field()
     payload_power_w: float | None = _payload_power_field()
     mission_duration_earth_days: float | None = _mission_duration_field()
+    required_obstacle_height_m: float | None = _required_obstacle_field()
 
 
 class EvaluateMetric(BaseModel):
@@ -457,6 +480,19 @@ class StallDiagnosticOut(BaseModel):
     """``DesignVector.peak_wheel_torque_nm`` echoed back for context."""
 
 
+class ArchitectureDiagnosticOut(BaseModel):
+    """Architecture-proxy obstacle negotiation diagnostic."""
+
+    model_config = ConfigDict(frozen=True)
+
+    mobility_architecture: Literal["rigid_4wheel", "rocker_bogie_6wheel"]
+    obstacle_capability_m: float
+    required_obstacle_height_m: float
+    obstacle_margin_m: float
+    obstacle_requirement_met: bool
+    architecture_mass_kg: float
+
+
 class EvaluateResponse(BaseModel):
     """Deterministic evaluator output for the four primary regression targets.
 
@@ -472,6 +508,7 @@ class EvaluateResponse(BaseModel):
     metrics: list[EvaluateMetric]
     thermal: ThermalDiagnosticOut
     stall: StallDiagnosticOut
+    architecture: ArchitectureDiagnosticOut
     """Schema v6: replaces the v5 ``motor_torque`` field."""
     effective_duty_cycle: float
     """Schema v7: ``operational_duty_cycle`` (per-scenario default or
@@ -598,16 +635,16 @@ class OptimizeObjectiveIn(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    target: PrimaryTarget
+    target: OptimizeTarget
     direction: Literal["min", "max"]
 
 
 class OptimizeConstraintIn(BaseModel):
-    """Threshold constraint over a primary target."""
+    """Threshold constraint over an evaluator metric."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    target: PrimaryTarget
+    target: OptimizeTarget
     sense: Literal["min", "max"]
     value: float
 
@@ -650,6 +687,7 @@ class OptimizeRequest(BaseModel):
     payload_mass_kg: float | None = _payload_mass_field()
     payload_power_w: float | None = _payload_power_field()
     mission_duration_earth_days: float | None = _mission_duration_field()
+    required_obstacle_height_m: float | None = _required_obstacle_field()
 
 
 class OptimizeJobResponse(BaseModel):

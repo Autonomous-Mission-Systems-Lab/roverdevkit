@@ -78,6 +78,11 @@ from roverdevkit.mass.parametric_mers import (
     MassModelParams,
     estimate_mass_from_design,
 )
+from roverdevkit.architecture import (
+    obstacle_capability_m,
+    obstacle_margin_m,
+    obstacle_requirement_met,
+)
 from roverdevkit.mission.capability import max_climbable_slope_deg
 from roverdevkit.mission.traverse_sim import TraverseLog, run_traverse
 from roverdevkit.power.thermal import (
@@ -165,6 +170,7 @@ def evaluate_verbose(
     operational_duty_cycle: float | None = None,
     payload_mass_kg: float | None = None,
     payload_power_w: float | None = None,
+    required_obstacle_height_m: float | None = None,
     panel_tilt_deg: float = 0.0,
     panel_azimuth_deg: float = 180.0,
 ) -> DetailedEvaluation:
@@ -244,6 +250,11 @@ def evaluate_verbose(
     payload_power = (
         scenario.payload_power_w if payload_power_w is None else payload_power_w
     )
+    obstacle_required = (
+        scenario.required_obstacle_height_m
+        if required_obstacle_height_m is None
+        else required_obstacle_height_m
+    )
 
     breakdown: MassBreakdown = estimate_mass_from_design(
         design, params=mass_params, payload_mass_kg=payload_mass
@@ -318,6 +329,12 @@ def evaluate_verbose(
     if not math.isfinite(sinkage_max_m):
         sinkage_max_m = 0.0
 
+    obs_capability = obstacle_capability_m(
+        design.mobility_architecture, design.wheel_radius_m
+    )
+    obs_margin = obstacle_margin_m(obs_capability, obstacle_required)
+    obs_met = obstacle_requirement_met(obs_capability, obstacle_required)
+
     metrics = MissionMetrics(
         range_km=range_km,
         energy_margin_pct=energy_margin_pct,
@@ -326,8 +343,12 @@ def evaluate_verbose(
         total_mass_kg=total_mass_kg,
         peak_motor_torque_nm=peak_torque_nm,
         sinkage_max_m=sinkage_max_m,
+        obstacle_capability_m=obs_capability,
+        obstacle_margin_m=obs_margin,
+        architecture_mass_kg=breakdown.architecture_kg,
         thermal_survival=thermal_ok,
         stalled=stalled,
+        obstacle_requirement_met=obs_met,
     )
     return DetailedEvaluation(
         metrics=metrics, log=log, mass=breakdown, thermal=thermal_result
@@ -345,6 +366,7 @@ def evaluate(
     operational_duty_cycle: float | None = None,
     payload_mass_kg: float | None = None,
     payload_power_w: float | None = None,
+    required_obstacle_height_m: float | None = None,
     panel_tilt_deg: float = 0.0,
     panel_azimuth_deg: float = 180.0,
 ) -> MissionMetrics:
@@ -366,6 +388,7 @@ def evaluate(
         operational_duty_cycle=operational_duty_cycle,
         payload_mass_kg=payload_mass_kg,
         payload_power_w=payload_power_w,
+        required_obstacle_height_m=required_obstacle_height_m,
         panel_tilt_deg=panel_tilt_deg,
         panel_azimuth_deg=panel_azimuth_deg,
     ).metrics

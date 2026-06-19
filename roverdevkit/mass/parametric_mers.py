@@ -62,6 +62,11 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+from roverdevkit.architecture import (
+    ArchitectureParams,
+    MobilityArchitecture,
+    architecture_suspension_mass_kg,
+)
 from roverdevkit.schema import DesignVector
 
 # ---------------------------------------------------------------------------
@@ -171,6 +176,12 @@ class MassModelParams:
     AIAA S-120A-2015 recommends 20 % at PDR maturity, dropping toward
     launch. Tradespace-level work uses the PDR number."""
 
+    rocker_bogie_fixed_mass_kg: float = 0.5
+    """Fixed rocker-bogie linkage / differential mass, kg."""
+
+    rocker_bogie_chassis_fraction: float = 0.08
+    """Additional rocker-bogie suspension mass as a fraction of chassis mass."""
+
     # -- Environment -------------------------------------------------------
     gravity_moon_m_per_s2: float = 1.625
     """Surface gravity at the lunar equator, m/s^2."""
@@ -194,6 +205,7 @@ class MassBreakdown:
     harness_kg: float
     thermal_kg: float
     margin_kg: float
+    architecture_kg: float = 0.0
     payload_kg: float = 0.0
     """Scientific-payload mass, kg (schema v9).
 
@@ -222,6 +234,7 @@ class MassBreakdown:
             + self.harness_kg
             + self.thermal_kg
             + self.margin_kg
+            + self.architecture_kg
             + self.payload_kg
         )
 
@@ -334,6 +347,7 @@ def estimate_mass(
     grouser_height_m: float = 0.0,
     grouser_count: int = 0,
     payload_mass_kg: float = 0.0,
+    mobility_architecture: MobilityArchitecture = "rigid_4wheel",
     params: MassModelParams | None = None,
 ) -> MassBreakdown:
     """Assemble a bottom-up subsystem mass breakdown for a rover design.
@@ -400,6 +414,15 @@ def estimate_mass(
     m_motors = _motors_mass(n_wheels, peak_wheel_torque_nm, params)
 
     m_subsystems = m_chassis + m_wheels + m_motors + m_solar + m_battery + m_avionics
+    m_architecture = architecture_suspension_mass_kg(
+        mobility_architecture,
+        m_chassis,
+        params=ArchitectureParams(
+            rocker_bogie_fixed_mass_kg=params.rocker_bogie_fixed_mass_kg,
+            rocker_bogie_chassis_fraction=params.rocker_bogie_chassis_fraction,
+        ),
+    )
+    m_subsystems += m_architecture
     m_harness = params.harness_fraction * m_subsystems
     m_thermal = params.thermal_fraction * (m_subsystems + m_harness)
     m_dry = m_subsystems + m_harness + m_thermal
@@ -415,6 +438,7 @@ def estimate_mass(
         harness_kg=m_harness,
         thermal_kg=m_thermal,
         margin_kg=m_margin,
+        architecture_kg=m_architecture,
         payload_kg=payload_mass_kg,
         n_iterations=1,
     )
@@ -445,5 +469,6 @@ def estimate_mass_from_design(
         grouser_height_m=design.grouser_height_m,
         grouser_count=design.grouser_count,
         payload_mass_kg=payload_mass_kg,
+        mobility_architecture=design.mobility_architecture,
         params=params,
     )

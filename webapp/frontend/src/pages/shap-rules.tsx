@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useShapExplain } from "@/hooks/use-shap";
+import { formatFeatureLabel } from "@/lib/feature-labels";
 import { useDesignStore } from "@/store/design-store";
 import type { PrimaryTarget, ShapFeatureScore } from "@/types/api";
 import { PRIMARY_REGRESSION_TARGET_ORDER, TARGET_META } from "@/types/api";
@@ -137,7 +138,7 @@ function FeatureBars({
           return (
             <div key={row.feature} className="space-y-1">
               <div className="flex justify-between gap-3 text-xs">
-                <span className="truncate">{prettifyFeature(row.feature)}</span>
+                <span className="truncate">{formatFeatureLabel(row.feature)}</span>
                 <span className="font-mono">{row.value.toPrecision(3)}</span>
               </div>
               <div className="h-2 rounded-full bg-[var(--color-muted)]">
@@ -170,11 +171,4 @@ function formatTarget(target: PrimaryTarget, value: number): string {
   const unit = TARGET_META[target].unit;
   const digits = Math.abs(value) >= 100 ? 1 : 2;
   return `${value.toFixed(digits)} ${unit}`.trim();
-}
-
-function prettifyFeature(feature: string): string {
-  return feature
-    .replace(/^design_/, "")
-    .replace(/^scenario_/, "")
-    .replace(/_/g, " ");
 }

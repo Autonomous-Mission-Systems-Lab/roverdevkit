@@ -1,6 +1,6 @@
 """Render the terramechanics validation figure (Fig. 8).
 
-Reproduces ``reports/figures/fig_terramechanics_experiment.png``: the analytical
+Reproduces ``paper/figures/fig_terramechanics_experiment.png``: the analytical
 Bekker-Wong physics layer evaluated against measured single-wheel drawbar pull
 and sinkage from three independent sources (Ding 2011, Wang & Han 2016 KLS-1,
 Hurrell 2025 Rashid-1), smooth and grousered. Data and BW predictions come from
@@ -48,7 +48,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--out",
         type=Path,
-        default=Path("reports/figures/fig_terramechanics_experiment.png"),
+        default=Path("paper/figures/fig_terramechanics_experiment.png"),
     )
     return p.parse_args(argv)
 

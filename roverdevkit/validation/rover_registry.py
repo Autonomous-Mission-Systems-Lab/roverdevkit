@@ -298,6 +298,7 @@ def _pragyan_entry() -> RoverRegistryEntry:
         grouser_height_m=0.008,
         grouser_count=12,
         n_wheels=6,
+        mobility_architecture="rocker_bogie_6wheel",
         chassis_mass_kg=10.0,
         wheelbase_m=0.5,
         solar_area_m2=0.5,
@@ -363,6 +364,7 @@ def _yutu2_entry() -> RoverRegistryEntry:
         grouser_height_m=0.012,
         grouser_count=18,
         n_wheels=6,
+        mobility_architecture="rocker_bogie_6wheel",
         chassis_mass_kg=35.0,  # published chassis ex-payload
         wheelbase_m=1.0,
         solar_area_m2=1.3,

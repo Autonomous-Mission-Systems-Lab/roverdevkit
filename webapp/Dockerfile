@@ -8,14 +8,14 @@
 #
 # Build context expectation: this file is invoked from the repo
 # root so it can reach `pyproject.toml`, `roverdevkit/`, `data/`,
-# `reports/`, and `webapp/` in one COPY plane:
+# `models/`, `reports/`, and `webapp/` in one COPY plane:
 #
 #     docker build -f webapp/Dockerfile -t roverdevkit/webapp:dev .
 #
 # The image bakes in:
 #  - the analytical Bekker-Wong mission evaluator,
 #  - the v9 quantile-XGB surrogate bundles
-#    (`reports/surrogate_v9/quantile_bundles.joblib`),
+#    (`models/surrogate_v9/quantile_bundles.joblib`),
 #  - the canonical Pareto fronts (`reports/pareto_fronts/`),
 #  - the built React frontend (`/app/static/`).
 
@@ -66,6 +66,7 @@ RUN pip install --no-cache-dir ".[webapp]"
 # Webapp backend + on-disk artifacts.
 COPY webapp/backend/ ./webapp/backend/
 COPY data/ ./data/
+COPY models/ ./models/
 COPY reports/ ./reports/
 
 # Built frontend bundle from stage 1 → mounted at /app/static via

@@ -33,7 +33,10 @@ def test_parameters_are_physically_plausible() -> None:
     for name in list_soil_simulants():
         params = get_soil_parameters(name)
         assert 0.5 <= params.n <= 1.5, f"{name}: sinkage exponent out of range"
-        assert params.k_c >= 0.0
+        # KLS-1 carries a negative k_c from a Wong 1980 least-squares fit;
+        # the catalogue notes k_eff = k_c/b + k_phi stays positive at wheel widths.
+        if name != "KLS-1":
+            assert params.k_c >= 0.0
         assert params.k_phi > 0.0
         assert params.cohesion_kpa >= 0.0
         assert 25.0 <= params.friction_angle_deg <= 55.0

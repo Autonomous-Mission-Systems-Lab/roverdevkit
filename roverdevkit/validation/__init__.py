@@ -5,7 +5,7 @@
 - :mod:`.rover_comparison`  — run the evaluator on the registry and score
   vs truth (real-rover validation, Layer 4).
 - :mod:`.rover_rediscovery` — the headline validation (Layer 5, rediscovery-validation).
-- :mod:`.rediscovery_report` — LOO orchestration + report writer on
+- :mod:`.rediscovery_report` — rediscovery orchestration + report writer on
   top of :mod:`.rover_rediscovery` (Layer 5, paper-figure pipeline).
 
 Layer-3 sub-model validation against published wheel-testbed data has two

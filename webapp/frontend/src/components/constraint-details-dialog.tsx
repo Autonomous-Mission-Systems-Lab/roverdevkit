@@ -81,7 +81,7 @@ function ThermalBody({
       ok: thermal.hot_case_ok,
       direction: "above",
       description:
-        "Steady-state interior temperature with the sun at its peak elevation for the scenario latitude and avionics drawing nominal operating power.",
+        "Steady-state interior temperature with the sun at its peak elevation for the scenario latitude, avionics and payload drawing nominal operating power, and any RHU dissipation.",
     },
     {
       label: "Cold case · lunar night",
@@ -163,9 +163,9 @@ function ThermalBody({
           </span>{" "}
           Closed-form Stefan&ndash;Boltzmann balance:{" "}
           <code>T = (T_sink⁴ + Q_in / (ε σ A))^(1/4)</code>. The hot case uses
-          absorbed solar power plus avionics; the cold case uses hibernation
-          power plus any RHU. Sink temperature is 250 K hot, 100 K cold; ε =
-          0.85, α = 0.3, sunlit-area fraction 0.25.
+          absorbed solar power plus avionics and payload dissipation; the cold
+          case uses hibernation power plus any RHU. Sink temperature is 250 K
+          hot, 100 K cold; ε = 0.85, α = 0.3, sunlit-area fraction 0.25.
         </p>
         <p>
           <span className="font-medium text-[var(--color-foreground)]">
@@ -196,8 +196,8 @@ function ThermalBody({
             <span className="font-medium text-[var(--color-foreground)]">
               Why this design fails the hot case.
             </span>{" "}
-            Peak-sun absorbed power plus avionics dissipation drives the
-            enclosure to ~{fmt1(thermal.peak_sun_temp_c)} °C — above the{" "}
+            Peak-sun absorbed power plus avionics and payload dissipation drives
+            the enclosure to ~{fmt1(thermal.peak_sun_temp_c)} °C — above the{" "}
             {fmt1(thermal.max_operating_temp_c)} °C operating ceiling. Reducing
             avionics power, lowering solar absorptivity, or adding radiator area
             would bring the hot case down.

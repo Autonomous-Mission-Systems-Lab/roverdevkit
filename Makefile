@@ -13,12 +13,13 @@
 #   make webapp-test     → backend pytest + frontend lint + frontend build
 #   make webapp-build    → frontend production build only
 #   make pareto-fronts   → (re)generate canonical Pareto fronts under reports/
-#   make figures         → (re)render every manuscript figure under reports/figures/
+#   make figures         → (re)render every manuscript figure under paper/figures/
+#   make optimizer-robustness → run multi-seed NSGA-II robustness sweep
 #
 # Override ports with `UVICORN_PORT=8001 make webapp-backend`.
 # Override the conda env used by python targets with `CONDA_ENV=other`.
 
-.PHONY: webapp-dev webapp-backend webapp-frontend webapp-test webapp-build pareto-fronts figures
+.PHONY: webapp-dev webapp-backend webapp-frontend webapp-test webapp-build pareto-fronts optimizer-robustness architecture-crossover figures
 
 UVICORN_PORT ?= 8000
 VITE_PORT ?= 5173
@@ -58,13 +59,22 @@ webapp-build:
 pareto-fronts:
 	conda run -n $(CONDA_ENV) --no-capture-output python scripts/generate_pareto_fronts.py $(SCRIPT_ARGS)
 
+optimizer-robustness:
+	conda run -n $(CONDA_ENV) --no-capture-output python scripts/run_optimizer_robustness.py $(SCRIPT_ARGS)
+
+architecture-crossover:
+	conda run -n $(CONDA_ENV) --no-capture-output python scripts/run_architecture_obstacle_crossover.py $(SCRIPT_ARGS)
+
 # Re-render every manuscript figure from the committed artifacts under
-# reports/. Each figure has a dedicated scripts/make_*_figure.py regenerator
-# (no notebook), so this target is the single one-command rebuild of all
-# paper figures. Run `make pareto-fronts` first if the fronts changed.
+# reports/ into paper/figures/ (the directory main.tex reads). Each figure
+# has a dedicated scripts/make_*_figure.py regenerator (no notebook), so this
+# target is the single one-command rebuild of all paper figures. Run
+# `make pareto-fronts` first if the fronts changed.
 figures:
 	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_pareto_fronts_figure.py
 	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_rediscovery_distance_figure.py
 	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_rediscovery_overlay_figure.py
 	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_peak_solar_figure.py
 	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_terramechanics_experiment_figure.py
+	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_terramechanics_sensitivity_figure.py
+	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_architecture_obstacle_crossover_figure.py

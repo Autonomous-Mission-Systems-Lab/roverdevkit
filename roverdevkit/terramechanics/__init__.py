@@ -12,6 +12,7 @@ from roverdevkit.terramechanics.bekker_wong import (
     WheelForces,
     WheelGeometry,
     single_wheel_forces,
+    traction_perturbation,
 )
 from roverdevkit.terramechanics.soils import (
     SoilSimulantRecord,
@@ -29,4 +30,5 @@ __all__ = [
     "list_soil_simulants",
     "load_soil_catalogue",
     "single_wheel_forces",
+    "traction_perturbation",
 ]
