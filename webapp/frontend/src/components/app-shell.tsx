@@ -21,10 +21,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
             <h1 className="text-lg font-semibold tracking-tight">
-              RoverDevKit | Tradespace Explorer
+              RoverDevKit
             </h1>
             <p className="text-xs text-[var(--color-muted-foreground)]">
-              Interactive design tradespace explorer for lunar micro-rovers.
+              Interactive design-space explorer for lunar micro-rovers.
             </p>
           </div>
         </div>
