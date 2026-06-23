@@ -102,6 +102,10 @@ models/surrogate_v9/*
 logs/
 *.log
 
+# Hugging Face Space deploy mirror (local clone of the Space repo,
+# rebuilt on each `make deploy-space`).
+.hf-space/
+
 # Project-specific scratch
 scratch/
 tmp/

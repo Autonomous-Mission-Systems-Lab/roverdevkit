@@ -15,11 +15,12 @@
 #   make pareto-fronts   → (re)generate canonical Pareto fronts under reports/
 #   make figures         → (re)render every manuscript figure under paper/figures/
 #   make optimizer-robustness → run multi-seed NSGA-II robustness sweep
+#   make deploy-space    → push current HEAD to the Hugging Face Space (manual)
 #
 # Override ports with `UVICORN_PORT=8001 make webapp-backend`.
 # Override the conda env used by python targets with `CONDA_ENV=other`.
 
-.PHONY: webapp-dev webapp-backend webapp-frontend webapp-test webapp-build pareto-fronts optimizer-robustness architecture-crossover figures
+.PHONY: webapp-dev webapp-backend webapp-frontend webapp-test webapp-build pareto-fronts optimizer-robustness architecture-crossover figures deploy-space
 
 UVICORN_PORT ?= 8000
 VITE_PORT ?= 5173
@@ -78,3 +79,11 @@ figures:
 	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_terramechanics_experiment_figure.py
 	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_terramechanics_sensitivity_figure.py
 	conda run -n $(CONDA_ENV) --no-capture-output python scripts/make_architecture_obstacle_crossover_figure.py
+
+# Manually deploy the webapp to the dedicated Hugging Face Space (Docker
+# SDK). Pushes the current committed HEAD; it does NOT run on git push.
+# Requires HF_SPACE_REMOTE to point at the Space git URL and git-lfs to
+# be installed (the ~26 MB surrogate bundle exceeds HF's plain-git limit).
+# See scripts/deploy_hf_space.sh for the full contract.
+deploy-space:
+	bash scripts/deploy_hf_space.sh

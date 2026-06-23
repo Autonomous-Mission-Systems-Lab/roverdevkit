@@ -231,21 +231,9 @@ regenerates the figures into `paper/figures/`.
 
 ## Research Background
 
-RoverDevKit is developed by the Autonomous Mission Systems Lab at Duke University.
+RoverDevKit is developed and maintained by the Autonomous Mission Systems Lab at Duke University.
 The project focuses on open, reproducible design-space exploration for lunar
 micro-rovers in the pre-Phase A / conceptual-design regime.
-
-## Use of AI Tools
-
-Portions of this repository's code and documentation were developed with the
-assistance of an AI coding tool — Anthropic's Claude (Opus 4.8) via the Cursor
-IDE — for code generation, refactoring, and documentation drafting. All
-AI-assisted contributions were reviewed, tested, and validated by the authors,
-who take full responsibility for the correctness of the physics models,
-methods, results, and claims presented here. This disclosure is provided in the
-interest of research transparency and reproducibility.
-
-## Citation
 
 If you use RoverDevKit in your research, please cite the preprint:
 <https://arxiv.org/abs/2606.21755>.
@@ -260,6 +248,14 @@ If you use RoverDevKit in your research, please cite the preprint:
   primaryClass={cs.RO}
 }
 ```
+
+Portions of this repository's code and documentation were developed with the
+assistance of an AI coding tool — Anthropic's Claude (Opus 4.8) via the Cursor
+IDE — for code generation, refactoring, and documentation drafting. All
+AI-assisted contributions were reviewed, tested, and validated by the authors,
+who take full responsibility for the correctness of the
+methods and results presented here. This disclosure is provided in the
+interest of research transparency and reproducibility.
 
 ## License
 
