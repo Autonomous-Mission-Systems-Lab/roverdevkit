@@ -2,12 +2,14 @@
 
 **Design-space exploration for lunar micro-rovers.**
 
+[![arXiv](https://img.shields.io/badge/arXiv-2606.21755-b31b1b.svg)](https://arxiv.org/abs/2606.21755)
+
 RoverDevKit is an open-source research toolkit for early-stage lunar
 micro-rover design. It combines a physics-based mission evaluator,
 calibrated surrogate models, and an
 interactive web app for exploring mobility, power, mass, and mission tradeoffs.
 
-The tool is aimed at conceptual design questions such as:
+The tool is aimed at supporting conceptual design questions such as:
 
 - How do wheel geometry, solar area, battery capacity, drivetrain torque, and
   chassis mass trade against each other for a given lunar mission, given a fixed
@@ -19,6 +21,8 @@ The tool is aimed at conceptual design questions such as:
 - How do candidate designs compare with historical and published lunar micro-rover designs?
 
 ## What RoverDevKit Provides
+
+![RoverDevKit system architecture](fig_system_architecture.png)
 
 - **Mission evaluator:** deterministic end-to-end evaluation of a rover design
   in a lunar mission scenario, returning range, energy margin, slope capability,
@@ -243,7 +247,19 @@ interest of research transparency and reproducibility.
 
 ## Citation
 
-A paper is in preparation. Citation information will be added on submission.
+If you use RoverDevKit in your research, please cite the preprint:
+<https://arxiv.org/abs/2606.21755>.
+
+```bibtex
+@article{reifschneider2026roverdevkit,
+  title={RoverDevKit: An open, physics-grounded tradespace toolkit for conceptual design of lunar micro-rovers},
+  author={Reifschneider, Jon},
+  year={2026},
+  eprint={2606.21755},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO}
+}
+```
 
 ## License
 
