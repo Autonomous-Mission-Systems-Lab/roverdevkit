@@ -3,6 +3,7 @@
 **Design-space exploration for lunar micro-rovers.**
 
 [![arXiv](https://img.shields.io/badge/arXiv-2606.21755-b31b1b.svg)](https://arxiv.org/abs/2606.21755)
+[![Open in HF Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/open-in-hf-spaces-md.svg)](https://huggingface.co/spaces/jjreif/roverdevkit)
 
 RoverDevKit is an open-source research toolkit for early-stage lunar
 micro-rover design. It combines a physics-based mission evaluator,
